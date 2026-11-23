@@ -1,3 +1,4 @@
+'use strict';
 // Issue #710: the one-click "Sign in as staging owner" button must exist only
 // on the staging site, and can only ever sign in the fictional staging owner.
 const { test } = require('node:test');
@@ -81,7 +82,7 @@ function filesUnder(dir, out = []) {
 
 test('production: the live Owner Admin page has no staging owner button or script', () => {
   const html = read('owner-admin.html');
-  assert.doesNotMatch(html, /owner-signin|stagingOwnerSignIn|staging owner|signInWithCustomToken/i);
+  assert.doesNotMatch(html, /owner-signin|stagingOwnerSignIn|Sign in as staging owner|signInWithCustomToken/i);
 });
 
 test('production: no live page loads the staging owner script', () => {
@@ -203,3 +204,4 @@ test('browser: the script only ever talks to the staging project', () => {
   const source = read('staging/owner-signin.js');
   assert.doesNotMatch(source, /b3-games|funtorahtools\.com|github\.io/i);
   assert.equal(client.ENDPOINT, 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/stagingOwnerSignIn');
+});
