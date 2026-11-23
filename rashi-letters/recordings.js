@@ -48,7 +48,6 @@
     return user.getIdToken();
   }
   async function loadStatus(force){
-    if(STAGING())return {};
     if(cfg.isPreview())return {};
     if(dailyDate&&dailyDate!==todayNY()){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';}
     if(!force&&statusMap&&Date.now()-statusAt<STATUS_CACHE_MS)return statusMap;
@@ -88,21 +87,82 @@
     +'.rr-big{font-size:24px!important;padding:16px 28px!important;min-width:min(100%,320px)}.rr-rec{background:#d93b3b!important}'
     +'.rr-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:10px 0}.rr-timer{font-size:30px;font-weight:900;color:#d93b3b}'
     +'.rr-msg{min-height:1.4em;font-weight:700;margin:6px 0}.rr-err{color:#a12b2b}.rr-note{color:#536180;font-size:14px;font-weight:700}'
+    +'.rr-review{margin:14px 0;text-align:center}.rr-review h3{margin:10px 0 6px}.rr-miss{background:#ffd0d0;color:#b00020;font-weight:900;border-radius:6px;text-decoration:underline wavy #b00020;text-underline-offset:5px}'
+    +'.rr-parts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0}.rr-part{border-radius:12px;padding:6px 12px;font-weight:800;font-size:15px}.rr-part-ok{background:#dcf5e5;color:#176447}.rr-part-bad{background:#ffe1e1;color:#a12b2b}'
+    +'.rr-legend{color:#536180;font-size:14px;font-weight:700}.rr-letters{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px;margin:8px 0}'
+    +".rr-ltr{background:#fff;border:2px solid #e1dcfb;border-radius:12px;padding:6px 4px}.rr-ltr b{display:block;font-family:'Mekorot Rashi',serif;font-size:30px;line-height:1.2}.rr-ltr span{font-size:13px;font-weight:800}.rr-ltr-bad{background:#ffe8e8;border-color:#e08b8b;color:#a12b2b}.rr-ltr-ok{color:#176447}"
     +'.rr-pulse{animation:rrpulse 1s infinite}@keyframes rrpulse{50%{opacity:.55}}'
     +'.rr-chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800}'
     +'.rr-menu-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#fff;border:2px solid #e1dcfb;border-radius:14px;padding:8px 12px;margin:8px 0}'
     +'.rr-passage{font-family:"Mekorot Rashi",serif;font-size:30px;line-height:1.85;display:block;width:100%;white-space:pre-wrap;text-align:right;padding:16px 20px;background:white;border-radius:18px;border:2px solid #c9bff5}'
     +'.rr-vayeira-title{font-size:24px;font-weight:800;margin:10px 0}.rr-vayeira-select{font-size:18px;min-height:44px;padding:8px;border-radius:9px}';
   function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+  // The teacher's marks: the Rashi text with the letters marked "not recognized" in red, the points and which parts were perfect.
+  function reviewBlock(review,passage){
+    const LM=root.B3RashiLetterMarks,box=el('div','rr-review');
+    if(!review||!LM)return null;
+    const missed=new Set(review.missed||[]);
+    const text=el('div',passage?'rr-words':'rr-words');text.setAttribute('dir','rtl');text.setAttribute('lang','he');
+    let offset=0;
+    const wordBox=passage?el('span','rr-passage'):null;
+    for(const w of review.words||[]){
+      const tk=LM.tokenize(w),holder=passage?wordBox:el('span','rr-word');
+      if(passage&&holder.childNodes.length)holder.append(' ');
+      tk.words.forEach((word,wi)=>{
+        if(wi)holder.append(' ');
+        for(const p of word){
+          if(!p.letter){holder.append(p.text);continue;}
+          if(missed.has(p.i+offset)){const m=el('span','rr-miss',p.text);m.title='Not read right';holder.append(m);}else holder.append(p.text);
+        }
+      });
+      offset+=tk.total;
+      if(!passage)text.append(holder);
+    }
+    if(passage)text.append(wordBox);
+    const parts=el('div','rr-parts');
+    (review.partsClean||[]).forEach((ok,k)=>parts.append(el('span','rr-part '+(ok?'rr-part-ok':'rr-part-bad'),'Part '+(k+1)+(ok?' ✅ perfect':' ❌ a letter was missed'))));
+    box.append(el('h3',null,'You earned '+review.points+' of 5 points'),parts,text,
+      el('p','rr-legend',review.missed&&review.missed.length?"Letters in red: you didn't read these right.":'You read every letter right. Great reading!'));
+    return box;
+  }
+  let letterScores=null,letterScoresAt=0,letterScoresPromise=null;
+  async function loadLetterScores(){
+    if(cfg.isPreview())return null;
+    if(letterScoresPromise)return letterScoresPromise;
+    if(letterScores&&Date.now()-letterScoresAt<STATUS_CACHE_MS)return letterScores;
+    letterScoresPromise=(async()=>{
+      try{
+        const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+await idToken()},body:JSON.stringify({action:'rashi-student-letters'})});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok)throw new Error(data.error||'Could not load your letter scores.');
+        letterScores=data;letterScoresAt=Date.now();
+      }catch(err){console.warn('Rashi letter scores unavailable',err);letterScores=null;}
+      finally{letterScoresPromise=null;}
+      return letterScores;
+    })();
+    return letterScoresPromise;
+  }
+  function lettersBlock(data){
+    const LM=root.B3RashiLetterMarks;
+    if(!data||!LM||!data.readings)return null;
+    const box=el('div','rr-review');
+    const rows=LM.LETTER_KEYS.map(k=>({k,row:data.letters&&data.letters[k],pct:LM.letterPct(data.letters&&data.letters[k])})).filter(r=>r.pct!=null);
+    const need=rows.filter(r=>r.pct<100).sort((a,b)=>a.pct-b.pct);
+    box.append(el('h3',null,'📊 My letters'),el('p','rr-legend',need.length?'Letters to practice (from '+data.readings+' graded reading'+(data.readings===1?'':'s')+')':'You read every letter right in your '+data.readings+' graded reading'+(data.readings===1?'':'s')+'. Amazing!'));
+    const grid=el('div','rr-letters');
+    (need.length?need:rows).forEach(r=>{const t=el('div','rr-ltr '+(r.pct<100?'rr-ltr-bad':'rr-ltr-ok'));t.append(el('b',null,r.k),el('span',null,r.pct+'% ('+(r.row.seen-r.row.missed)+'/'+r.row.seen+')'));grid.append(t);});
+    box.append(grid);
+    return box;
+  }
   function ensureScreen(){
     if(ui)return ui;
     const style=document.createElement('style');style.textContent=CSS;document.head.appendChild(style);
     const card=el('div','card');card.id='recordScreen';card.style.display='none';
     ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),quota:el('p','rr-note'),words:el('div','rr-words'),banner:el('div','rr-banner'),
-      timer:el('div','rr-timer hidden'),controls:el('div','rr-row'),msg:el('div','rr-msg'),audio:null,
+      review:el('div'),letters:el('div'),timer:el('div','rr-timer hidden'),controls:el('div','rr-row'),msg:el('div','rr-msg'),audio:null,
       note:el('p','rr-note','Sending costs '+POINTS+' points. After your teacher listens you earn up to 5 points: 1 for each fifth of the reading with every letter read right.'),footer:el('div','rr-row')};
     ui.words.setAttribute('dir','rtl');ui.words.setAttribute('lang','he');ui.msg.setAttribute('role','status');ui.msg.setAttribute('aria-live','polite');
-    card.append(ui.title,ui.sub,ui.quota,ui.words,ui.banner,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
+    card.append(ui.title,ui.sub,ui.quota,ui.words,ui.banner,ui.review,ui.letters,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
     const anchor=document.getElementById('closedScreen');
     (anchor&&anchor.parentNode?anchor.parentNode:document.body).insertBefore(card,anchor||null);
     return ui;
@@ -124,6 +184,11 @@
     const result=statusMap?.[s.id];
     if(result&&result.grade!=null&&status==='approved')u.banner.textContent+=' · Grade: '+result.grade+'/100';
     if(result?.feedback)u.banner.textContent+=' · Teacher feedback: '+result.feedback;
+    const passage=s.id.startsWith('vayeira-'),block=(status==='approved'||status==='rerecord')?reviewBlock(result&&result.review,passage):null;
+    u.review.replaceChildren(...(block?[block]:[]));
+    u.words.style.display=block?'none':'';
+    u.letters.replaceChildren();
+    if(block)loadLetterScores().then(data=>{if(session===s&&u.review.contains(block)){const lb=lettersBlock(data);u.letters.replaceChildren(...(lb?[lb]:[]));}});
     u.controls.replaceChildren();u.footer.replaceChildren();
     u.timer.classList.toggle('hidden',s.state!=='recording');
     u.note.classList.toggle('hidden',status==='approved');
@@ -245,7 +310,11 @@
     const map=cfg.isPreview()?{}:await loadStatus(false);
     rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const e=map[r.sec.id],st=e&&e.canRerecord&&e.status==='approved'?'rerecord':(e&&e.status)||'none',b=bannerFor(st,e);
       r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
-      if(st==='pending'||st==='approved')r.go.textContent='View';else if(st==='rerecord')r.go.textContent='🔁 Record again';});
+      if(st==='pending'||st==='approved')r.go.textContent='View';else if(st==='rerecord')r.go.textContent='🔁 Record again';
+      // A graded reading can always be opened to see the teacher's marks, even when today's 3 readings are used up.
+      if(e&&e.review&&(st==='approved'||st==='rerecord')&&r.go.textContent!=='View'){
+        const see=button('👀 See my marks','gold',()=>open(r.sec,()=>openHub(sections),()=>openHub(sections)));r.go.before(see);}
+    });
   }
   
   // A standalone passage browser. Each source Rashi has its own record ID and status.
@@ -291,6 +360,6 @@
 
   function hideHub(){if(hub)hub.style.display='none';}
   function init(options){cfg=Object.assign(cfg,options||{});}
-  function reset(){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';}
+  function reset(){statusMap=null;statusAt=0;dailyCount=0;dailyDate='';letterScores=null;}
   return {init,open,offer,openHub,openVayeiraHub,hideHub,loadStatus,reset,canRecord,bannerFor,formatTime,POINTS,MAX_MS,MIN_MS};
 });

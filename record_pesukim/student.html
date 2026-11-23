@@ -9,6 +9,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
+<script src="posuk-word-marks-core.js?v=20261122-student"></script>
 <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="posuk-practice-scroll"></script>
 <script>
 /* חידון (quiz) mode. The AI comprehension questions (tap the Hebrew words)
@@ -646,6 +647,8 @@
     .nav-arrow:hover, .nav-arrow:focus, .nav-arrow:active{ opacity: 1; }
     #prevPosukBtn{ left: 8px; right:auto; }
     #nextPosukBtn{ right: 8px; left:auto; }
+    /* The sticky posuk box stops below the arrow row (10px + 40px) so the arrows never sit on top of the text. */
+    .scroll{ top: 58px; }
   }
   .nav-arrow:disabled{
     opacity: 0.4;
@@ -1249,6 +1252,15 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
   .combined-history h4{ margin:0 0 6px; font-size:.95rem; }
   .combined-history-row{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:8px 10px; border-radius:10px; background:#faf6ec; margin-bottom:6px; font-size:.86rem; }
   .combined-history-row audio{ height:32px; max-width:100%; }
+  .combined-marks{ flex:1 1 100%; background:#fff; border:2px solid #eadfc2; border-radius:10px; padding:6px 10px; }
+  .combined-marks summary{ cursor:pointer; font-weight:800; }
+  .combined-marks .pm-text{ direction:rtl; font-size:1.5rem; line-height:2.1; margin:6px 0; }
+  .combined-marks .pm-w{ padding:1px 5px; border-radius:7px; margin:0 1px; }
+  .combined-marks .pm-read{ background:#ffd0d0; color:#b00020; font-weight:800; }
+  .combined-marks .pm-tr{ background:#ffe2b8; color:#8a4b00; font-weight:800; }
+  .combined-marks .pm-both{ background:#ffd0d0; color:#b00020; font-weight:800; box-shadow:0 3px 0 #f59e0b; }
+  .combined-marks .pm-legend{ font-size:.82rem; font-weight:700; color:#5b5b5b; }
+  .combined-marks .pm-legend .pm-w{ margin-left:6px; }
   .bonus-notice{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:10px 0; padding:12px 14px; border-radius:14px; background:#fff7dc; border:2px solid var(--gold); font-weight:800; }
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
@@ -6886,6 +6898,24 @@ function combinedScoreOf(s){
   if(Number.isFinite(Number(s.score)) && s.score != null) return Number(s.score);
   return s.status === 'gold' ? Math.max(0, 10 - (Number(s.mistakes) || 0)) : 0;
 }
+// The teacher's word marks: words read wrong in red, words translated wrong in orange. Always the current marks.
+function combinedMarksHtml(x, open){
+  const WM = window.B3PosukWordMarks, rev = x && x.wordReview;
+  if(!WM || !rev || x.status === 'pending' || !x.hebrewText) return '';
+  const words = WM.splitWords(x.hebrewText);
+  if(!words.length || rev.total !== words.length || !(rev.words || []).every((w, n) => w && w.w === words[n])) return '';
+  const wrong = WM.wrongSets(rev);
+  const html = words.map((w, i) => {
+    const r = wrong.read.has(i), t = wrong.translation.has(i);
+    return '<span class="pm-w' + (r && t ? ' pm-both' : r ? ' pm-read' : t ? ' pm-tr' : '') + '"' +
+      (r || t ? ' title="' + (r ? 'Read wrong' : '') + (r && t ? ' + ' : '') + (t ? 'Translated wrong' : '') + '"' : '') + '>' + combinedEscape(w) + '</span>';
+  }).join(' ');
+  const none = !wrong.read.size && !wrong.translation.size;
+  return '<details class="combined-marks"' + (open ? ' open' : '') + '><summary>🔍 See my marks · Grade ' + combinedScoreOf(x) + '/10</summary>' +
+    '<div class="pm-text" lang="he">' + html + '</div>' +
+    '<div class="pm-legend">' + (none ? 'Every word was right. Great job!' :
+      '<span class="pm-w pm-read">Read wrong</span><span class="pm-w pm-tr">Translated wrong</span><span class="pm-w pm-both">Both</span>') + '</div></details>';
+}
 function combinedStatusLabel(s){
   if(s.status === 'pending') return '⏳ Waiting for your teacher';
   const pts = Number(s.pointsAwarded) || 0;
@@ -6945,12 +6975,14 @@ async function loadCombinedState(keepMessage){
   }
   if(box.className.indexOf('hidden') < 0) box.classList.remove('hidden');
   if(mine.length){
-    hist.innerHTML = '<h4>📈 My recordings for this posuk</h4>' + mine.slice(0, 10).map(x =>
+    const firstMarked = mine.slice(0, 10).findIndex(x => combinedMarksHtml(x, false));
+    hist.innerHTML = '<h4>📈 My recordings for this posuk</h4>' + mine.slice(0, 10).map((x, n) =>
       '<div class="combined-history-row" data-path="' + combinedEscape(x.audioStoragePath) + '">' +
         '<span>' + combinedEscape(combinedDate(x.submittedAt)) + (x.selectionKey !== key ? ' · ' + combinedEscape(combinedRefLabel(x)) : '') + '</span>' +
         '<strong>' + combinedEscape(combinedStatusLabel(x)) + '</strong>' +
         (x.teacherNote && x.status !== 'pending' ? '<span>💬 ' + combinedEscape(x.teacherNote) + '</span>' : '') +
         '<button class="btn small" type="button" data-listen="1">▶️ Listen</button>' +
+        combinedMarksHtml(x, n === firstMarked) +
       '</div>').join('');
     hist.querySelectorAll('[data-listen]').forEach(b => b.onclick = async () => {
       const row = b.closest('.combined-history-row');

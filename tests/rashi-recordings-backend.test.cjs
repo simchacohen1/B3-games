@@ -294,6 +294,25 @@ test('marking letters: each clean part earns 1 point (5 = perfect), net of the 2
   const st=(await b.status('kid1')).body.sections.zayin;assert.equal(st.status,'approved');assert.equal(st.points,3);assert.equal(st.letterMode,true);
   const item=b.db.getAt('studentRewards/pointRequests/'+id);assert.equal(item.status,'approved');assert.equal(item.pointsPaid,3);
 });
+test('student sees the teacher marks (missed letters, parts, points) and his own letter scores; a later change shows the new marks',async()=>{
+  const b=makeBackend(seed());await sendText(b,'kid1','zayin');
+  const id=pendingRequests(b)[0][0];
+  assert.equal((await b.status('kid1')).body.sections.zayin.review,null,'nothing to show before grading');
+  await marks(b,'teacherEt',id,[0,19]);
+  const st=(await b.status('kid1')).body.sections.zayin;
+  assert.equal(st.review.total,20);assert.equal(JSON.stringify(st.review.missed),'[0,19]');assert.equal(st.review.points,3);
+  assert.equal(st.review.partsClean.length,5);assert.equal(st.review.partsClean.filter(Boolean).length,3);assert.ok(st.review.words.length>0);
+  const mine=await b.call({headers:{authorization:'Bearer kid1'},body:{action:'rashi-student-letters'}});
+  assert.equal(mine.code,200);assert.equal(mine.body.readings,1);
+  const seen=Object.values(mine.body.letters).reduce((n,r)=>n+r.seen,0),missed=Object.values(mine.body.letters).reduce((n,r)=>n+r.missed,0);
+  assert.equal(seen,20);assert.equal(missed,2);
+  const other=await b.call({headers:{authorization:'Bearer kid2'},body:{action:'rashi-student-letters'}});
+  assert.equal(other.body.readings,0,'another boy never sees these scores');
+  const noAuth=await b.call({headers:{},body:{action:'rashi-student-letters'}});assert.ok(noAuth.code>=400);
+  await marks(b,'teacherEt',id,[5]);
+  const after=(await b.status('kid1')).body.sections.zayin;assert.equal(JSON.stringify(after.review.missed),'[5]');
+  assert.equal((await b.call({headers:{authorization:'Bearer kid1'},body:{action:'rashi-student-letters'}})).body.readings,1);
+});
 test('a perfect reading needs no taps: saving with nothing marked pays 5',async()=>{
   const b=makeBackend(seed());await sendText(b,'kid1','bet');
   const id=pendingRequests(b)[0][0];
