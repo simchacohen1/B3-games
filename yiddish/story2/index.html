@@ -32,6 +32,10 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
 .lesson-bar #lessonCount{font-size:14px;color:#614d19}
 .lesson-bar button{background:#143e69;color:white}.lesson-bar button:disabled{background:#dedede;color:#555}
 .lesson-end{color:#614d19;font-size:14px;font-weight:bold}
+.practice-panel{max-width:980px;margin:12px auto;padding:16px;background:#fffdf6;border:2px solid #d4b766;border-radius:12px}
+.practice-panel button{margin:5px}.practice-panel #practiceFeedback{font-weight:bold}
+#lessonLock{padding:16px;background:#fff3cf;color:#614d19;font-weight:bold;text-align:center}
+
 .thumbs button{min-width:44px}.chosen{background:#ffe291!important}
 #notice{font-size:14px;color:#614d19}input[type=range]{width:110px}
 @media(max-width:850px){header{display:block}main{height:auto;display:block}.card{height:70vh;margin-bottom:12px}.player{margin-top:10px}h1{font-size:20px}
@@ -47,8 +51,10 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
   <button type="button" id="lessonNext">Next part →</button>
   <span id="lessonCount" aria-live="polite"></span><span class="lesson-end" id="lessonEnd" role="status"></span>
 </nav>
-<main><section class="card pic-card" aria-label="Pictures"><div class="bar"><label>Picture width <input id="width" type="range" min="30" max="75" value="55"></label></div><div id="stage" class="stage"></div><div id="caption" class="caption"></div><div id="picNav" class="bar nav"><button id="prev">← Previous</button><strong id="count"></strong><button id="next">Next →</button></div><div id="thumbs" class="thumbs"></div><div class="hint" id="picHint">Pictures follow the audio. You can also use ← / → or click a paragraph.</div></section><section class="card" aria-label="Story text"><div class="bar textbar"><button id="smaller">A−</button><strong id="fontLabel">28 px</strong><button id="bigger">A+</button><button id="top">Text top</button><label><input type="checkbox" id="follow" checked> Follow the audio</label></div><div class="transcript" id="text"></div><div class="hint">Original wording preserved. Click a paragraph to highlight it<span id="seekHint" hidden> and play from there</span>. <span id="notice" role="status"></span></div></section></main>
-<script src="story.js?v=2"></script><script src="word-times.js?v=2"></script>
+<div id="lessonLock" role="status">Checking which story parts are open for your class…</div>
+<section id="practice" class="practice-panel" hidden><h2>Practice this part's Yiddish words</h2><p id="practiceQuestion"></p><div id="practiceOptions"></div><p id="practiceFeedback" role="status"></p><button type="button" id="practiceNext" hidden>Next word →</button></section>
+<main hidden><section class="card pic-card" aria-label="Pictures"><div class="bar"><label>Picture width <input id="width" type="range" min="30" max="75" value="55"></label></div><div id="stage" class="stage"></div><div id="caption" class="caption"></div><div id="picNav" class="bar nav"><button id="prev">← Previous</button><strong id="count"></strong><button id="next">Next →</button></div><div id="thumbs" class="thumbs"></div><div class="hint" id="picHint">Pictures follow the audio. You can also use ← / → or click a paragraph.</div></section><section class="card" aria-label="Story text"><div class="bar textbar"><button id="smaller">A−</button><strong id="fontLabel">28 px</strong><button id="bigger">A+</button><button id="top">Text top</button><label><input type="checkbox" id="follow" checked> Follow the audio</label></div><div class="transcript" id="text"></div><div class="hint">Original wording preserved. Click a paragraph to highlight it<span id="seekHint" hidden> and play from there</span>. <span id="notice" role="status"></span></div></section></main>
+<script src="../api.js"></script><script src="story.js?v=2"></script><script src="word-times.js?v=2"></script>
 <script>
 (() => {
   const S = window.YIDDISH_STORY_2 || {}, WT = window.YIDDISH_STORY_2_WORD_TIMES || null, $ = id => document.getElementById(id);
@@ -67,7 +73,7 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
     end: i+1 < lessonParagraphs.length ? Number(S.times?.[lessonParagraphs[i+1]]) : Infinity
   }));
   const KEY = 'yiddish-story2-reader-v2', audio = $('audio');
-  let currentLesson = 0, changingLesson = false;
+  let currentLesson = 0, changingLesson = false, openParts = 0, vocabularyParts = [], practicePosition = 0;
   let state = { font: 28, width: 55 }, pos = 0, activePara = -1, onWord = null;
   try { state = { ...state, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
@@ -115,8 +121,8 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
 
   /* Lesson navigation: show and play one part at a time. */
   function chooseLesson(index, play = false) {
-    if (!lessons.length) return;
-    index = Math.max(0, Math.min(lessons.length - 1, index));
+    if (!lessons.length || !openParts) return;
+    index = Math.max(0, Math.min(openParts - 1, index));
     changingLesson = true;
     audio.pause();
     currentLesson = index;
@@ -132,9 +138,14 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
     if (first) setActive(lesson.first, false);
     $('lessonSelect').value = String(index);
     $('lessonPrev').disabled = index === 0;
-    $('lessonNext').disabled = index === lessons.length - 1;
+    $('lessonNext').disabled = index >= openParts - 1;
     $('lessonCount').textContent = 'Part ' + (index + 1) + ' of ' + lessons.length;
     $('lessonEnd').textContent = '';
+    const wordCount = vocabularyParts[index]?.wordCount || 0;
+    $('practice').hidden = wordCount < 2;
+    $('practiceFeedback').textContent = '';
+    practicePosition = 0;
+    if (wordCount >= 2) loadQuestion();
     if (audioReady) audio.currentTime = lesson.start;
     if (picsByTime && pics.length) {
       let picIndex = 0;
@@ -237,6 +248,46 @@ main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-colu
   $('bigger').onclick = () => { state.font = Math.min(72, state.font + 2); settings(); };
   $('width').oninput = e => { state.width = +e.target.value; settings(); };
   $('top').onclick = () => { box.scrollTop = 0; };
-  settings(); renderPic(); chooseLesson(Number.isInteger(lastSaved) ? lastSaved : 0);
+  settings(); renderPic();
+  async function loadQuestion() {
+    const label = $('practiceQuestion'), answers = $('practiceOptions');
+    label.textContent = 'Loading vocabulary…'; answers.replaceChildren();
+    $('practiceNext').hidden = true;
+    try {
+      const r = await YiddishAPI.call('story2Practice',{part:currentLesson,position:practicePosition});
+      label.textContent = 'What does this mean? '+r.question;
+      r.options.forEach(option => {
+        const btn = document.createElement('button');
+        btn.textContent = option;
+        btn.onclick = async () => {
+          answers.querySelectorAll('button').forEach(b=>b.disabled=true);
+          try {
+            const result = await YiddishAPI.call('story2Practice',{part:currentLesson,position:practicePosition,answer:option});
+            $('practiceFeedback').textContent = result.correct ? '✓ Correct!' : 'Try again. Correct meaning: '+result.correctAnswer;
+            $('practiceNext').hidden = false;
+            $('practiceNext').textContent = practicePosition + 1 >= r.total ? 'Practice again' : 'Next word →';
+          } catch(e) { $('practiceFeedback').textContent = e.message; answers.querySelectorAll('button').forEach(b=>b.disabled=false); }
+        };
+        answers.append(btn);
+      });
+    } catch(e) { label.textContent = e.message; }
+  }
+  $('practiceNext').onclick=()=>{practicePosition=(practicePosition+1)%(vocabularyParts[currentLesson]?.wordCount||1);$('practiceFeedback').textContent='';loadQuestion()};
+  async function loadAccess() {
+    document.querySelector('.lesson-bar').hidden = true;
+    $('lessonLock').hidden = false;
+    document.querySelector('main').hidden = true;
+    try {
+      const r = await YiddishAPI.call('story2Status');
+      openParts = Math.min(lessons.length,Math.max(0,Number(r.openParts)||0));
+      vocabularyParts = r.parts||[];
+      Array.from($('lessonSelect').options).forEach((option,i)=>{option.disabled=i>=openParts;option.textContent='Part '+(i+1)+(i>=openParts?' 🔒':'')});
+      if(!openParts){$('lessonLock').textContent='Your teacher has not opened any parts of Living Dream yet.';return;}
+      $('lessonLock').hidden=true;document.querySelector('.lesson-bar').hidden=false;
+      document.querySelector('main').hidden=false;
+      chooseLesson(Math.min(openParts-1,Number.isInteger(lastSaved)?lastSaved:0));
+    }catch(e){$('lessonLock').textContent='Please open the Yiddish Library and sign in first. '+e.message;}
+  }
+  loadAccess();
 })();
 </script></html>
