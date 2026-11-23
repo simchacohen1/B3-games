@@ -112,7 +112,7 @@
         if(wi)holder.append(' ');
         for(const p of word){
           if(!p.letter){holder.append(p.text);continue;}
-          if(missed.has(p.i+offset)){const m=el('span','rr-miss',p.text);m.title='You didn't read this right';holder.append(m);}else holder.append(p.text);
+          if(missed.has(p.i+offset)){const m=el('span','rr-miss',p.text);m.title='Not read right';holder.append(m);}else holder.append(p.text);
         }
       });
       offset+=tk.total;
@@ -122,7 +122,7 @@
     const parts=el('div','rr-parts');
     (review.partsClean||[]).forEach((ok,k)=>parts.append(el('span','rr-part '+(ok?'rr-part-ok':'rr-part-bad'),'Part '+(k+1)+(ok?' ✅ perfect':' ❌ a letter was missed'))));
     box.append(el('h3',null,'You earned '+review.points+' of 5 points'),parts,text,
-      el('p','rr-legend',review.missed&&review.missed.length?'Letters in red: you didn't read these right.':'You read every letter right. Great reading!'));
+      el('p','rr-legend',review.missed&&review.missed.length?"Letters in red: you didn't read these right.":'You read every letter right. Great reading!'));
     return box;
   }
   let letterScores=null,letterScoresAt=0,letterScoresPromise=null;
