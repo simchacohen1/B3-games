@@ -39,6 +39,7 @@ function inRange(value, range) {
 
 function scheduledOpen(settings, classId, date = new Date()) {
   const access = settings?.classAccess?.[classId] || {};
+  if (Number(access.openUntil) > date.getTime()) return true; // timed unlock from Class Access
   if (access.mode === 'open') return true;
   if (access.mode === 'locked') return false;
   const local = newYorkNow(date);

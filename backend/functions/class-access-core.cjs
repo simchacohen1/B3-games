@@ -30,16 +30,20 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  if(!isAdmin&&!assigned)fail(403,'You are not assigned to this class.');
  if(!cls||cls.active===false)fail(404,'This class is unavailable.');
  const action=body.action,root=`b3Games/workspaces/b3-2026/classes/${classId}`;
- if(['mode','lockWindows','game','star'].includes(action)){
+ if(['mode','lockWindows','game','star','timedOpen'].includes(action)){
   if(!store.updateSettings)fail(503,'Class access settings are unavailable.');
   if(action==='mode'&&!['auto','open','locked'].includes(body.mode))fail(400,'Choose Automatic, Open, or Locked.');
+  if(action==='timedOpen'&&!(Number.isInteger(body.minutes)&&body.minutes>=0&&body.minutes<=180))fail(400,'Choose 15, 30 or 45 minutes.');
   if(action==='lockWindows'&&!validWindows(body.lockWindows))fail(400,'Invalid class schedule.');
   if(action==='game'&&(!validId(body.gameId)||typeof body.enabled!=='boolean'||!['et','wt'].includes(classId)))fail(400,'Invalid activity setting.');
   if(action==='star'&&(!validId(body.gameId)||typeof body.keepOpen!=='boolean'))fail(400,'Invalid starred exception.');
   const result=await store.updateSettings(current=>{
    const updated=structuredClone(current||{});
    if(action==='mode'){
-    const row=updated.classAccess?.[classId];if(!row)return null;row.mode=body.mode;
+    const row=updated.classAccess?.[classId];if(!row)return null;row.mode=body.mode;delete row.openUntil;
+   }else if(action==='timedOpen'){
+    const row=updated.classAccess?.[classId];if(!row)return null;
+    if(body.minutes)row.openUntil=now+body.minutes*60000;else delete row.openUntil;
    }else if(action==='lockWindows'){
     if(!updated.classAccess?.[classId])return null;
     updated.classAccess[classId].lockWindows=body.lockWindows;

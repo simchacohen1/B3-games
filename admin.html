@@ -43,6 +43,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 .cp-status small{display:block;font-size:14px;font-weight:700;opacity:.85;margin-top:3px}
 .cp-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
 .cp-modes button{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:13px 6px;font-size:15px;font-weight:900;cursor:pointer;color:#334155}
+.cp-timed{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));align-items:center}.cp-timed-label{font-weight:900;color:#334155;grid-column:1/-1}
 .cp-modes button.on{background:#172033;border-color:#172033;color:#fff}
 .cp-emergency{background:#7f1d1d;color:#fff;border-radius:14px;padding:13px 16px;margin-bottom:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .cp-emergency button{border:0;border-radius:10px;padding:9px 13px;font-weight:900;cursor:pointer}
@@ -280,6 +281,7 @@ function renderOwnerControl(){
   const starUntil=id=>{const ms=api.lockedGameExpiry?api.lockedGameExpiry(s,cls,id):0;return ms?" · until "+new Date(ms).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):""};
   let detail;
   if(s.siteEnabled===false)detail="Emergency lock is on";
+  else if(info.openUntil)detail="Timed unlock · closes again at "+new Date(info.openUntil).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"});
   else if(access.mode==="open")detail="Opened by you · stays open until you press Automatic";
   else if(access.mode==="locked")detail="Locked by you · stays locked until you press Automatic";
   else detail="Following recess schedule · "+cpNextChange(access.lockWindows,!info.open);
@@ -298,10 +300,12 @@ function renderOwnerControl(){
     +(s.siteEnabled===false?'<div class="cp-emergency"><span>🚨 Emergency lock is ON — every class is locked.</span><button type="button" id="cpEmergencyOff">Turn emergency lock off</button></div>':"")
     +'<div class="cp-status '+(info.open?"open":"locked")+'"><div>'+(info.open?"✅ "+cls.toUpperCase()+" is OPEN":"🔒 "+cls.toUpperCase()+" is LOCKED")+'<small>'+cpEsc(detail)+'</small></div></div>'
     +'<div class="cp-modes">'+modes+'</div>'
+    +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock '+CL+' for</span>'+[15,30,45].map(m=>'<button type="button" data-cp-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(info.openUntil?'<button type="button" data-cp-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
     +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(games.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-all="open"'+(cpBusy?" disabled":"")+'>✅ Open ALL</button><button type="button" class="all-closed" data-cp-all="closed"'+(cpBusy?" disabled":"")+'>⛔ Close ALL</button></div>':"")+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
   cpBindClassTabs(panel);
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
+  panel.querySelectorAll("[data-cp-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpTimed);cpSave(()=>api.updateClassTimedOpen(cls,m),m?CL+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
     cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&stars.includes(id))await api.setClassLockedGame(cls,id,false);},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
   panel.querySelectorAll("[data-cp-all]").forEach(b=>b.onclick=()=>{const open=b.dataset.cpAll==="open";

@@ -495,6 +495,7 @@
     var access = settings && settings.classAccess && settings.classAccess[classId] ? settings.classAccess[classId] : null;
     var mode = access && (access.mode === "open" || access.mode === "locked" || access.mode === "auto") ? access.mode : "auto";
 
+    if (access && Number(access.openUntil) > Date.now()) return { open:true, reason:"Timed unlock" };
     if (mode === "open") return { open:true, reason:"Manual override: OPEN" };
     if (mode === "locked") return { open:false, reason:"Manual override: LOCKED" };
 
@@ -740,6 +741,21 @@
   if (!isGuestPreview()) watchTeacherAccess();
   checkNow();
   setInterval(checkNow, POLL_INTERVAL_MS);
+  // Live push: the settings are watched with a Firebase streaming read, so a lock or unlock a teacher presses reaches a
+  // student who is already inside a tool within seconds (the 30 second poll above stays as the backup).
+  (function watchSettingsLive(){
+    if (typeof EventSource !== "function" || isGuestPreview()) return;
+    var first = true, timer = null, source = null;
+    try {
+      source = new EventSource(databaseUrl() + "/" + SETTINGS_PATH + ".json");
+      var onChange = function(){
+        if (first) { first = false; return; }          // the first message is just the current state
+        clearTimeout(timer); timer = setTimeout(checkNow, 250);
+      };
+      source.addEventListener("put", onChange);
+      source.addEventListener("patch", onChange);
+    } catch (e) { /* the poll still covers it */ }
+  })();
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") checkNow();
   });

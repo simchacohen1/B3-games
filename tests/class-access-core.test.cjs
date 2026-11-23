@@ -59,6 +59,30 @@ test('owner Teacher View is limited to classes in the current owner invitation',
  await manageClassAccess(s,{uid:'u',email:'simcha5770@gmail.com',email_verified:true},{classId:'wt',action:'mode',mode:'open',actorMode:'teacher'});
  await assert.rejects(manageClassAccess(s,{uid:'u',email:'simcha5770@gmail.com',email_verified:true},{classId:'other',action:'mode',mode:'open',actorMode:'teacher'}),{code:403});
 });
+test('timed unlock sets openUntil for the assigned class only, and choosing a mode ends it',async()=>{
+ const s=store();s.data.settings.classAccess={et:{mode:'locked',lockWindows:{}},wt:{mode:'locked',lockWindows:{}}};
+ const now=1000000;
+ await manageClassAccess(s,identity,{classId:'et',action:'timedOpen',minutes:15},now);
+ assert.equal(s.data.settings.classAccess.et.openUntil,now+15*60000);
+ assert.equal(s.data.settings.classAccess.wt.openUntil,undefined);
+ await manageClassAccess(s,identity,{classId:'et',action:'mode',mode:'locked'},now);
+ assert.equal(s.data.settings.classAccess.et.openUntil,undefined);
+ await manageClassAccess(s,identity,{classId:'et',action:'timedOpen',minutes:30},now);
+ await manageClassAccess(s,identity,{classId:'et',action:'timedOpen',minutes:0},now);
+ assert.equal(s.data.settings.classAccess.et.openUntil,undefined);
+ await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'timedOpen',minutes:9999},now),{code:400});
+ await assert.rejects(manageClassAccess(s,identity,{classId:'wt',action:'timedOpen',minutes:15},now),{code:403});
+});
+test('timed unlock opens a locked class until it runs out (server rules, game gate, browser rules)',()=>{
+ const policy=require('../backend/functions/multiplayer-lock-policy.cjs');
+ const t=new Date('2026-11-23T16:00:00Z');
+ const open=(until)=>policy.allowsMultiplayer({actorRole:'student',classId:'et',studentId:'x',settings:{siteEnabled:true,classAccess:{et:{mode:'locked',openUntil:until}}},date:t});
+ assert.equal(open(undefined),false);
+ assert.equal(open(t.getTime()+60000),true,'timed unlock opens a manually locked class');
+ assert.equal(open(t.getTime()-60000),false,'and it locks again when the time is up');
+ assert.match(fs.readFileSync(__dirname+'/../game-gate.js','utf8'),/Number\(access\.openUntil\) > Date\.now\(\)/);
+ assert.match(fs.readFileSync(__dirname+'/../site-settings.js','utf8'),/openUntil > \(date instanceof Date/);
+});
 test('invalid schedule and action are rejected without writes',async()=>{
  const s=store();await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'lockWindows',lockWindows:{mon:[{start:'99:99',end:'10:00'}]}}),{code:400});
  await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'wat'}),{code:400});assert.equal(s.data.writes.length,0);
