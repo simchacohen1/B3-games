@@ -14,7 +14,7 @@ h1{font-size:24px;margin:0 0 4px}.title-yi{display:block;font:bold 22px 'Times N
 audio{width:100%}.player{flex:1}
 button,select{font:600 16px Arial;padding:9px 12px;border:1px solid #bcc8d3;border-radius:8px;background:white;color:#143e69;cursor:pointer}button:hover{background:#e5eef7}button:disabled{opacity:.4;cursor:default}
 .bar{display:flex;align-items:center;gap:8px;padding:8px;flex-wrap:wrap}
-main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-columns:var(--pictureWidth,55%) 1fr;gap:12px;padding:12px}
+main{height:calc(100vh - 174px);min-height:450px;display:grid;grid-template-columns:var(--pictureWidth,55%) 1fr;gap:12px;padding:12px}
 .card{background:#fffdf6;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-width:0;box-shadow:0 3px 15px #0002}
 .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#e2dacb;padding:10px}
 .stage img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
@@ -28,7 +28,13 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
 .w{border-radius:5px}.w.on{background:#ffb020;color:#1d1300}
 .empty{font-size:20px;color:#614d19;padding:18px;line-height:1.5}
 .hint{font-size:13px;padding:8px;color:#4f4c45;border-top:1px solid #ddd}
-.thumbs{display:flex;overflow-x:auto;gap:6px;padding:6px}.thumbs button{min-width:44px}.chosen{background:#ffe291!important}
+.thumbs{display:flex;overflow-x:auto;gap:6px;padding:6px}
+.lesson-bar{background:#fff7df;padding:10px 16px;border-bottom:2px solid #d4b766;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lesson-bar label{font-weight:bold;color:#143e69}.lesson-bar select{max-width:245px}
+.lesson-bar #lessonCount{font-size:14px;color:#614d19}
+.lesson-bar button{background:#143e69;color:white}.lesson-bar button:disabled{background:#dedede;color:#555}
+.lesson-end{color:#614d19;font-size:14px;font-weight:bold}
+.thumbs button{min-width:44px}.chosen{background:#ffe291!important}
 #notice{font-size:14px;color:#614d19}input[type=range]{width:110px}
 @media(max-width:850px){header{display:block}main{height:auto;display:block}.card{height:70vh;margin-bottom:12px}.player{margin-top:10px}h1{font-size:20px}
  /* No pictures yet: keep the placeholder small so the story text is near the top. */
@@ -36,6 +42,13 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
 </style>
 <script src="../../guest-mode.js?v=20261011-guest"></script><script src="../../access-guard.js" data-b3-tool-id="yiddish"></script><script src="../../teacher-account.js?v=20261008"></script>
 <header><a class="back" href="../index.html">← Yiddish</a><div><h1 id="title">Story 2</h1><span id="titleYi" class="title-yi" lang="yi" hidden></span><small id="credit"></small></div><div class="player"><audio id="audio" controls preload="metadata"></audio><div class="bar"><label>Speed <select id="speed"><option>0.75</option><option selected>1</option><option>1.1</option><option>1.25</option><option>1.5</option><option>2</option></select></label><button id="rewind">Back 10 sec</button><button id="full">Full screen</button></div></div></header>
+<nav class="lesson-bar" aria-label="Story parts">
+  <label for="lessonSelect">Story part</label>
+  <button type="button" id="lessonPrev" aria-label="Previous part">← Previous part</button>
+  <select id="lessonSelect" aria-label="Choose story part"></select>
+  <button type="button" id="lessonNext">Next part →</button>
+  <span id="lessonCount" aria-live="polite"></span><span class="lesson-end" id="lessonEnd" role="status"></span>
+</nav>
 <main><section class="card pic-card" aria-label="Pictures"><div class="bar"><label>Picture width <input id="width" type="range" min="30" max="75" value="55"></label></div><div id="stage" class="stage"></div><div id="caption" class="caption"></div><div id="picNav" class="bar nav"><button id="prev">← Previous</button><strong id="count"></strong><button id="next">Next →</button></div><div id="thumbs" class="thumbs"></div><div class="hint" id="picHint">Pictures follow the audio. You can also use ← / → or click a paragraph.</div></section><section class="card" aria-label="Story text"><div class="bar textbar"><button id="smaller">A−</button><strong id="fontLabel">28 px</strong><button id="bigger">A+</button><button id="top">Text top</button><label><input type="checkbox" id="follow" checked> Follow the audio</label></div><div class="transcript" id="text"></div><div class="hint">Original wording preserved. Click a paragraph to highlight it<span id="seekHint" hidden> and play from there</span>. <span id="notice" role="status"></span></div></section></main>
 <script src="story.js?v=2"></script><script src="word-times.js?v=2"></script>
 <script>
@@ -47,7 +60,16 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
   const picsByTime = pics.length > 0 && pics.every(p => Number.isFinite(p.at));
   pics.sort(picsByTime ? (a, b) => a.at - b.at : (a, b) => (a.para || 0) - (b.para || 0));
   const times = Object.entries(S.times || {}).map(([i, t]) => [Number(i), Number(t)]).filter(([i, t]) => Number.isInteger(i) && paras[i] != null && Number.isFinite(t)).sort((a, b) => a[1] - b[1]);
-  const KEY = 'yiddish-story2-reader-v1', audio = $('audio');
+  // Natural breaks in the existing recording, aligned to paragraph starts.
+  // No change to the original words, audio or word timings.
+  const lessonParagraphs = [0, 2, 7, 8, 15, 25, 37, 42].filter(i => paras[i] != null && (i === 0 || times.some(([p]) => p === i)));
+  const lessons = lessonParagraphs.map((p,i) => ({
+    first:p, last: i+1 < lessonParagraphs.length ? lessonParagraphs[i+1] : paras.length,
+    start: Number(S.times?.[p] ?? 0),
+    end: i+1 < lessonParagraphs.length ? Number(S.times?.[lessonParagraphs[i+1]]) : Infinity
+  }));
+  const KEY = 'yiddish-story2-reader-v2', audio = $('audio');
+  let currentLesson = 0, changingLesson = false;
   let state = { font: 28, width: 55 }, pos = 0, activePara = -1, onWord = null;
   try { state = { ...state, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
@@ -93,11 +115,53 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
   if (times.length) $('seekHint').hidden = false;
   function startOf(i) { const f = times.find(([p]) => p === i); return f ? f[1] : null; }
 
+  /* Lesson navigation: show and play one part at a time. */
+  function chooseLesson(index, play = false) {
+    if (!lessons.length) return;
+    index = Math.max(0, Math.min(lessons.length - 1, index));
+    changingLesson = true;
+    audio.pause();
+    currentLesson = index;
+    const lesson = lessons[index];
+    Array.from(box.querySelectorAll('.para:not(.en)')).forEach(el => {
+      const p = Number(el.dataset.i);
+      el.hidden = p < lesson.first || p >= lesson.last;
+    });
+    box.scrollTop = 0;
+    activePara = -1;
+    if (onWord) { onWord.classList.remove('on'); onWord = null; }
+    const first = $('p' + lesson.first);
+    if (first) setActive(lesson.first, false);
+    $('lessonSelect').value = String(index);
+    $('lessonPrev').disabled = index === 0;
+    $('lessonNext').disabled = index === lessons.length - 1;
+    $('lessonCount').textContent = 'Part ' + (index + 1) + ' of ' + lessons.length;
+    $('lessonEnd').textContent = '';
+    if (audioReady) audio.currentTime = lesson.start;
+    if (picsByTime && pics.length) {
+      let picIndex = 0;
+      pics.forEach((pic,j) => { if (pic.at <= lesson.start) picIndex = j; });
+      pos = picIndex; renderPic();
+    }
+    try { localStorage.setItem('yiddish-story2-last-part', String(index)); } catch (e) {}
+    changingLesson = false;
+    if (play && audioReady) audio.play().catch(() => {});
+  }
+  lessons.forEach((part,i) => {
+    const option = document.createElement('option');
+    option.value = String(i);
+    option.textContent = 'Part ' + (i + 1);
+    $('lessonSelect').append(option);
+  });
+  $('lessonSelect').onchange = e => chooseLesson(Number(e.target.value));
+  $('lessonPrev').onclick = () => chooseLesson(currentLesson - 1);
+  $('lessonNext').onclick = () => chooseLesson(currentLesson + 1);
+  const lastSaved = (() => { try { return Number(localStorage.getItem('yiddish-story2-last-part')); } catch (e) { return 0; } })();
   /* Audio */
   let audioReady = false;
   if (paras.length && S.audio) {
     audio.src = S.audio;
-    audio.addEventListener('loadedmetadata', () => { audioReady = true; });
+    audio.addEventListener('loadedmetadata', () => { audioReady = true; audio.currentTime = lessons[currentLesson]?.start || 0; });
     audio.addEventListener('error', () => { $('notice').textContent = 'The recording is not ready yet.'; });
   } else { audio.removeAttribute('src'); audio.closest('.player').querySelectorAll('button,select').forEach(b => b.disabled = true); }
   $('speed').onchange = e => audio.playbackRate = +e.target.value;
@@ -114,7 +178,20 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     if (pics.length && !picsByTime) { let j = -1; pics.forEach((pic, k) => { if ((pic.para || 0) <= i) j = k; }); if (j >= 0 && j !== pos) { pos = j; renderPic(); } }
   }
   function tick() {
+    if (changingLesson || !lessons.length) return;
+    const lesson = lessons[currentLesson];
     const t = audio.currentTime;
+    if (t >= lesson.end - 0.08) {
+      audio.pause();
+      audio.currentTime = lesson.end;
+      $('lessonEnd').textContent = 'Part complete! Choose Next part to continue.';
+      return;
+    }
+    if (t < lesson.start - 0.2) {
+      audio.pause();
+      audio.currentTime = lesson.start;
+      return;
+    }
     if (times.length) { let cur = null; for (const [i, s] of times) { if (s <= t + 0.05) cur = i; else break; } if (cur != null) setActive(cur, true); }
     let hit = null; const spans = wordSpans[activePara];
     if (spans) for (const sp of spans) { if (+sp.dataset.s <= t && t < +sp.dataset.e) { hit = sp; break; } }
@@ -143,7 +220,13 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
     $('thumbs').replaceChildren(...pics.map((p, j) => { const b = document.createElement('button'); b.textContent = j + 1; b.title = p.caption || ''; b.className = j === pos ? 'chosen' : ''; b.onclick = () => go(j); return b; }));
   }
   function go(j) {
-    if (j < 0 || j >= pics.length) return; pos = j; renderPic();
+    if (j < 0 || j >= pics.length) return;
+    const pic = pics[j];
+    if (picsByTime && lessons.length) {
+      const lessonIndex = lessons.findIndex(l => pic.at >= l.start && pic.at < l.end);
+      if (lessonIndex >= 0 && lessonIndex !== currentLesson) chooseLesson(lessonIndex);
+    }
+    pos = j; renderPic();
     if (picsByTime && audioReady) { audio.currentTime = pics[j].at; return; }
     if ($('follow').checked && pics[j].para != null) { const p = $('p' + pics[j].para); if (p) { box.querySelectorAll('.para.active').forEach(x => x.classList.remove('active')); p.classList.add('active'); activePara = pics[j].para; box.scrollTop = p.offsetTop - box.offsetTop - 10; } }
   }
@@ -156,6 +239,6 @@ main{height:calc(100vh - 119px);min-height:450px;display:grid;grid-template-colu
   $('bigger').onclick = () => { state.font = Math.min(72, state.font + 2); settings(); };
   $('width').oninput = e => { state.width = +e.target.value; settings(); };
   $('top').onclick = () => { box.scrollTop = 0; };
-  settings(); renderPic();
+  settings(); renderPic(); chooseLesson(Number.isInteger(lastSaved) ? lastSaved : 0);
 })();
 </script></html>
