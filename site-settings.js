@@ -977,6 +977,12 @@
     return best ? at(best) : midnight;
   }
 
+  // When a star on a new class switches itself off: the next New York midnight (a manual lock has no end time).
+  function newYorkMidnightMs() {
+    const d = new Date(), now = getNewYorkNow(d);
+    return d.getTime() - (d.getTime() % 60000) + (1440 - now.minutes) * 60000;
+  }
+
   function classHasLockedGameOverride(settings, classId, gameId, date) {
     if (!["et", "wt"].includes(classId) || !gameId) return false;
     return activeLockedGameList(settings, classId, date).indexOf(String(gameId)) !== -1;
@@ -1597,6 +1603,7 @@
     updateClassGameEnabled: updateClassGameEnabled,
     manageClassAccessAction: manageClassAccessAction,
     manageStudentLocks: manageStudentLocks,
+    newYorkMidnightMs: newYorkMidnightMs,
     updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,

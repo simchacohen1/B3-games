@@ -52,6 +52,7 @@ function allowsMultiplayer({ actorRole, classId, studentId, settings = {}, class
   if (settings.games?.[TOOL] === false || settings.classGames?.[classId]?.[TOOL] === false) return false;
   if (classId !== 'et' && classId !== 'wt') {
     if (Number(classRow.access?.openUntil) > date.getTime()) return settings.siteEnabled !== false;
+    if (Number(classRow.access?.stars?.[TOOL]) > date.getTime()) return settings.siteEnabled !== false; // starred: open while the class is locked
     return settings.siteEnabled !== false && classRow.siteEnabled !== false && classRow.access?.mode !== 'locked';
   }
   const overrideList = String(settings.classLockedGameOverride?.[classId] || '').split(',').map(value => value.trim());

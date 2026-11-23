@@ -635,7 +635,10 @@
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(!followActivityOpen&&!teacherOverrideOpen()&&!(Number(assignedClass.access&&assignedClass.access.openUntil)>Date.now())&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      // A starred tool stays open while the class is locked (same idea as the ET/WT star; saved in access/stars/<tool> as the
+      // time it switches itself off). The emergency lock above and the tool switch just before still win.
+      var starOpen=Number(assignedClass.access&&assignedClass.access.stars&&assignedClass.access.stars[grantId])>Date.now();
+      if(!starOpen&&!followActivityOpen&&!teacherOverrideOpen()&&!(Number(assignedClass.access&&assignedClass.access.openUntil)>Date.now())&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 

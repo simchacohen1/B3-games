@@ -64,7 +64,14 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  }
  if(action==='platform'){
   if(!['open','locked'].includes(body.mode))fail(400,'Choose Open or Locked.');
-  await store.update({[`${root}/access/mode`]:body.mode,[`${root}/siteEnabled`]:body.mode==='open',[`${root}/access/openUntil`]:null});
+  await store.update({[`${root}/access/mode`]:body.mode,[`${root}/siteEnabled`]:body.mode==='open',[`${root}/access/openUntil`]:null,...(body.mode==='open'?{[`${root}/access/stars`]:null}:{})});
+  return {ok:true};
+ }
+ if(action==='platformStar'){
+  // A starred tool stays open while the class is locked; it switches itself off at expiresAt (at most 24 hours ahead).
+  if(!CLASS_TOOL_GRANT_SET.has(body.toolId)||typeof body.keepOpen!=='boolean')fail(400,'Invalid star setting.');
+  const until=Math.min(Number(body.expiresAt)||now+86400000,now+86400000+60000);
+  await store.update({[`${root}/access/stars/${body.toolId}`]:body.keepOpen&&until>now?until:null});
   return {ok:true};
  }
  if(action==='platformTimedOpen'){

@@ -321,6 +321,8 @@ function renderOwnerControl(){
   const em=document.getElementById("cpEmergencyOff");if(em)em.onclick=()=>{if(confirm("Turn the emergency lock off? Classes go back to their normal settings."))cpSave(()=>api.updateSiteEnabled(true),"Emergency lock off ✓")};
 }
 // New classes use their own access and tool grants, never B3's shared ET/WT settings.
+// A tool's id in the Class Access list -> its id in the per-feature lock list (a few differ).
+function cpFeatureOf(tool){return tool==="gallery"||tool==="tag"?"class-gallery":tool}
 function renderOwnerPlatformClass(panel){
  const id=cpClass,row=cpRecords[id],w=frame.contentWindow,teacherMode=w?.B3SiteSettings?.getCurrentAccess?.().role==="teacher";
  if(!row){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading class settings…</div></div>';return}
@@ -329,6 +331,7 @@ function renderOwnerPlatformClass(panel){
  const lockedFeatures=Object.values(row.locks?.features||{}).filter(f=>f&&f.locked===true).length,
    lockOverrides=Object.entries(row.locks?.overrides||{}).filter(([,o])=>o&&Number(o.until)>Date.now()).map(([k])=>k),
    lockSchedules=Object.keys(row.locks?.schedules||{}).length;
+ const starCount=Object.values(row.access?.stars||{}).filter(v=>Number(v)>Date.now()).length;
  const lockedOv=lockOverrides.filter(k=>row.locks.overrides[k].state==="locked");
  // One state for the whole class: open means class access, feature locks and timed feature locks all agree.
  const mixed=isOpen&&(lockedFeatures>0||lockedOv.length>0),bigState=mixed?"mixed":isOpen?"open":"locked";
@@ -336,12 +339,12 @@ function renderOwnerPlatformClass(panel){
  tools.push({id:"tag",name:"Tag Game"});
  const known=new Set(),distinct=tools.filter(t=>{if(known.has(t.id))return false;known.add(t.id);return true});
  const rows=distinct.map(t=>{
-   const on=row.toolGrants?.[t.id]===true;
-   return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
+   const on=row.toolGrants?.[t.id]===true,starMs=Number(row.access?.stars?.[t.id])||0,starred=starMs>Date.now();
+   return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-newstar="'+cpEsc(t.id)+'" title="'+(starred?"Remove the star: this tool locks with the class":"Keep this tool open for students while the class is locked")+'" aria-label="Star '+cpEsc(t.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button><div class="cp-name">'+cpEsc(t.name)+(starred?'<small>'+(isOpen?"⭐ will stay open if you lock the class":"⭐ open for students even though the class is locked")+' · until '+new Date(starMs).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+'</small>':'')+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
  }).join("");
  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
   +(cpSettings?.siteEnabled===false&&!teacherMode?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
-  +'<div class="cp-status '+(bigState==="open"?"open":"locked")+'"><div>'+(bigState==="open"?"✅ ":bigState==="mixed"?"⚠️ ":"🔒 ")+cpEsc(name)+(bigState==="open"?" is OPEN":bigState==="mixed"?" is PARTLY LOCKED":" is LOCKED")+'<small>'+(mixed?'Class is open but '+(lockedFeatures?lockedFeatures+' feature'+(lockedFeatures===1?' is':'s are')+' still locked':'a timed feature lock is active')+' — press OPEN to clear it. ':'Only this class is affected by the controls below. ')+(lockSchedules?lockSchedules+' weekly lock schedule(s) from a teacher still apply (that teacher clears it). ':'')+'</small></div></div>'
+  +'<div class="cp-status '+(bigState==="open"?"open":"locked")+'"><div>'+(bigState==="open"?"✅ ":bigState==="mixed"?"⚠️ ":"🔒 ")+cpEsc(name)+(bigState==="open"?" is OPEN":bigState==="mixed"?" is PARTLY LOCKED":" is LOCKED")+'<small>'+(mixed?'Class is open but '+(lockedFeatures?lockedFeatures+' feature'+(lockedFeatures===1?' is':'s are')+' still locked':'a timed feature lock is active')+' — press OPEN to clear it. ':'Only this class is affected by the controls below. ')+(starCount&&!isOpen?'⭐ '+starCount+' starred tool'+(starCount===1?' is':'s are')+' open while locked. ':'')+(lockSchedules?lockSchedules+' weekly lock schedule(s) from a teacher still apply (that teacher clears it). ':'')+'</small></div></div>'
   +'<div class="cp-bigswitch"><button type="button" data-cp-big="open" class="open'+(bigState==="open"?" on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 OPEN</button><button type="button" data-cp-big="locked" class="lock'+(bigState==="locked"?" on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 LOCK</button></div>'
   +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock this class for'+(openUntil>Date.now()?' · open until '+new Date(openUntil).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):'')+'</span>'+[15,30,45].map(m=>'<button type="button" data-cp-new-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(openUntil>Date.now()?'<button type="button" data-cp-new-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
@@ -359,7 +362,7 @@ function renderOwnerPlatformClass(panel){
          await api.manageClassAccessAction(id,"platform",{mode:"open"});
          await Promise.all(distinct.map(t=>api.manageClassAccessAction(id,"grant",{toolId:t.id,enabled:true})));
        }else{
-         const u={[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null};
+         const u={[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null,[base+"/access/stars"]:null};
          distinct.forEach(t=>{u[base+"/toolGrants/"+t.id]=true});
          await db.ref().update(u);
        }
@@ -369,6 +372,8 @@ function renderOwnerPlatformClass(panel){
        if(teacherMode)await api.manageClassAccessAction(id,"platform",{mode:"locked"});
        else await db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
        await api.manageStudentLocks(id,{action:"setAll",locked:true});
+       // Starred tools stay open: put their feature lock back to open after locking everything.
+       for(const t of distinct){if(Number(row.access?.stars?.[t.id])>Date.now()){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:cpFeatureOf(t.id),locked:false})}catch(e){console.warn("Could not keep starred tool open",t.id,e)}}}
      }
    },open?name+" is OPEN: class, features and all tools ✓":name+" is LOCKED ✓");
  });
@@ -391,10 +396,29 @@ function renderOwnerPlatformClass(panel){
    if(confirm("Turn off the emergency lock for every class?"))
      cpSave(()=>cpApi().updateSiteEnabled(true),"Emergency lock off ✓");
  };
+ // Star = the tool stays open while the class is LOCKED (same idea as the ET/WT star). Saved as access/stars/<tool> = the time
+ // it switches itself off (next New York midnight). The tool's feature lock is opened with it, so no layer can disagree.
+ panel.querySelectorAll("[data-cp-newstar]").forEach(b=>b.onclick=()=>{
+   const tool=b.dataset.cpNewstar,api=cpApi(),starred=Number(row.access?.stars?.[tool])>Date.now(),fid=cpFeatureOf(tool);
+   return cpSave(async()=>{
+     const write=keep=>teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:tool,keepOpen:keep,expiresAt:api.newYorkMidnightMs()}):db.ref(base+"/access/stars/"+tool).set(keep?api.newYorkMidnightMs():null);
+     if(starred){
+       await write(false);
+       if(!isOpen){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:true})}catch(e){console.warn("Could not relock the tool",e)}}
+       return;
+     }
+     // Like ET/WT: starring a switched-off tool switches it on first.
+     if(row.toolGrants?.[tool]!==true)await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:tool,enabled:true}):db.ref(base+"/toolGrants/"+tool).set(true));
+     await write(true);
+     try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not open the tool's feature lock",e)}
+   },starred?tool+" will lock with the class ✓":tool+" will stay open while the class is locked ✓");
+ });
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
-   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true,api=cpApi(),fid=tool==="gallery"?"class-gallery":tool;
+   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true,api=cpApi(),fid=cpFeatureOf(tool);
    cpSave(async()=>{
      await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on}):db.ref(base+"/toolGrants/"+tool).set(!on));
+     // Like ET/WT: switching a tool off also removes its star.
+     if(on&&Number(row.access?.stars?.[tool])>Date.now())await (teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:tool,keepOpen:false}):db.ref(base+"/access/stars/"+tool).set(null));
      // Turning a tool ON also clears an old per-feature lock on that same tool, so the two cannot disagree.
      if(!on&&row.locks?.features?.[fid]?.locked===true){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not clear the feature lock",e)}}
    },tool+(on?" disabled":" enabled")+" for "+name+" ✓");

@@ -83,6 +83,18 @@ test('timed unlock opens a locked class until it runs out (server rules, game ga
  assert.match(fs.readFileSync(__dirname+'/../game-gate.js','utf8'),/Number\(access\.openUntil\) > Date\.now\(\)/);
  assert.match(fs.readFileSync(__dirname+'/../site-settings.js','utf8'),/openUntil > \(date instanceof Date/);
 });
+test('platformStar saves and clears a star under access/stars, and opening the class clears every star',async()=>{
+ const s=store(),now=1000000,root='b3Games/workspaces/b3-2026/classes/et/access/';
+ await manageClassAccess(s,identity,{classId:'et',action:'platformStar',toolId:'halacha',keepOpen:true,expiresAt:now+3600000},now);
+ assert.deepEqual(s.data.writes.at(-1),{[root+'stars/halacha']:now+3600000});
+ await manageClassAccess(s,identity,{classId:'et',action:'platformStar',toolId:'halacha',keepOpen:false},now);
+ assert.deepEqual(s.data.writes.at(-1),{[root+'stars/halacha']:null});
+ await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'platformStar',toolId:'owner-admin',keepOpen:true},now),{code:400});
+ await manageClassAccess(s,identity,{classId:'et',action:'platform',mode:'open'},now);
+ assert.equal(s.data.writes.at(-1)[root+'stars'],null);
+ await manageClassAccess(s,identity,{classId:'et',action:'platform',mode:'locked'},now);
+ assert.equal(Object.hasOwn(s.data.writes.at(-1),root+'stars'),false,'locking keeps the stars');
+});
 test('invalid schedule and action are rejected without writes',async()=>{
  const s=store();await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'lockWindows',lockWindows:{mon:[{start:'99:99',end:'10:00'}]}}),{code:400});
  await assert.rejects(manageClassAccess(s,identity,{classId:'et',action:'wat'}),{code:400});assert.equal(s.data.writes.length,0);

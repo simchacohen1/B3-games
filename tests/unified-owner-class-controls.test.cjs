@@ -6,13 +6,14 @@ const vm=require('node:vm');
 
 function harness(classId='testing') {
   const html=fs.readFileSync('admin.html','utf8');
-  const start=html.indexOf('function renderOwnerPlatformClass(panel){');
+  const start=html.indexOf('function cpFeatureOf(tool)');
   const end=html.indexOf('async function cpSave(',start);
   assert.ok(start>0&&end>start,'Owner class editor must exist');
   const controls={
     lock:{dataset:{cpBig:'locked'}},
     open:{dataset:{cpBig:'open'}},
     timed15:{dataset:{cpNewTimed:'15'}},
+    starHalacha:{dataset:{cpNewstar:'halacha'}},
     halacha:{dataset:{cpGrant:'halacha'}},
     posuk:{dataset:{cpGrant:'posuk-practice-scroll'}}
   };
@@ -20,6 +21,7 @@ function harness(classId='testing') {
     innerHTML:'',
     querySelectorAll(query){
       if(query==='[data-cp-big]')return [controls.open,controls.lock];
+      if(query==='[data-cp-newstar]')return [controls.starHalacha];
       if(query==='[data-cp-new-timed]')return [controls.timed15];
       if(query==='[data-cp-grant]')return [controls.halacha,controls.posuk];
       return [];
@@ -47,7 +49,7 @@ function harness(classId='testing') {
     document:{getElementById:()=>null},
     cpGames:()=>[{id:'halacha',name:'Halacha'},{id:'posuk-practice-scroll',name:'Posuk Practice'}],
     cpClassTabs:()=>'',cpBindClassTabs:()=>{},cpEsc:String,
-    cpApi:()=>({updateSiteEnabled:async()=>{throw Error('Unexpected global update')},manageStudentLocks:async(id,body)=>{lockCalls.push({id,...body});return {ok:true}}}),
+    cpApi:()=>({newYorkMidnightMs:()=>1900000000000,updateSiteEnabled:async()=>{throw Error('Unexpected global update')},manageStudentLocks:async(id,body)=>{lockCalls.push({id,...body});return {ok:true}}}),
     cpSave:async(fn)=>await fn(),console
   };
   vm.createContext(ctx);
@@ -93,6 +95,39 @@ test('15 min after LOCK opens the features first, then sets the class open-until
   assert.equal(x.writes[0].method,'set');
   const left=x.writes[0].value-Date.now();
   assert.ok(left>14*60000&&left<=15*60000+1000,'about 15 minutes from now');
+});
+
+test('star: a starred tool stays open while the class is locked (saved as access/stars/<tool>, feature lock opened with it)',async()=>{
+  const x=harness('testing');
+  x.render();
+  await x.controls.starHalacha.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(x.writes)),[{path:ROOT+'/testing/access/stars/halacha',method:'set',value:1900000000000}]);
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setFeature',featureId:'halacha',locked:false}]);
+});
+
+test('LOCK keeps a starred tool open and OPEN clears every star',async()=>{
+  const x=harness('testing');
+  x.ctx.cpRecords.testing.access={stars:{halacha:Date.now()+3600000}};
+  x.render();
+  await x.controls.lock.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setAll',locked:true},{id:'testing',action:'setFeature',featureId:'halacha',locked:false}]);
+  x.writes.length=0;
+  await x.controls.open.onclick();
+  assert.equal(JSON.parse(JSON.stringify(x.writes[0].value))[ROOT+'/testing/access/stars'],null);
+});
+
+test('student pages honour the timed unlock and stars: game gate, student home page, Arcade server rule',()=>{
+  const gate=fs.readFileSync('game-gate.js','utf8'),home=fs.readFileSync('index.html','utf8');
+  assert.match(gate,/assignedClass\.access\.stars\[grantId\]/);
+  assert.match(gate,/assignedClass\.access&&assignedClass\.access\.openUntil/);
+  assert.match(home,/accessNow\.openUntil/);
+  assert.match(home,/accessNow\.stars/);
+  const policy=require('../backend/functions/multiplayer-lock-policy.cjs'),t=new Date('2026-11-23T16:00:00Z');
+  const ok=(access)=>policy.allowsMultiplayer({actorRole:'student',classId:'testing',studentId:'x',settings:{siteEnabled:true},classRow:{siteEnabled:true,access},date:t});
+  assert.equal(ok({mode:'locked'}),false);
+  assert.equal(ok({mode:'locked',stars:{'multiplayer-center':t.getTime()+60000}}),true,'starred Arcade opens while locked');
+  assert.equal(ok({mode:'locked',stars:{'multiplayer-center':t.getTime()-60000}}),false,'and stops when the star ends');
+  assert.equal(ok({mode:'locked',openUntil:t.getTime()+60000}),true);
 });
 
 test('Halacha is changed for the selected class only',async()=>{
