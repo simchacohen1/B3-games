@@ -121,3 +121,26 @@ server code in memory).
 - **Changing a passcode** is refused if another student with the same name already uses it.
 - **Find possible duplicates** (Owner Admin, Students, Bulk Management) lists same-name accounts, same-name classes and class-list entries without an account. It is read-only: nothing is deleted, merged or renamed, and no passcode is shown.
 - **Blocked / Enabled** in Class management applies to the chosen class only, for the owner as well as for teachers. A student in both ET and WT can be blocked in one and stay enabled in the other.
+
+## Classes & Students page, and the easier import (Nov 2026)
+
+**Owner Admin → school → Classes & Students** shows one card per class (teachers on top, students below). Single actions: add a
+student (type a name, pick a match, or create a new one with a made-up 6-digit passcode shown once), × to remove, add or remove a
+teacher, rename, turn off or on, delete an empty class. Bulk actions: tick students, choose a class, then Move to / Add to / Remove
+from class. **Paste a list** matches names against the school's students (case, spacing and word order ignored) and asks only when
+a name is close to an existing student. Students in no class sit in their own card at the top (their names are read from their
+profiles). All class changes go through `funTorahManageStudents` `add` / `remove` / `create`, so names, passcodes and saved work
+never change. Pure helpers: `class-roster-tools.js`.
+
+**Importer.** No Type column = every row is a student. Class names that differ only in spacing or capitals (`B6WT`, `b6 wt`) are
+matched to the existing class and listed under "Fixed automatically". A class that is not on the site is offered for creation (or,
+if a look-alike exists, e.g. `B6 WT` vs `B6 WT Boys`, the owner picks the existing class); nothing is created until Import. When two
+site classes share a name, the preview shows both (students, teachers, school, created date) and the owner picks one; the pick is
+sent as `classPicks` and the server only honours a pick that really is one of the matching classes.
+
+**Why 13 students ended up in a class nobody could see (Nov 2026).** The file said `B6 WT` but the class was `B6 WT Boys`. The old
+importer treated the unknown name as "create a new class", made class `b6_wt` with no teacher, and put the boys in it. The database
+rules do not allow listing all classes, and Owner Admin only found classes through teacher invitations or ones this browser had
+seen, so the new class was invisible and the boys got a second "B6 WT" button at sign-in. Fixes: look-alike names are now a question,
+Owner Admin also finds classes through the classes named on student records, and classes an import makes are remembered. Limit that
+remains: a class with no teacher, no students and never opened in this browser still cannot be listed.

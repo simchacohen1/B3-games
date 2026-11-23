@@ -44,7 +44,10 @@ function readInput(body){
  const classes=names(list(body.classes,MAX_CLASSES,'classes'));
  const staff=list(body.staff,MAX_STAFF,'teachers').map(s=>({role:s?.role==='principal'?'principal':s?.role==='teacher'?'teacher':'',name:cleanName(s?.name),email:String(s?.email||'').trim().toLowerCase(),classes:names(s?.classes)}));
  const students=list(body.students,MAX_STUDENTS,'students').map(s=>({key:String(s?.key||''),name:cleanName(s?.name),passcode:clean(s?.passcode),rosterId:clean(s?.rosterId),classes:names(s?.classes),decision:s?.decision&&typeof s.decision==='object'?{type:String(s.decision.type||''),studentId:String(s.decision.studentId||'')}:null}));
- return {batchId,label:cleanName(body.label).slice(0,120),classes,staff,students};
+ // Which class the owner picked when several classes on the site share one name: { classKey: classId }.
+ const classPicks={};
+ if(body.classPicks&&typeof body.classPicks==='object'&&!Array.isArray(body.classPicks))for(const [k,v] of Object.entries(body.classPicks).slice(0,200))if(typeof k==='string'&&k.length<=120&&validId(v))classPicks[k]=v;
+ return {batchId,label:cleanName(body.label).slice(0,120),classes,staff,students,classPicks};
 }
 
 async function load(store){
@@ -62,21 +65,28 @@ async function buildPlan(store,input,state){
  // ---- classes -------------------------------------------------------------
  const byKey={};
  for(const [id,c] of Object.entries(classes)){if(!validId(id)||!c)continue;const k=classKey(c.name||id);if(!k)continue;(byKey[k]??=[]).push(id);}
- const classPlan=[],newClassIds={},takenIds=new Set(Object.keys(classes));
+ const classPlan=[],newClassIds={},takenIds=new Set(Object.keys(classes)),classChoices=[];
+ // Same name on several classes: the owner may pick one (input.classPicks). Otherwise the choices are listed, never guessed.
+ const pickHits=(k,hits)=>{
+  const pick=input.classPicks&&input.classPicks[k];
+  if(hits.length>1&&pick&&hits.includes(pick)){byKey[k]=[pick];return [pick];}
+  if(hits.length>1&&!classChoices.some(c=>c.key===k))classChoices.push({key:k,name:classes[hits[0]]?.name||hits[0],options:hits.map(id=>({classId:id,name:classes[id]?.name||id,schoolId:classes[id]?.schoolId||'',active:classes[id]?.active!==false,students:Object.keys(classes[id]?.members||{}).length,teachers:Object.keys(classes[id]?.teacherIds||{}).length,createdAt:classes[id]?.createdAt||null}))});
+  return hits;
+ };
  for(const name of input.classes){
   const k=classKey(name);
   if(!k){errors.push('Class "'+name+'" needs letters or numbers.');continue;}
   const done=Object.entries(batch.classes||{}).find(([id,c])=>classKey(c.name)===k&&classes[id]);
   if(done){classPlan.push({name,classId:done[0],status:'exists'});continue;}
-  const hits=byKey[k]||[];
-  if(hits.length>1){errors.push('Class "'+name+'" matches '+hits.length+' classes on the site ('+hits.join(', ')+'). Rename or remove the extra one first.');continue;}
+  const hits=pickHits(k,byKey[k]||[]);
+  if(hits.length>1){errors.push('Class "'+name+'" matches '+hits.length+' classes on the site ('+hits.join(', ')+'). Choose which one to use.');continue;}
   if(hits.length===1){classPlan.push({name,classId:hits[0],status:'exists'});continue;}
   let id=slug(name)||'class';if(takenIds.has(id))id=id+'_'+crypto.createHash('sha256').update(input.batchId+name).digest('hex').slice(0,6);
   takenIds.add(id);newClassIds[k]=id;byKey[k]=[id];
   classPlan.push({name,classId:id,status:'create'});
  }
  const resolveClass=(name,where)=>{
-  const k=classKey(name),hits=byKey[k]||[];
+  const k=classKey(name),hits=pickHits(k,byKey[k]||[]);
   if(hits.length===1)return hits[0];
   errors.push(where+': class "'+name+'" '+(hits.length?'matches more than one class':'does not exist and is not in this file')+'.');
   return null;
@@ -181,13 +191,13 @@ async function buildPlan(store,input,state){
   conflicts:conflicts.length,errors:errors.length
  };
  const planHash=hashOf({c:classPlan,t:staffPlan.map(({claimedUid,...s})=>s),s:studentPlan.map(s=>[s.key,s.status,s.studentId,s.addClassIds])});
- return {batchId:input.batchId,classPlan,staffPlan,studentPlan,conflicts,errors,summary,planHash,batchStatus:batch.status||'new'};
+ return {batchId:input.batchId,classPlan,staffPlan,studentPlan,conflicts,errors,summary,planHash,classChoices,batchStatus:batch.status||'new'};
 }
 
 function describe(plan,profiles){
  const sClean=s=>({key:s.key,name:s.name,status:s.status,studentId:s.studentId,matchedBy:s.matchedBy,addClassIds:s.addClassIds,alreadyClassIds:s.alreadyClassIds});
  const cand=id=>({studentId:id,name:profiles[id]?.name||id,createdAt:profiles[id]?.createdAt||null,importBatchId:profiles[id]?.importBatchId||null});
- return {ok:true,batchId:plan.batchId,batchStatus:plan.batchStatus,planHash:plan.planHash,summary:plan.summary,errors:plan.errors,
+ return {ok:true,batchId:plan.batchId,batchStatus:plan.batchStatus,planHash:plan.planHash,summary:plan.summary,errors:plan.errors,classChoices:plan.classChoices,
   classes:plan.classPlan,staff:plan.staffPlan.map(({claimedUid,...s})=>s),students:plan.studentPlan.map(sClean),
   conflicts:plan.conflicts.map(c=>({...c,candidates:c.candidates.map(cand)}))};
 }
