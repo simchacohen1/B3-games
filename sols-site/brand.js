@@ -39,7 +39,7 @@
       .replace(/Shluchim Online School/gi, ' ')
       .replace(/\s+/g, ' ')
       .replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
-    return 'SOLS Tools | ' + (rest || NAME);
+    var page = rest.replace(/\s*·\s*SOLS$/i, '').trim(); return 'SOLS Tools | ' + (!page || page === 'Home' ? NAME : page);
   }
   function fixText(node) {
     var parent = node.parentNode;

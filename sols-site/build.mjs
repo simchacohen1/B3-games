@@ -58,7 +58,9 @@ export function solsTitle(raw) {
     .replace(/Shluchim Online School/gi, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
-  return PREFIX + ' | ' + (rest || NAME);
+  // Page titles end in " · SOLS"; this site's own "SOLS Tools |" prefix replaces that. "Home" is the home page.
+  const page = rest.replace(/\s*·\s*SOLS$/i, '').trim();
+  return PREFIX + ' | ' + (!page || page === 'Home' ? NAME : page);
 }
 
 const esc = text => String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
