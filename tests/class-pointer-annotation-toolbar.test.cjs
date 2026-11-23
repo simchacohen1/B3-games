@@ -9,7 +9,8 @@ const read=name=>fs.readFileSync(path.join(repo,name),'utf8');
 const toolbar=read('class-pointer-prototype/annotation-toolbar.js');
 
 test('toolbar offers the eight Kami-style tools',()=>{
-  for(const tool of ['pointer','hand','select','highlight','text','shape','eraser','pen'])
+  assert.doesNotMatch(toolbar,/\['hand',/,'the Hand is merged into the Pointer');
+  for(const tool of ['pointer','select','highlight','text','shape','eraser','pen'])
     assert.match(toolbar,new RegExp("\\['"+tool+"',"),tool);
   for(const shape of ['rect','ellipse','line','arrow'])assert.match(toolbar,new RegExp("\\['"+shape+"',"),shape);
 });

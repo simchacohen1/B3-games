@@ -26,7 +26,7 @@ let peer=null,teacherConnection=null,screen=null,mediaCall=null,viewportControll
 let closingClass=false,endPromise=Promise.resolve();
 let captureControl=null,tabScrollOn=false;
 let generation=0,colorIndex=0,pendingPoint=null,hoverTimer=null,lastHover=0;
-let navigating=false;
+let navigating=false,navPointer=false,shiftNav=false,toolNav=false,toolPointer=false;
 const pointerNodes=new Map();
 const highlightStore=new C.HighlightStore();let highlighter=null;
 const pointerIcons={
@@ -694,13 +694,13 @@ function hideOwnPointer(){
   if(isTeacher){if(state.points.teacher){delete state.points.teacher;queuePoint('teacher')}}else send(teacherConnection,{type:'pointer-hide'});
 }
 function sendHover(){
-  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if(navigating||!point||!live()||!allowed())return;
+  hoverTimer=null;const point=pendingPoint;pendingPoint=null;if((navigating&&!navPointer)||!point||!live()||!allowed())return;
   lastHover=Date.now();
   if(isTeacher){state.points.teacher=point;queuePoint('teacher')}else send(teacherConnection,{type:'point',point});
 }
 function pointAt(event,immediate=false){
   if(isTeacher&&['eraser','select'].includes($('teacherTool').value)){hideOwnPointer();return}
-  if(navigating||!live())return;
+  if((navigating&&!navPointer)||!live())return;
   if(!allowed()){if(immediate)$('pointerStatus').textContent='Your teacher has not enabled your pointer.';return}
   const pdfOpen=window.ClassPointerPdf?.active();const video=$('lesson'),rect=$('stage').getBoundingClientRect(),box=pdfOpen?{left:0,top:0,w:1,h:1}:pointerPictureBox(rect,video);if(!box)return;
   const pdfPoint=pdfOpen?window.ClassPointerPdf.normalized(event):null;if(pdfOpen&&!pdfPoint){hideOwnPointer();return}
@@ -828,20 +828,24 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
   // Teacher only: put the marks of a saved whiteboard back for everyone (pdf-mode.js importWhiteboard).
   restoreMarks(list){if(!isTeacher)return;state.points={};highlightStore.restore(list);publishHighlights();publish()}};
-function setNavigation(on){
-  if(navigating===on)return;
-  navigating=on;cancelHover();hideOwnPointer();highlighter?.cancel();
+// Mouse mode comes from two places: holding Shift, and the toolbar's Pointer or Select tool. With the Pointer tool the page is used
+// normally AND the class still sees the dot (navPointer); holding Shift is the plain mouse with no dot, as before.
+function setNavigation(on,pointer=false){toolNav=!!on;toolPointer=!!pointer;applyNavigation()}
+function applyNavigation(){
+  const on=shiftNav||toolNav,withPointer=!shiftNav&&toolNav&&toolPointer;
+  if(navigating===on&&navPointer===withPointer)return;
+  navigating=on;navPointer=withPointer;cancelHover();hideOwnPointer();highlighter?.cancel();
   $('stage').classList.toggle('mouse-navigation',on);pointerPermission();
   const hint=$('navigationHint');if(hint)hint.textContent=on?'🖱 Mouse mode — release Shift to return to your tool':'Hold Shift for mouse navigation';
   document.dispatchEvent(new Event('class-pointer-navigation'));
 }
 document.addEventListener('keydown',event=>{
   if(event.key!=='Shift'||event.repeat||event.target.closest?.('input,select,textarea,[contenteditable],dialog[open]'))return;
-  setNavigation(true);
+  shiftNav=true;applyNavigation();
 });
-document.addEventListener('keyup',event=>{if(event.key==='Shift'||!event.shiftKey)setNavigation(false)});
-window.addEventListener('blur',()=>setNavigation(false));
-document.addEventListener('visibilitychange',()=>{if(document.hidden)setNavigation(false)});
+document.addEventListener('keyup',event=>{if(event.key==='Shift'||!event.shiftKey){shiftNav=false;applyNavigation()}});
+window.addEventListener('blur',()=>{shiftNav=false;applyNavigation()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){shiftNav=false;applyNavigation()}});
 $('teacherPanel').hidden=!isTeacher;$('studentPanel').hidden=isTeacher;if(!isTeacher)status(autoJoin?'Connecting to your class…':'Join your teacher’s class.');
 if(autoJoin){$('joinForm').hidden=true;$('leaveClass').hidden=true}
 window.addEventListener('pagehide',()=>{if(isTeacher)endClass();else leaveClass()});

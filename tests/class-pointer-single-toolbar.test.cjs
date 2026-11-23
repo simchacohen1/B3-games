@@ -102,6 +102,7 @@ test('a tool can have kinds: clicking the chosen tool again opens them, and the 
   const t=withToolbar();
   const {calls,surface}=delegateSurface({variants:{pointer:[['target','◎','Target'],['star','★','Star']],highlight:[['highlight','🖍','Highlighter'],['box','▧','Highlight box']]}});
   t.FA.setRole('teacher');t.FA.push(surface);t.FA.open();
+  t.tool('pen').click();
   t.tool('pointer').click();
   assert.equal(t.fly.hidden,true,'first click only chooses the tool');
   assert.ok(t.tool('pointer').classList.contains('fa-more'),'tools with kinds are marked');
@@ -256,8 +257,8 @@ test('teacher: every old dock tool is on the one toolbar and drives the lesson�
   c.root.querySelectorAll('.fa-color').find(b=>b.dataset.color==='#1f2937').click();
   assert.equal(c.colorSel.value,'#1f2937');assert.equal(c.FA.state().tool,'pointer');
   // Hand is the lesson's mouse mode.
-  c.tool('hand').click();assert.equal(c.state.nav,true);
-  c.tool('pointer').click();assert.equal(c.state.nav,false);
+  c.tool('pen').click();assert.equal(c.state.nav,false);
+  c.tool('pointer').click();assert.equal(c.state.nav,true);
 });
 
 test('teacher: Clear offers the four choices of the old Clear menu',()=>{

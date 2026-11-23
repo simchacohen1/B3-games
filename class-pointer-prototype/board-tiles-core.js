@@ -244,6 +244,8 @@
     function put(tile){io.apply({type:'board-tile',tile})}
     return{
       active:()=>!!grab,
+      // Is there a tile under this point? (Nothing is moved.)
+      hit(p){const activity=io.activity(),state=io.state();if(!activity||!state)return false;const {w,h}=io.size();return !!tileAt(activity,state,p,w,h)},
       down(p){
         const activity=io.activity(),state=io.state();if(!activity||!state)return false;
         const {w,h}=io.size(),tile=tileAt(activity,state,p,w,h);if(!tile)return false;

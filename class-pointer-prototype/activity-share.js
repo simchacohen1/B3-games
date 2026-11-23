@@ -140,6 +140,7 @@
       shareArea.appendChild(holder);
     }
     else document.body.appendChild(holder);
+    let boardShown=false;   // this student's own whiteboard is on display (student-boards.js tells us)
     let lessonOnAir=false,sharePaused=false;   // teacher presenting (own tab) / told to pause by the own tab (sharing tab)
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Remembered per tab (sessionStorage survives a refresh of the same tab): this student was sharing from this tab
@@ -240,8 +241,14 @@
       else if(s?.open){btn.textContent='✖ Cancel';btn.style.background='#64748b';label.textContent='Choose Entire Screen in the sharing tab that opened.'}
       else{btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';label.textContent=IDLE_TEXT}
       // A sharing tab that is open keeps its Stop / Cancel button here whatever else happens.
-      holder.style.display=((active&&permissionReady)||s?.open)&&!lessonOnAir?'flex':'none';
+      holder.style.display=((active&&permissionReady)||s?.open)&&!lessonOnAir&&!(boardShown&&!s?.open)?'flex':'none';
     }
+    // While the student's whiteboard is on display there is no Share My Screen button (as while the teacher presents).
+    // A share or a sharing tab that is already open keeps its Stop / Cancel button.
+    document.addEventListener?.('classpointer:student-board',event=>{
+      const on=event.detail?.on===true;if(boardShown===on)return;boardShown=on;
+      try{showLinked()}catch{}
+    });
     function openHolder(){
       if(busy||!active||!sameStudent()||lessonOnAir)return;
       // Opened straight from the click so the browser allows the new tab.

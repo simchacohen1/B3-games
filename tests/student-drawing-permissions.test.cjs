@@ -36,7 +36,7 @@ test('each level gives a student only its tools, with no greyed-out buttons (Not
   // The student's own screen only gets those tools; a teacher's page keeps all of them.
   assert.match(toolbar,/get tools\(\)\{return role==='teacher'\|\|ownDrawing\(\)\?undefined:LEVEL_TOOLS\[studentLevel\]\}/);
   assert.match(toolbar,/get hideUnused\(\)\{return role!=='teacher'&&!ownDrawing\(\)\}/);
-  assert.match(toolbar,/get defaultTool\(\)\{return role==='teacher'\?'hand':'pointer'\}/);
+  assert.match(toolbar,/get defaultTool\(\)\{return 'pointer'\}/);
   // Unknown levels fall back to Nothing.
   assert.match(toolbar,/Object\.prototype\.hasOwnProperty\.call\(LEVEL_TOOLS,next\)\?next:'none'/);
 });

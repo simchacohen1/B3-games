@@ -156,7 +156,7 @@ test('student-boards.js is wired to the tiles: messages, saving, restoring, and 
   assert.match(s,/tiles:board\.tiles\.map/,'the student\'s tile places are saved with the board');
   assert.match(s,/data\.tiles/,'and put back when it is opened');
   assert.match(s,/Hebrew tiles/);
-  assert.match(s,/grab:\{down/,'tiles can be picked up through the drawing toolbar');
+  assert.match(s,/grab:\{hit:/,'tiles can be picked up through the drawing toolbar');
   const tb=read('class-pointer-prototype/annotation-toolbar.js');
   assert.match(tb,/surface\.grab/);
 });

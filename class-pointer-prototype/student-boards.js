@@ -528,6 +528,13 @@
   // =====================================================================
   if(!isTeacher){
     let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null,teacherPresenting=false;
+    // Tell the page when this student's whiteboard is actually on display (activity-share.js hides Share My Screen meanwhile).
+    let announced=null;
+    function announceBoard(){
+      const shown=on&&mode==='boards'&&!blocked&&!view.hidden&&(!B.embedded||stage.style.display!=='none');
+      if(shown===announced)return;announced=shown;
+      try{document.dispatchEvent(new CustomEvent('classpointer:student-board',{detail:{on:shown}}))}catch{}
+    }
     // Whatever the teacher presents comes first: no Share My Screen button meanwhile, and a share from this page is paused until the teacher stops.
     document.addEventListener('classpointer:teacher-presenting',event=>{
       teacherPresenting=event.detail?.on===true;
@@ -552,10 +559,10 @@
     if(!B.embedded)bar.append(full);
     else{
       const back=button('↩ Back to Activity','Hide the whiteboard without losing your drawing',()=>{
-        stage.style.display='none';returnBoard.hidden=false;
+        stage.style.display='none';returnBoard.hidden=false;announceBoard();
       });
       const returnBoard=button('📝 Show My Whiteboard','Return to your whiteboard',()=>{
-        if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw()}
+        if(on&&mode==='boards'&&!blocked){stage.style.display='block';returnBoard.hidden=true;redraw();announceBoard()}
       });
       returnBoard.id='fttReturnPointerBoard';
       returnBoard.hidden=true;
@@ -579,7 +586,7 @@
       // The slim top bar keeps the title, Paste, Copy board, Save, My files, Back to Activity and Full screen.
       const oneToolbar=boardsOn&&!!window.FTTAnnotate;view.classList.toggle('boards-annotated',oneToolbar);
       drawGroup.hidden=!boardsOn||oneToolbar;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
-      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';
+      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';announceBoard();
       clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
       shareBtn.hidden=teacherPresenting;
@@ -627,7 +634,7 @@
       getItems:()=>board.strokes.filter(item=>item.by==='student'),
       setItems(list){syncBoardItems(board,'student',list,act)},
       // Hebrew word tiles can be picked up with any drawing tool.
-      grab:{down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
+      grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
       live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
@@ -678,7 +685,7 @@
       view.hidden=!next;document.body.classList.toggle('boards-on',next);
       if(B.embedded){stage.style.display=next?'block':'none';stage.dispatchEvent(new Event('classpointer:board-state'))}
       if(next)stage.dispatchEvent(new PointerEvent('pointerleave'));
-      redraw();
+      redraw();announceBoard();
     }
     // ---------- The teacher's pointer and drawings on MY shared screen ----------
     // The teacher opens my screen large and points or draws on it (screen-annotate.js). Positions are 0..1 across
@@ -1406,7 +1413,7 @@
     getItems:()=>focusBoard()?.strokes.slice()||[],
     setItems(list){if(boardOpen())syncTeacherBoardItems(focusBoard(),list,act)},
     // The teacher can move a student's tiles too (for example to show where a word goes).
-    grab:{down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
+    grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
     live(draft){
       const m=focusMember();if(!m||!boardOpen())return;
       const op={type:'board-draft',stroke:draft||null};
