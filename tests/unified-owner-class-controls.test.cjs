@@ -12,6 +12,7 @@ function harness(classId='testing') {
   const controls={
     lock:{dataset:{cpBig:'locked'}},
     open:{dataset:{cpBig:'open'}},
+    timed15:{dataset:{cpNewTimed:'15'}},
     halacha:{dataset:{cpGrant:'halacha'}},
     posuk:{dataset:{cpGrant:'posuk-practice-scroll'}}
   };
@@ -19,6 +20,7 @@ function harness(classId='testing') {
     innerHTML:'',
     querySelectorAll(query){
       if(query==='[data-cp-big]')return [controls.open,controls.lock];
+      if(query==='[data-cp-new-timed]')return [controls.timed15];
       if(query==='[data-cp-grant]')return [controls.halacha,controls.posuk];
       return [];
     }
@@ -27,7 +29,8 @@ function harness(classId='testing') {
   const db={ref(path=''){
     return {
       async set(value){writes.push({path,method:'set',value})},
-      async update(value){writes.push({path,method:'update',value})}
+      async update(value){writes.push({path,method:'update',value})},
+      async once(){return {val:()=>null}}
     };
   }};
   const classes={
@@ -76,6 +79,20 @@ test('the big OPEN switch opens class access, every feature lock and every tool 
   assert.equal(update[ROOT+'/testing/toolGrants/posuk-practice-scroll'],true);
   assert.ok(Object.keys(update).every(k=>k.startsWith(ROOT+'/testing/')),'only the selected class is written');
   assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setAll',locked:false}]);
+});
+
+test('15 min after LOCK opens the features first, then sets the class open-until time',async()=>{
+  const x=harness('testing');
+  x.render();
+  await x.controls.lock.onclick();
+  x.lockCalls.length=0;x.writes.length=0;
+  await x.controls.timed15.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setAll',locked:false}],'feature locks are cleared even if the panel has not yet seen them');
+  assert.equal(x.writes.length,1);
+  assert.equal(x.writes[0].path,ROOT+'/testing/access/openUntil');
+  assert.equal(x.writes[0].method,'set');
+  const left=x.writes[0].value-Date.now();
+  assert.ok(left>14*60000&&left<=15*60000+1000,'about 15 minutes from now');
 });
 
 test('Halacha is changed for the selected class only',async()=>{

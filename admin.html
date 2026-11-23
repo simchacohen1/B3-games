@@ -373,10 +373,18 @@ function renderOwnerPlatformClass(panel){
    },open?name+" is OPEN: class, features and all tools ✓":name+" is LOCKED ✓");
  });
  panel.querySelectorAll("[data-cp-new-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpNewTimed);
-   cpSave(async()=>{
-     await (teacherMode?cpApi().manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null));
-     // A timed unlock must open the features too, or the old per-feature locks would keep students out.
-     if(m&&(lockedFeatures||lockOverrides.length)){await cpApi().manageStudentLocks(id,{action:"setAll",locked:false});if(lockOverrides.length){try{await cpApi().manageStudentLocks(id,{action:"clearOverride",targets:lockOverrides})}catch(e){console.warn(e)}}}
+   return cpSave(async()=>{
+     const api=cpApi();
+     if(m){
+       // A timed unlock must open the per-feature locks too (LOCK sets them, and nothing else clears them), or students
+       // stay out behind the padlock. Always done, never decided from the panel's last picture of the class, which can be
+       // a moment behind right after LOCK. Done first, so a failure shows before the class claims to be unlocked.
+       await api.manageStudentLocks(id,{action:"setAll",locked:false});
+       let ov=lockOverrides;
+       try{ov=Object.keys((await db.ref(base+"/locks/overrides").once("value")).val()||{})}catch(e){}
+       if(ov.length){try{await api.manageStudentLocks(id,{action:"clearOverride",targets:ov})}catch(e){console.warn("Could not end timed feature settings",e)}}
+     }
+     await (teacherMode?api.manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null));
    },m?name+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
  const emergency=document.getElementById("cpEmergencyOffNew");
  if(emergency)emergency.onclick=()=>{
