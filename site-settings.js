@@ -832,6 +832,23 @@
   function manageClassAccessAction(classId, action, fields) {
     return saveTeacherClassAccess(classId,Object.assign({action:action},fields||{}));
   }
+  // The per-feature locks (classes/<id>/locks) can only be written by the studentLocks function (no client write rule).
+  function manageStudentLocks(classId, payload) {
+    if (typeof classId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(classId)) return Promise.reject(new Error("Choose a class."));
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) return Promise.reject(new Error("Google sign-in required."));
+    return user.getIdToken().then(function (token) {
+      return fetch("https://us-central1-b3-games.cloudfunctions.net/studentLocks", {
+        method:"POST", headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({classId:classId},payload))
+      });
+    }).then(async function (response) {
+      const result = await response.json().catch(function(){ return {}; });
+      if (!response.ok || result.ok === false) throw new Error(result.error || "Could not change the feature locks.");
+      return result;
+    });
+  }
 
   function updateSiteEnabled(enabled) {
     return readOnce().then(function (settings) {
@@ -1579,6 +1596,7 @@
     updateGameEnabled: updateGameEnabled,
     updateClassGameEnabled: updateClassGameEnabled,
     manageClassAccessAction: manageClassAccessAction,
+    manageStudentLocks: manageStudentLocks,
     updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
