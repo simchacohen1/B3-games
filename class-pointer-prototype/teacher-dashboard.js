@@ -408,7 +408,11 @@ function init(){
   const w=window.ClassPointerBoards?.workspace?.();
   if(w==='screens'||w==='boards')void setPresentationAside();else showResume();
  },0)}
- document.addEventListener('class-pointer-workspace',onWorkspaceChange);
+ // The tab event names the tab itself (screens / whiteboards / teach), so a slow browser cannot make this miss it.
+ document.addEventListener('class-pointer-workspace',event=>{
+  if(event.detail==='screens'||event.detail==='whiteboards')setTimeout(()=>{void setPresentationAside()},0);
+  else if(event.detail==='teach')setTimeout(showResume,0);
+ });
  document.addEventListener('classpointer:sharing-state',onWorkspaceChange);
  // The still picture of a tab or window is not a start-screen choice any more: it is in Switch presentation, right under Share my screen.
  pickerCard.append(el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));

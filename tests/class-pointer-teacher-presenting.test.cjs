@@ -42,6 +42,7 @@ test('poll: timer select (default 1 minute), countdown, shrink once answered, cl
 test('teacher: opening Student screens sets the presentation aside; Resume presenting brings back the same one',()=>{
   const d=read('teacher-dashboard.js'),p=read('pdf-mode.js');
   // the dashboard reacts to the Student screens / whiteboards workspaces and stops what is on
+  assert.match(d,/event\.detail==='screens'\|\|event\.detail==='whiteboards'\)setTimeout\(\(\)=>\{void setPresentationAside\(\)\}/);
   assert.match(d,/w==='screens'\|\|w==='boards'\)void setPresentationAside\(\)/);
   assert.match(d,/window\.ClassPointerPdf\?\.suspend\?\.\(\)/);
   assert.match(d,/stopScreen\.click\(\);heldPresentation=\{label:'Shared screen',screen:true\}/);
