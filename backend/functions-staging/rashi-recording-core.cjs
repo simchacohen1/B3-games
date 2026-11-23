@@ -54,6 +54,15 @@ function publicStatus(record,requestStatus){
   const letterMode=!!record.letterReview;
   const points=status==='approved'?(letterMode?(Number(record.bestPoints)||0):RASHI_POINTS):0;
   return {status,attempt:Number(record.attempt)||1,submittedAt:record.createdAt||null,reviewedAt:record.reviewedAt||null,points,letterMode,
-    canRerecord:canRerecord(record),grade:record.grade??null,feedback:record.feedback||''};
+    canRerecord:canRerecord(record),grade:record.grade??null,feedback:record.feedback||'',
+    review:publicReview(record)};
+}
+// The teacher's letter marks, for the student to see (the words he read, the letters marked, the 5 parts). Always the
+// current marks, so a teacher who changes them later changes what the student sees.
+function publicReview(record){
+  const r=record&&record.letterReview;
+  if(!r||!Array.isArray(r.missed)||!Array.isArray(record.words))return null;
+  return {words:record.words.map(w=>String(w)).slice(0,200),total:Number(r.total)||0,missed:r.missed.filter(Number.isInteger),
+    partsClean:Array.isArray(r.partsClean)?r.partsClean.map(Boolean):[],points:Number(r.points)||0,markedAt:r.markedAt||record.gradedAt||null};
 }
 module.exports={SUBMIT_COST,MAX_POINTS,canRerecord,canSendAgain,RASHI_SOURCE,RASHI_POINTS,MIN_BYTES,MAX_BYTES,MIN_DURATION_MS,MAX_WORDS,SECTIONS,PASSAGES,isSection,sectionLabel,sectionText,readingWords,cleanWords,claim,requestIdFor,publicStatus};

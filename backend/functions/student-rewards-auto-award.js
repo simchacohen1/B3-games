@@ -292,6 +292,18 @@ async function rashiStudentStatus(req,res){
   }
   return res.status(200).json({ok:true,sections,dailyCount:await rashiDailyCount(student.studentId,rashiDate()),dailyLimit:RASHI_DAILY_LIMIT});
 }
+// A student's own running letter scores (which letters he still needs to practice), worked out from his graded readings.
+async function rashiStudentLetters(req,res){
+  const student=await requirePracticeStudent(req,rashiCore.RASHI_SOURCE);
+  if(!student.ok)return res.status(student.status||401).json({error:student.error});
+  const rows=(await rtdb.ref(`rashiLetters/recordings/${student.studentId}`).get()).val()||{};
+  const letters={};let readings=0;
+  for(const record of Object.values(rows)){
+    if(!record||!record.letterReview)continue;
+    letterMarks.addLetters(letters,record.letterReview.letters);readings++;
+  }
+  return res.status(200).json({ok:true,letters,readings});
+}
 async function rashiTeacherList(teacher){
   const scope=teacher.scope;
   const all=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
@@ -1720,6 +1732,7 @@ exports.studentRewardsAutoAward = onRequest(
       const body=req.body&&typeof req.body==="object"&&!Buffer.isBuffer(req.body)?req.body:{};
       const action=String(body.action||"").trim();
       if(action==="rashi-student-status")return await rashiStudentStatus(req,res);
+      if(action==="rashi-student-letters")return await rashiStudentLetters(req,res);
       if(action){
         if(action==="student-point-history" || action==="class-reward-status" || action==="contribute-class-reward"){
           const student=await requireStudent(req);
