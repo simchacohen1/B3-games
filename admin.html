@@ -43,6 +43,10 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 .cp-status small{display:block;font-size:14px;font-weight:700;opacity:.85;margin-top:3px}
 .cp-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
 .cp-modes button{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:13px 6px;font-size:15px;font-weight:900;cursor:pointer;color:#334155}
+.cp-bigswitch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.cp-bigswitch button{border:3px solid #cbd5e1;background:#fff;border-radius:18px;padding:26px 8px;font-size:28px;font-weight:900;letter-spacing:.04em;cursor:pointer;color:#475569}
+.cp-bigswitch button.open.on{background:#16a34a;border-color:#16a34a;color:#fff}.cp-bigswitch button.lock.on{background:#dc2626;border-color:#dc2626;color:#fff}
+.cp-bigswitch button:disabled{opacity:.5;cursor:wait}
 .cp-timed{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));align-items:center}.cp-timed-label{font-weight:900;color:#334155;grid-column:1/-1}
 .cp-modes button.on{background:#172033;border-color:#172033;color:#fff}
 .cp-emergency{background:#7f1d1d;color:#fff;border-radius:14px;padding:13px 16px;margin-bottom:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -325,6 +329,9 @@ function renderOwnerPlatformClass(panel){
  const lockedFeatures=Object.values(row.locks?.features||{}).filter(f=>f&&f.locked===true).length,
    lockOverrides=Object.entries(row.locks?.overrides||{}).filter(([,o])=>o&&Number(o.until)>Date.now()).map(([k])=>k),
    lockSchedules=Object.keys(row.locks?.schedules||{}).length;
+ const lockedOv=lockOverrides.filter(k=>row.locks.overrides[k].state==="locked");
+ // One state for the whole class: open means class access, feature locks and timed feature locks all agree.
+ const mixed=isOpen&&(lockedFeatures>0||lockedOv.length>0),bigState=mixed?"mixed":isOpen?"open":"locked";
  const tools=cpGames().map(t=>({id:t.id==="class-gallery"?"gallery":t.id,name:t.name}));
  tools.push({id:"tag",name:"Tag Game"});
  const known=new Set(),distinct=tools.filter(t=>{if(known.has(t.id))return false;known.add(t.id);return true});
@@ -334,57 +341,60 @@ function renderOwnerPlatformClass(panel){
  }).join("");
  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
   +(cpSettings?.siteEnabled===false&&!teacherMode?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
-  +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.'+(lockedFeatures?' · ⚠ '+lockedFeatures+' feature'+(lockedFeatures===1?'':'s')+' still locked for students — press Unlock all features.':'')+(lockOverrides.length?' · '+lockOverrides.length+' timed feature lock/unlock setting(s) active.':'')+(lockSchedules?' · '+lockSchedules+' weekly lock schedule(s) from a teacher still apply (that teacher clears it).':'')+'</small></div></div>'
-  +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
-  +'<div class="cp-modes"><span class="cp-timed-label">Features</span><button type="button" data-cp-feat="lock"'+(cpBusy?" disabled":"")+'>🔒 Lock all features</button><button type="button" data-cp-feat="unlock"'+(cpBusy?" disabled":"")+'>🔓 Unlock all features</button></div>'
+  +'<div class="cp-status '+(bigState==="open"?"open":"locked")+'"><div>'+(bigState==="open"?"✅ ":bigState==="mixed"?"⚠️ ":"🔒 ")+cpEsc(name)+(bigState==="open"?" is OPEN":bigState==="mixed"?" is PARTLY LOCKED":" is LOCKED")+'<small>'+(mixed?'Class is open but '+(lockedFeatures?lockedFeatures+' feature'+(lockedFeatures===1?' is':'s are')+' still locked':'a timed feature lock is active')+' — press OPEN to clear it. ':'Only this class is affected by the controls below. ')+(lockSchedules?lockSchedules+' weekly lock schedule(s) from a teacher still apply (that teacher clears it). ':'')+'</small></div></div>'
+  +'<div class="cp-bigswitch"><button type="button" data-cp-big="open" class="open'+(bigState==="open"?" on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 OPEN</button><button type="button" data-cp-big="locked" class="lock'+(bigState==="locked"?" on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 LOCK</button></div>'
   +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock this class for'+(openUntil>Date.now()?' · open until '+new Date(openUntil).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):'')+'</span>'+[15,30,45].map(m=>'<button type="button" data-cp-new-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(openUntil>Date.now()?'<button type="button" data-cp-new-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
-  +(distinct.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-grant-all="1"'+(cpBusy?" disabled":"")+'>✅ Enable ALL</button><button type="button" class="all-closed" data-cp-grant-all="0"'+(cpBusy?" disabled":"")+'>⛔ Disable ALL</button></div>':"")
   +(rows||'<div class="cp-row">No class activities found.</div>')+'</div>'
   +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
  cpBindClassTabs(panel);
  const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
- panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(()=>{
-   const mode=b.dataset.cpNewMode;
-   if(teacherMode)return cpApi().manageClassAccessAction(id,"platform",{mode});
-   if(mode==="open")return db.ref().update({[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null});
-   return db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
- },name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
- panel.querySelectorAll("[data-cp-new-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpNewTimed);
-   cpSave(()=>teacherMode?cpApi().manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null),m?name+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
- panel.querySelectorAll("[data-cp-feat]").forEach(b=>b.onclick=()=>{
-   const lock=b.dataset.cpFeat==="lock",api=cpApi();
-   if(!confirm((lock?"Lock ALL features for ":"Unlock ALL features for ")+name+"?"))return;
-   cpSave(async()=>{
-     await api.manageStudentLocks(id,{action:"setAll",locked:lock});
-     // Unlock also ends any timed feature lock/unlock setting so nothing keeps a feature locked.
-     if(!lock&&lockOverrides.length){try{await api.manageStudentLocks(id,{action:"clearOverride",targets:lockOverrides})}catch(e){console.warn("Could not end timed feature settings",e)}}
-   },lock?"All features locked ✓":"All features unlocked ✓");
+ // ONE switch sets every layer, so they cannot disagree: class access (access/mode, siteEnabled, openUntil),
+ // per-feature locks (locks/features, timed locks) and, on OPEN, every tool grant.
+ panel.querySelectorAll("[data-cp-big]").forEach(b=>b.onclick=()=>{
+   const open=b.dataset.cpBig==="open",api=cpApi();
+   return cpSave(async()=>{
+     if(open){
+       if(teacherMode){
+         await api.manageClassAccessAction(id,"platform",{mode:"open"});
+         await Promise.all(distinct.map(t=>api.manageClassAccessAction(id,"grant",{toolId:t.id,enabled:true})));
+       }else{
+         const u={[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null};
+         distinct.forEach(t=>{u[base+"/toolGrants/"+t.id]=true});
+         await db.ref().update(u);
+       }
+       await api.manageStudentLocks(id,{action:"setAll",locked:false});
+       if(lockOverrides.length){try{await api.manageStudentLocks(id,{action:"clearOverride",targets:lockOverrides})}catch(e){console.warn("Could not end timed feature settings",e)}}
+     }else{
+       if(teacherMode)await api.manageClassAccessAction(id,"platform",{mode:"locked"});
+       else await db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
+       await api.manageStudentLocks(id,{action:"setAll",locked:true});
+     }
+   },open?name+" is OPEN: class, features and all tools ✓":name+" is LOCKED ✓");
  });
+ panel.querySelectorAll("[data-cp-new-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpNewTimed);
+   cpSave(async()=>{
+     await (teacherMode?cpApi().manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null));
+     // A timed unlock must open the features too, or the old per-feature locks would keep students out.
+     if(m&&(lockedFeatures||lockOverrides.length)){await cpApi().manageStudentLocks(id,{action:"setAll",locked:false});if(lockOverrides.length){try{await cpApi().manageStudentLocks(id,{action:"clearOverride",targets:lockOverrides})}catch(e){console.warn(e)}}}
+   },m?name+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
  const emergency=document.getElementById("cpEmergencyOffNew");
  if(emergency)emergency.onclick=()=>{
    if(confirm("Turn off the emergency lock for every class?"))
      cpSave(()=>cpApi().updateSiteEnabled(true),"Emergency lock off ✓");
  };
- panel.querySelectorAll("[data-cp-grant-all]").forEach(b=>b.onclick=()=>{
-   const on=b.dataset.cpGrantAll==="1";
-   if(!confirm((on?"Enable":"Disable")+" ALL tools for "+name+"?"))return;
-   const updates={};distinct.forEach(t=>{updates[base+"/toolGrants/"+t.id]=on;});
-   cpSave(()=>teacherMode
-     ?Promise.all(distinct.map(t=>cpApi().manageClassAccessAction(id,"grant",{toolId:t.id,enabled:on})))
-     :db.ref().update(updates),"All tools "+(on?"enabled":"disabled")+" for "+name+" ✓");
- });
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
-   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true;
-   cpSave(()=>teacherMode
-     ?cpApi().manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on})
-     :db.ref(base+"/toolGrants/"+tool).set(!on),
-     tool+(on?" disabled":" enabled")+" for "+name+" ✓");
+   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true,api=cpApi(),fid=tool==="gallery"?"class-gallery":tool;
+   cpSave(async()=>{
+     await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on}):db.ref(base+"/toolGrants/"+tool).set(!on));
+     // Turning a tool ON also clears an old per-feature lock on that same tool, so the two cannot disagree.
+     if(!on&&row.locks?.features?.[fid]?.locked===true){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not clear the feature lock",e)}}
+   },tool+(on?" disabled":" enabled")+" for "+name+" ✓");
  });
 }
 async function cpSave(fn,okMsg){
   if(cpBusy)return;cpBusy=true;cpMsg="Saving…";renderOwnerControl();
-  try{await fn();cpMsg=okMsg;}catch(e){console.error(e);cpMsg="Could not save. Please try again.";}
+  try{await fn();cpMsg=okMsg;}catch(e){console.error(e);cpMsg="Could not save"+(e&&e.message?": "+e.message:"")+". Please try again.";}
   cpBusy=false;renderOwnerControl();
 }
 function applyRoleView(){

@@ -10,20 +10,20 @@ function harness(classId='testing') {
   const end=html.indexOf('async function cpSave(',start);
   assert.ok(start>0&&end>start,'Owner class editor must exist');
   const controls={
-    lock:{dataset:{cpNewMode:'locked'}},
-    open:{dataset:{cpNewMode:'open'}},
+    lock:{dataset:{cpBig:'locked'}},
+    open:{dataset:{cpBig:'open'}},
     halacha:{dataset:{cpGrant:'halacha'}},
     posuk:{dataset:{cpGrant:'posuk-practice-scroll'}}
   };
   const panel={
     innerHTML:'',
     querySelectorAll(query){
-      if(query==='[data-cp-new-mode]')return [controls.open,controls.lock];
+      if(query==='[data-cp-big]')return [controls.open,controls.lock];
       if(query==='[data-cp-grant]')return [controls.halacha,controls.posuk];
       return [];
     }
   };
-  const writes=[];
+  const writes=[],lockCalls=[];
   const db={ref(path=''){
     return {
       async set(value){writes.push({path,method:'set',value})},
@@ -44,24 +44,26 @@ function harness(classId='testing') {
     document:{getElementById:()=>null},
     cpGames:()=>[{id:'halacha',name:'Halacha'},{id:'posuk-practice-scroll',name:'Posuk Practice'}],
     cpClassTabs:()=>'',cpBindClassTabs:()=>{},cpEsc:String,
-    cpApi:()=>({updateSiteEnabled:async()=>{throw Error('Unexpected global update')}}),
+    cpApi:()=>({updateSiteEnabled:async()=>{throw Error('Unexpected global update')},manageStudentLocks:async(id,body)=>{lockCalls.push({id,...body});return {ok:true}}}),
     cpSave:async(fn)=>await fn(),console
   };
   vm.createContext(ctx);
   vm.runInContext(html.slice(start,end),ctx);
-  return {ctx,panel,controls,writes,render:()=>ctx.renderOwnerPlatformClass(panel)};
+  return {ctx,panel,controls,writes,lockCalls,render:()=>ctx.renderOwnerPlatformClass(panel)};
 }
 const ROOT='b3Games/workspaces/b3-2026/classes';
 
-test('owner can lock Testing without touching ET, WT, or Family and Friends',async()=>{
+test('the big LOCK switch locks the class and every feature of that class only',async()=>{
   const x=harness('testing');
   x.render();
   assert.match(x.panel.innerHTML,/Testing/);
   await x.controls.lock.onclick();
-  assert.deepEqual(x.writes,[{path:ROOT+'/testing/access/mode',method:'set',value:'locked'}]);
+  assert.equal(x.writes.length,1);
+  assert.deepEqual(JSON.parse(JSON.stringify(x.writes[0].value)),{[ROOT+'/testing/access/mode']:'locked',[ROOT+'/testing/access/openUntil']:null});
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setAll',locked:true}]);
 });
 
-test('opening a class clears its own site lock without changing another class',async()=>{
+test('the big OPEN switch opens class access, every feature lock and every tool of that class in one press',async()=>{
   const x=harness('testing');
   x.render();
   await x.controls.open.onclick();
@@ -69,7 +71,11 @@ test('opening a class clears its own site lock without changing another class',a
   const update=x.writes[0].value;
   assert.equal(update[ROOT+'/testing/access/mode'],'open');
   assert.equal(update[ROOT+'/testing/siteEnabled'],true);
-  assert.deepEqual(Object.keys(update).sort(),[ROOT+'/testing/access/mode',ROOT+'/testing/siteEnabled'].sort());
+  assert.equal(update[ROOT+'/testing/access/openUntil'],null);
+  assert.equal(update[ROOT+'/testing/toolGrants/halacha'],true);
+  assert.equal(update[ROOT+'/testing/toolGrants/posuk-practice-scroll'],true);
+  assert.ok(Object.keys(update).every(k=>k.startsWith(ROOT+'/testing/')),'only the selected class is written');
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setAll',locked:false}]);
 });
 
 test('Halacha is changed for the selected class only',async()=>{
@@ -88,5 +94,5 @@ test('new classes retain distinct tools and can be selected without ET/WT hardco
   x.render();
   assert.match(x.panel.innerHTML,/Family and Friends/);
   assert.match(x.panel.innerHTML,/data-cp-grant/);
-  assert.match(x.panel.innerHTML,/data-cp-new-mode/);
+  assert.match(x.panel.innerHTML,/data-cp-big/);
 });
