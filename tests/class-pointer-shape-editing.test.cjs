@@ -99,7 +99,7 @@ test('Select is offered on the teacher whiteboard, PDF and webpage, and to stude
  assert.match(html,/<option value="eraser">Eraser<\/option><option value="select">Select<\/option>/);
  assert.equal((html.match(/value="select"/g)||[]).length,2,'both classroom tool menus');
  assert.match(annotate,/const canSelect=\(\)=>allowed\('select'\)&&\(teacher\?\['whiteboard','pdf','webpage'\]\.includes\(B\.lessonKind\?\.\(\)\):highlightShapes\(\)\.length>0\);/);
- assert.match(annotate,/const out=\[canSelect\(\)\?'select':'hand'\];/,'one arrow button: Select where it works, the plain Mouse elsewhere');
+ assert.match(annotate,/const out=\['pointer'\];\s*if\(canSelect\(\)\)out\.push\('select'\);/,'the Pointer is the mouse; Select is added where it works');
  assert.match(annotate,/recolor:color=>!!window\.ClassPointerPdf\?\.recolorSelected\?\.\(color\)/);
  // Select never moves the teacher's pointer for the class.
  assert.match(classroom,/\['eraser','select'\]\.includes\(\$\('teacherTool'\)\.value\)\)\{hideOwnPointer\(\);return\}/);
@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=hlshapes2"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=combo2"/,'classroom');
+ assert.match(html,/"classroom\.js\?v=20261123-tiles2"/,'classroom');
  assert.match(html,/"pdf-mode\.js\?v=20261122-resume1"/,'pdf-mode');
 });
 
@@ -297,12 +297,12 @@ test('a paste picks the biggest size at which the words fit on one line',()=>{
 // ---------- Mouse mode on the lesson; nothing of the toolbar hidden behind the tabs ----------
 test('one arrow button is both Select and the mouse on the teacher whiteboard, PDF and webpage',()=>{
  // The toolbar shows Select (a computer mouse) instead of the Mouse there; a shared screen and students keep the Mouse.
- assert.match(annotate,/const out=\[canSelect\(\)\?'select':'hand'\];/);
+ assert.match(annotate,/const out=\['pointer'\];\s*if\(canSelect\(\)\)out\.push\('select'\);/);
  assert.match(annotate,/select:\['🖱️','Select',/,'drawn as a computer mouse');
  // With the arrow chosen the lesson is in mouse mode: no pointing, no drawing, the page scrolls and drags.
- assert.match(annotate,/const arrow=tool=>tool==='hand'\|\|tool==='select';/);
- assert.match(annotate,/B\.setNavigation\?\.\(arrow\(tool\)&&open\);/);
- assert.equal((annotate.match(/arrow\(s\.tool\)&&!B\.navigating\?\.\(\)\)B\.setNavigation\?\.\(true\);/g)||[]).length,2,'kept on for the teacher and the student');
+ assert.match(annotate,/const arrow=tool=>tool==='pointer'\|\|tool==='hand'\|\|tool==='select';/);
+ assert.match(annotate,/B\.setNavigation\?\.\(arrow\(tool\)&&open,tool==='pointer'\);/);
+ assert.equal((annotate.match(/arrow\(s\.tool\)&&!B\.navigating\?\.\(\)\)B\.setNavigation\?\.\(true,s\.tool==='pointer'\);/g)||[]).length,2,'kept on for the teacher and the student');
  assert.match(annotate,/else if\(kind==='webpage'\)FA\.select\('select'\);/,'a webpage opens on the arrow');
  assert.ok(!annotate.includes('cpMouseBtn'),'no second button for the mouse');
  // The toolbar shows a surface's own name for a tool.

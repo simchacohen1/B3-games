@@ -47,9 +47,8 @@
   // A menu choice as a mark: {tool, fill}.
   const shapeKind=id=>{const filled=/f$/.test(id)&&id!=='arrow';const tool=filled?id.slice(0,-1):id;return{tool:KINDS.includes(tool)?tool:'rect',fill:filled&&CLOSED.includes(tool)}};
   const TOOLS=[
-    ['pointer','🔴','Pointer','Show a pointer dot. Clicks still reach the page.'],
-    ['hand','✋','Hand','Use the page normally: click, type and scroll.'],
-    ['select','🖱️','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it.'],
+    ['pointer','🔴','Pointer','Use the page normally: click, type and scroll. Others see a dot where you point.'],
+    ['select','🖱️','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it. Buttons and links on the page still work.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
@@ -206,7 +205,7 @@
   const stack=[];                // surfaces pushed by other scripts (top = last)
   let mode='hidden';             // hidden | mini | open
   let autoOpened=false;
-  const st={tool:'hand',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1};
+  const st={tool:'pointer',shape:'rect',variant:{},color:PALETTE[1][0],sizeIndex:1};
   const TOOL_ICON=Object.fromEntries(TOOLS.map(t=>[t[0],t[1]]));
   let actionsFn=null;            // page buttons under the tools (setActions)
   const toolColors={pen:PALETTE[1][0],highlight:PALETTE[6][0],shape:PALETTE[1][0],text:PALETTE[1][0]};
@@ -217,7 +216,7 @@
   // The whole-window surface: marks stay on this page only.
   const viewport={id:'viewport',idPrefix:'a',items:[],
     // A teacher's page keeps every tool. A student gets only the tools their level allows, and no greyed-out buttons.
-    get defaultTool(){return role==='teacher'?'hand':'pointer'},
+    get defaultTool(){return 'pointer'},
     // (On the student's own whiteboard the whiteboard's own surface is on top; if it is ever not, they still have every tool.)
     get tools(){return role==='teacher'||ownDrawing()?undefined:LEVEL_TOOLS[studentLevel]},
     get hideUnused(){return role!=='teacher'&&!ownDrawing()},
@@ -474,6 +473,7 @@
   // ---------- Toolbar state ----------
   const colorKey=(s,tool)=>s.variantColor?.(tool,variantOf(tool))?.key||tool;
   function chooseTool(tool,fromClick){
+    if(tool==='hand')tool='pointer';
     const s=surface();if(!supports(s,tool))return;
     // Clicking the chosen tool again shows its kinds (pointer shapes, highlight box, shapes).
     if(fromClick&&st.tool===tool&&variantsOf(s,tool)){openVariants(tool);return}
@@ -515,7 +515,7 @@
     }
     // A tool or a kind that is not allowed here (any more) gives way to one that is.
     let changed=false;
-    if(!s.bare&&!supports(s,st.tool)){st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'hand';changed=true}
+    if(!s.bare&&!supports(s,st.tool)){st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'pointer';changed=true}
     for(const [tool] of toolButtons){
       const kinds=variantsOf(s,tool);
       if(kinds&&!kinds.some(k=>k[0]===variantOf(tool))){setVariant(tool,kinds[0][0]);if(tool===st.tool)changed=true}
@@ -589,6 +589,8 @@
     const s=surface(),r=s.rect?.();
     const on=mode==='open'&&!s.bare&&!isDelegate(s)&&CAPTURES.has(st.tool)&&!!r;
     capture.hidden=!on;capture.dataset.tool=st.tool;
+    // Select lets every click through to the page except one on a mark (see the document pointerdown below).
+    if(pid===null)capture.style.pointerEvents=st.tool==='select'?'none':'';
     if(on){
       const key=[r.left,r.top,r.width,r.height].map(Math.round).join();
       if(key!==lastRectKey){lastRectKey=key;Object.assign(capture.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'})}
@@ -651,17 +653,24 @@
     return null;
   }
   let pid=null,liveTimer=0,lastLive=0;
+  // A surface may carry movable things of its own (the Hebrew word tiles on a whiteboard): surface.grab = {down(p), move(p), up(p), cancel()}
+  // with p = {x,y} from 0 to 1. When down() takes the press, the tool underneath (pen, text, select...) is left alone.
+  let tileGrab=null;
   function sendLive(force){
     const s=surface();if(!s.live)return;
     const go=()=>{liveTimer=0;lastLive=Date.now();try{s.live(draft?{...draft,points:draft.points.slice()}:null,laser)}catch{}};
     clearTimeout(liveTimer);liveTimer=0;const wait=60-(Date.now()-lastLive);
     if(force||wait<=0)go();else liveTimer=setTimeout(go,wait);
   }
-  capture.addEventListener('pointerdown',e=>{
+  function onCaptureDown(e){
     if(e.button!==0||pid!==null)return;
     const s=surface(),p=rel(e,s);if(!p)return;
     closeFly();
     e.preventDefault();e.stopPropagation();
+    if(s.grab){
+      let took=false;try{took=!!s.grab.down({x:p.x,y:p.y})}catch(err){console.warn('Drawing tools:',err)}
+      if(took){if(editor)finishEditor(true);pid=e.pointerId;try{capture.setPointerCapture(pid)}catch{}tileGrab=s;return}
+    }
     if(st.tool==='text'){
       const hit=topHit(s,p,true);
       if(hit&&hit.tool==='text'){startEditor(s,hit);return}
@@ -683,9 +692,32 @@
     const kind=st.tool==='shape'?shapeKind(st.shape):{tool:st.tool,fill:false},tool=kind.tool;
     draft={id:newId(s.idPrefix),tool,color:st.color,size:currentSize(s),points:tool==='pen'||tool==='highlight'?[{x:p.x,y:p.y}]:[{x:p.x,y:p.y},{x:p.x,y:p.y}],...(kind.fill?{fill:true}:{})};
     sendLive();scheduleRender();
-  });
+  }
+  capture.addEventListener('pointerdown',onCaptureDown);
+  // With Select chosen the drawing layer does not block the page: a press on one of your marks (or a handle, or a word tile)
+  // is taken over here, any other press goes to the page as usual, so its buttons and links keep working.
+  const insideSurface=(e,s)=>{const r=s.rect?.();return !!r&&e.clientX>=r.left&&e.clientX<=r.left+r.width&&e.clientY>=r.top&&e.clientY<=r.top+r.height};
+  function markUnder(e){
+    const s=surface();if(!insideSurface(e,s))return null;
+    const p=rel(e,s);if(!p)return null;
+    const picked=selected&&itemsOf(s).find(i=>i.id===selected);
+    if(picked&&handleAt(picked,p.px,p.py,p.w,p.h))return{s,p,kind:'handle'};
+    const hit=topHit(s,p,true);if(hit)return{s,p,kind:'mark',hit};
+    let tile=false;try{tile=!!s.grab?.hit?.({x:p.x,y:p.y})}catch{}
+    return tile?{s,p,kind:'tile'}:null;
+  }
+  document.addEventListener('pointerdown',e=>{
+    if(mode!=='open'||st.tool!=='select'||capture.hidden||pid!==null||e.button!==0)return;
+    if(root.contains(e.target))return;
+    const found=markUnder(e);
+    if(!found){if(selected){selected=null;sync()}return}
+    capture.style.pointerEvents='auto';
+    e.stopImmediatePropagation();
+    onCaptureDown(e);
+  },true);
   capture.addEventListener('pointermove',e=>{
     if(e.pointerId!==pid)return;
+    if(tileGrab){const q=rel(e,tileGrab);e.stopPropagation();if(q)try{tileGrab.grab.move({x:q.x,y:q.y},false)}catch{}return}
     const s=surface(),p=rel(e,s);if(!p)return;e.stopPropagation();
     if(st.tool==='select'){
       if(!drag)return;const dx=p.x-drag.start.x,dy=p.y-drag.start.y;
@@ -709,6 +741,12 @@
   });
   function endPointer(e,cancel){
     if(e&&e.pointerId!==pid)return;pid=null;
+    setTimeout(()=>{if(pid===null)capture.style.pointerEvents=st.tool==='select'?'none':''},0);
+    if(tileGrab){
+      const g=tileGrab;tileGrab=null;
+      try{if(cancel)g.grab.cancel();else{const q=e&&rel(e,g);g.grab.up(q?{x:q.x,y:q.y}:null)}}catch(err){console.warn('Drawing tools:',err)}
+      return;
+    }
     const s=surface();
     if(st.tool==='select'){
       if(drag?.moved&&!cancel){if(drag.resize)changeItem(s,drag.item,{points:drag.points.map(q=>({x:round(q.x),y:round(q.y)}))});else moveItem(s,drag.item,drag.dx,drag.dy)}
@@ -728,10 +766,15 @@
   capture.addEventListener('pointerup',e=>endPointer(e,false));
   capture.addEventListener('pointercancel',e=>endPointer(e,true));
   capture.addEventListener('lostpointercapture',e=>{if(e.pointerId===pid)endPointer(e,false)});
-  capture.addEventListener('dblclick',e=>{
+  function onDouble(e){
     if(st.tool!=='select')return;const s=surface(),p=rel(e,s);if(!p)return;
     const hit=topHit(s,p,true);if(hit?.tool==='text'){e.preventDefault();startEditor(s,hit)}
-  });
+  }
+  capture.addEventListener('dblclick',onDouble);
+  document.addEventListener('dblclick',e=>{
+    if(mode!=='open'||st.tool!=='select'||capture.hidden||root.contains(e.target)||e.target===capture)return;
+    const s=surface();if(insideSurface(e,s))onDouble(e);
+  },true);
   for(const type of ['click','contextmenu','wheel'])capture.addEventListener(type,e=>{if(type!=='wheel')e.preventDefault();e.stopPropagation()},{passive:false});
   // The browser moves focus on mouse down; a new text box must keep it so the typing goes into it.
   capture.addEventListener('mousedown',e=>e.preventDefault());
@@ -994,7 +1037,7 @@
       on=!!on;if(reasons.has(name)===on)return;
       if(on){
         // Start with the surface's own tool: Hand on a page (the student keeps working), Pen on a whiteboard.
-        reasons.add(name);mount();const s=stack[stack.length-1]||surface();st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'hand';lastSurface=null;openBar(true);return}
+        reasons.add(name);mount();const s=stack[stack.length-1]||surface();st.tool=s.defaultTool&&supports(s,s.defaultTool)?s.defaultTool:'pointer';lastSurface=null;openBar(true);return}
       reasons.delete(name);
       if(!visible())return hideAll();
       if(!reasons.size&&autoOpened&&role==='teacher')mode='mini';

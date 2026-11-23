@@ -10,7 +10,7 @@ test('student page: presentation hides the share button, blocks opening a share,
   assert.match(s,/lessonActive=false;setPresenting\(false\)/);
   assert.equal((s.match(/setPresenting\(false\)/g)||[]).length,2);
   // the button is hidden (both the idle button and a running share's Stop button)
-  assert.match(s,/\(active&&permissionReady\)\|\|s\?\.open\)&&!lessonOnAir\?'flex':'none'/);
+  assert.match(s,/\(active&&permissionReady\)\|\|s\?\.open\)&&!lessonOnAir&&!\(boardShown&&!s\?\.open\)\?'flex':'none'/);
   assert.match(s,/holder\.style\.display=lessonOnAir\?'none':'flex'/);
   // no share window may be opened or started meanwhile (this was the blank window that flashed twice)
   assert.match(s,/function openHolder\(\)\{\s*if\(busy\|\|!active\|\|!sameStudent\(\)\|\|lessonOnAir\)return;/);
