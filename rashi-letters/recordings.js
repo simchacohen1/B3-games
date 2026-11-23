@@ -310,7 +310,11 @@
     const map=cfg.isPreview()?{}:await loadStatus(false);
     rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const e=map[r.sec.id],st=e&&e.canRerecord&&e.status==='approved'?'rerecord':(e&&e.status)||'none',b=bannerFor(st,e);
       r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
-      if(st==='pending'||st==='approved')r.go.textContent='View';else if(st==='rerecord')r.go.textContent='🔁 Record again';});
+      if(st==='pending'||st==='approved')r.go.textContent='View';else if(st==='rerecord')r.go.textContent='🔁 Record again';
+      // A graded reading can always be opened to see the teacher's marks, even when today's 3 readings are used up.
+      if(e&&e.review&&(st==='approved'||st==='rerecord')&&r.go.textContent!=='View'){
+        const see=button('👀 See my marks','gold',()=>open(r.sec,()=>openHub(sections),()=>openHub(sections)));r.go.before(see);}
+    });
   }
   
   // A standalone passage browser. Each source Rashi has its own record ID and status.
