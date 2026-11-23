@@ -26,5 +26,5 @@
   t.appendChild(tl);
   main.append(h,p,go,t);
   body.appendChild(main);
-  document.title='Class Pointer';
+  document.title='Class Pointer · SOLS';
 })();

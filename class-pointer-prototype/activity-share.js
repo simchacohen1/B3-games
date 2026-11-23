@@ -219,7 +219,7 @@
       // While sharing: a title and one short line. Otherwise nothing but the big button.
       if(headline)headline.textContent=sharePaused?'Paused ⏸':stream?'Sharing your screen ✅':'';
       if(shareLine)shareLine.textContent=sharePaused?'Your teacher is presenting. Keep this tab open: sharing continues when they stop.':stream?'Keep this tab open':'';
-      try{document.title=sharePaused?'⏸ Sharing paused':stream?'📺 Sharing your screen':'Share My Screen'}catch{}
+      try{document.title=(sharePaused?'⏸ Sharing paused':stream?'📺 Sharing':'Screen Share')+' · SOLS'}catch{}
     }
     // The student ended it (Stop here, Stop in his other tab, or the browser's own Stop sharing bar).
     function studentStop(){
