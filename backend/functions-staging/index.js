@@ -10,3 +10,4 @@ exports.teacherStudentFiles = require('./teacher-student-files').teacherStudentF
 exports.classWorksheets = require('./class-worksheets').classWorksheets;
 exports.studentRewardsTeacher = require('./rewards-teacher').studentRewardsTeacher;
 exports.studentLocks = require('./student-locks').studentLocks;
+exports.funTorahClassAccess = require('./class-access').funTorahClassAccess;
