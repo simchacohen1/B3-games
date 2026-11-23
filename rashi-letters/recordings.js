@@ -112,7 +112,7 @@
         if(wi)holder.append(' ');
         for(const p of word){
           if(!p.letter){holder.append(p.text);continue;}
-          if(missed.has(p.i+offset)){const m=el('span','rr-miss',p.text);m.title='Not recognized';holder.append(m);}else holder.append(p.text);
+          if(missed.has(p.i+offset)){const m=el('span','rr-miss',p.text);m.title='You didn't read this right';holder.append(m);}else holder.append(p.text);
         }
       });
       offset+=tk.total;
@@ -122,7 +122,7 @@
     const parts=el('div','rr-parts');
     (review.partsClean||[]).forEach((ok,k)=>parts.append(el('span','rr-part '+(ok?'rr-part-ok':'rr-part-bad'),'Part '+(k+1)+(ok?' ✅ perfect':' ❌ a letter was missed'))));
     box.append(el('h3',null,'You earned '+review.points+' of 5 points'),parts,text,
-      el('p','rr-legend',review.missed&&review.missed.length?'Letters in red were not recognized by your teacher.':'Every letter was recognized. Great reading!'));
+      el('p','rr-legend',review.missed&&review.missed.length?'Letters in red: you didn't read these right.':'You read every letter right. Great reading!'));
     return box;
   }
   let letterScores=null,letterScoresAt=0,letterScoresPromise=null;
@@ -148,7 +148,7 @@
     const box=el('div','rr-review');
     const rows=LM.LETTER_KEYS.map(k=>({k,row:data.letters&&data.letters[k],pct:LM.letterPct(data.letters&&data.letters[k])})).filter(r=>r.pct!=null);
     const need=rows.filter(r=>r.pct<100).sort((a,b)=>a.pct-b.pct);
-    box.append(el('h3',null,'📊 My letters'),el('p','rr-legend',need.length?'Letters your teacher did not recognize yet: practice these! (from '+data.readings+' graded reading'+(data.readings===1?'':'s')+')':'Every letter was recognized in your '+data.readings+' graded reading'+(data.readings===1?'':'s')+'. Amazing!'));
+    box.append(el('h3',null,'📊 My letters'),el('p','rr-legend',need.length?'Letters to practice (from '+data.readings+' graded reading'+(data.readings===1?'':'s')+')':'You read every letter right in your '+data.readings+' graded reading'+(data.readings===1?'':'s')+'. Amazing!'));
     const grid=el('div','rr-letters');
     (need.length?need:rows).forEach(r=>{const t=el('div','rr-ltr '+(r.pct<100?'rr-ltr-bad':'rr-ltr-ok'));t.append(el('b',null,r.k),el('span',null,r.pct+'% ('+(r.row.seen-r.row.missed)+'/'+r.row.seen+')'));grid.append(t);});
     box.append(grid);
