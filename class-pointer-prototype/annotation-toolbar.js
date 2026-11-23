@@ -651,6 +651,9 @@
     return null;
   }
   let pid=null,liveTimer=0,lastLive=0;
+  // A surface may carry movable things of its own (the Hebrew word tiles on a whiteboard): surface.grab = {down(p), move(p), up(p), cancel()}
+  // with p = {x,y} from 0 to 1. When down() takes the press, the tool underneath (pen, text, select...) is left alone.
+  let tileGrab=null;
   function sendLive(force){
     const s=surface();if(!s.live)return;
     const go=()=>{liveTimer=0;lastLive=Date.now();try{s.live(draft?{...draft,points:draft.points.slice()}:null,laser)}catch{}};
@@ -662,6 +665,10 @@
     const s=surface(),p=rel(e,s);if(!p)return;
     closeFly();
     e.preventDefault();e.stopPropagation();
+    if(s.grab){
+      let took=false;try{took=!!s.grab.down({x:p.x,y:p.y})}catch(err){console.warn('Drawing tools:',err)}
+      if(took){if(editor)finishEditor(true);pid=e.pointerId;try{capture.setPointerCapture(pid)}catch{}tileGrab=s;return}
+    }
     if(st.tool==='text'){
       const hit=topHit(s,p,true);
       if(hit&&hit.tool==='text'){startEditor(s,hit);return}
@@ -686,6 +693,7 @@
   });
   capture.addEventListener('pointermove',e=>{
     if(e.pointerId!==pid)return;
+    if(tileGrab){const q=rel(e,tileGrab);e.stopPropagation();if(q)try{tileGrab.grab.move({x:q.x,y:q.y},false)}catch{}return}
     const s=surface(),p=rel(e,s);if(!p)return;e.stopPropagation();
     if(st.tool==='select'){
       if(!drag)return;const dx=p.x-drag.start.x,dy=p.y-drag.start.y;
@@ -709,6 +717,11 @@
   });
   function endPointer(e,cancel){
     if(e&&e.pointerId!==pid)return;pid=null;
+    if(tileGrab){
+      const g=tileGrab;tileGrab=null;
+      try{if(cancel)g.grab.cancel();else{const q=e&&rel(e,g);g.grab.up(q?{x:q.x,y:q.y}:null)}}catch(err){console.warn('Drawing tools:',err)}
+      return;
+    }
     const s=surface();
     if(st.tool==='select'){
       if(drag?.moved&&!cancel){if(drag.resize)changeItem(s,drag.item,{points:drag.points.map(q=>({x:round(q.x),y:round(q.y)}))});else moveItem(s,drag.item,drag.dx,drag.dy)}
