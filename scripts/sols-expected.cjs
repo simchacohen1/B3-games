@@ -36,7 +36,7 @@ function solsTitle(raw) {
   if (/^SOLS Tools\b/i.test(text)) return text;
   const rest = text.replace(/Fun Torah Tools/gi, ' ').replace(/Shluchim Online School/gi, ' ')
     .replace(/\s+/g, ' ').replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
-  return 'SOLS Tools | ' + (rest || 'Shluchim Online School');
+  const page = rest.replace(/\s*·\s*SOLS$/i, '').trim(); return 'SOLS Tools | ' + (!page || page === 'Home' ? 'Shluchim Online School' : page);
 }
 
 module.exports = { expectedLiveFiles, sha, solsTitle };
