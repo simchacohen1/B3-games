@@ -385,6 +385,35 @@ function init(){
   grid.append(b);tileButtons.push([b,original]);
  }
  pickerCard.append(grid);
+ /* Resume presenting: shown on My screen after opening Student screens set the teacher's presentation aside. */
+ let heldPresentation=null;
+ const resumeBtn=el('button','cp-resume-btn','');resumeBtn.type='button';resumeBtn.hidden=true;resumeBtn.id='cpResumePresenting';
+ resumeBtn.style.cssText='display:block;margin:0 auto 18px;padding:16px 26px;border:0;border-radius:14px;background:#1d4ed8;color:#fff;font:800 20px system-ui,sans-serif;cursor:pointer';
+ pickerCard.prepend(resumeBtn);
+ function showResume(){resumeBtn.hidden=!heldPresentation;if(heldPresentation)resumeBtn.textContent='▶ Resume presenting: '+heldPresentation.label}
+ async function setPresentationAside(){
+  if(heldPresentation)return;
+  if(docOpen()){const label=lastDoc;if(await window.ClassPointerPdf?.suspend?.())heldPresentation={label}}
+  else if(sharingScreen()){stopScreen.click();heldPresentation={label:'Shared screen',screen:true}}
+  showResume();
+ }
+ resumeBtn.addEventListener('click',async()=>{
+  const h=heldPresentation;heldPresentation=null;showResume();
+  if(!h)return;
+  if(h.screen){$('shareScreen')?.click();return}   // the browser asks again which screen to share
+  await window.ClassPointerPdf?.resumeHeld?.();
+ });
+ // Student screens / Student whiteboards: the teacher's presentation stops, so students can share and their tiles go live.
+ function onWorkspaceChange(){setTimeout(()=>{
+  const w=window.ClassPointerBoards?.workspace?.();
+  if(w==='screens'||w==='boards')void setPresentationAside();else showResume();
+ },0)}
+ // The tab event names the tab itself (screens / whiteboards / teach), so a slow browser cannot make this miss it.
+ document.addEventListener('class-pointer-workspace',event=>{
+  if(event.detail==='screens'||event.detail==='whiteboards')setTimeout(()=>{void setPresentationAside()},0);
+  else if(event.detail==='teach')setTimeout(showResume,0);
+ });
+ document.addEventListener('classpointer:sharing-state',onWorkspaceChange);
  // The still picture of a tab or window is not a start-screen choice any more: it is in Switch presentation, right under Share my screen.
  pickerCard.append(el('p','cp-source-note','Students who are signed in join by themselves. You can switch anytime.'));
  stage?.append(pickerCard);
@@ -424,6 +453,7 @@ function init(){
   // Leaving the whiteboard (or a PDF, webpage or screen share): the old "Whiteboard open for everyone…" line must go.
   if(wasLive&&!isLive){const line=$('connectionStatus');if(line)line.textContent='Nothing is shown to students right now. Pick what to teach from.'}
   const changed=wasLive!==isLive;wasLive=isLive;
+  if(isLive&&heldPresentation){heldPresentation=null;window.ClassPointerPdf?.discardHeld?.();showResume()}
   if(changed){try{syncJoined()}catch{}}
   const boards=document.body.classList.contains('boards-on');
   document.body.classList.toggle('cp-is-live',isLive);

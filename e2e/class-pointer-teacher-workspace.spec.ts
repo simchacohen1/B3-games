@@ -552,8 +552,14 @@ test('My Screen whiteboard supplies live frames with published pictures and pen 
   await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>{const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d')!;ctx.drawImage(v,0,0);const pixels=ctx.getImageData(0,0,c.width,c.height).data;let red=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>180&&pixels[i+1]<90&&pixels[i+2]<120)red++;return red})).toBeGreaterThan(100);
   await whiteboardSettled(page);
   const box=(await page.locator('#pdfContent').boundingBox())!;await page.mouse.move(box.x+40,box.y+40);await page.mouse.down();await page.mouse.move(box.x+180,box.y+70,{steps:8});await page.mouse.up();await expect.poll(()=>inkCount(page)).toBeGreaterThan(0);const marks=await inkCount(page);
-  await page.getByRole('button',{name:'Student screens',exact:true}).click();await page.getByRole('button',{name:'My screen',exact:true}).click();
-  expect(await inkCount(page)).toBe(marks);expect(await page.evaluate(()=>(window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
+  await expect(page.locator('#studentBoards')).toBeEnabled();
+  await page.getByRole('button',{name:'Student screens',exact:true}).click();
+  // Opening Student screens stops the presentation; back on My screen one button brings back the same board.
+  await expect(page.locator('#cpStopBtn')).toBeHidden();
+  await page.getByRole('button',{name:'My screen',exact:true}).click();
+  await page.getByRole('button',{name:/Resume presenting/}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).ClassPointerPdf.isOpen())).toBe(true);
+  await expect.poll(()=>inkCount(page)).toBe(marks);expect(await page.evaluate(()=>(window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
   await page.evaluate(()=>{(window as any).__testBoardStream=(window as any).ClassPointerPdf.presentationStream();(window as any).ClassPointerPdf.close(true)});
   expect(await page.evaluate(()=>(window as any).__testBoardStream.getVideoTracks()[0].readyState)).toBe('ended');expect(errors).toEqual([]);await context.close();
 });
@@ -607,17 +613,22 @@ test('Stop sharing stays on the Live bar on every tab and ends the share from on
   expect(await stop.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(220, 38, 38)');
   await shot(page, 'stop-my-screen');
   for (const name of ['Student screens', 'Student whiteboards']) {
+    // The student tabs ignore clicks until the class is open (the launch button is enabled).
+    await expect(page.locator('#studentBoards')).toBeEnabled();
     await tab(name);
-    await expect(stop).toBeVisible(); await expect(page.locator('.cp-live-wrap')).toBeVisible();
+    await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('aria-selected', 'true');
+    // Opening a student tab stops the teacher's screen share, so students can share and their tiles are live.
+    await expect(stopScreen).toBeDisabled(); await expect(stop).toBeHidden();
     await shot(page, 'stop-' + name.replace(/\s/g, '-'));
+    await tab('My screen');
+    await expect(page.getByRole('button', { name: /Resume presenting: Shared screen/ })).toBeVisible();
+    await page.getByRole('button', { name: /Resume presenting/ }).click();   // the browser asks again which screen to share
+    await expect(stopScreen).toBeEnabled(); await expect(stop).toBeVisible();
   }
-  await tab('My screen');
 
-  // One click on Stop ends the share from any tab.
-  await tab('Student whiteboards');
+  // One click on Stop ends the share.
   await stop.click();
   await expect(stopScreen).toBeDisabled(); await expect(stop).toBeHidden();
-  await tab('My screen');
   await expect(page.locator('#placeholder')).not.toHaveAttribute('hidden'); await expect(page.locator('#cpSourcePicker')).toBeVisible();
   expect(await page.evaluate(() => (window as any).__tracks.every((t: MediaStreamTrack) => t.readyState === 'ended'))).toBe(true);
 

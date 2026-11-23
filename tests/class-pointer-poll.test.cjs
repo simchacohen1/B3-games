@@ -20,3 +20,12 @@ test('student payload hides totals until shared and never includes names/other v
   p.show=true;v=C.view(p,'fictional-b');assert.deepEqual(v.counts,[0,1]);assert.equal(v.choice,null);assert.equal(JSON.stringify(v).includes('fictional-a'),false);
   p.show=false;assert.equal('counts' in C.view(p,'fictional-b'),false);
 });
+test('auto-close timer: 30s / 1 min / 2 min / none, sent to students as seconds left (never a clock time)',()=>{
+  for(const seconds of [30,60,120,0,null,undefined])assert.doesNotThrow(()=>C.create('thumbs','',[],'p',seconds));
+  for(const seconds of [5,45,-1,'60',1e6])assert.throws(()=>C.create('thumbs','',[],'p',seconds),/timer/);
+  const p=C.create('thumbs','',[],'p',60);p.endsAt=1000+60000;
+  assert.equal(C.remaining(p,1000),60);assert.equal(C.remaining(p,1000+59001),1);assert.equal(C.remaining(p,1000+70000),0);
+  assert.equal(C.view(p,'a',1000).secondsLeft,60);assert.equal('endsAt' in C.view(p,'a',1000),false);
+  p.open=false;assert.equal(C.view(p,'a',1000).secondsLeft,null);
+  const none=C.create('thumbs','',[],'p',0);assert.equal(C.view(none,'a').secondsLeft,null);
+});
