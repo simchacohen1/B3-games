@@ -100,9 +100,9 @@
     // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
     await load(new URL('class-pointer-prototype/classroom-core.js?v=hlshapes2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=hlshapes1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/poll-core.js?v=1',root).href);
-    await load(new URL('class-pointer-prototype/poll.js?v=1',root).href);
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261120-sharetab3',root).href);
+    await load(new URL('class-pointer-prototype/poll-core.js?v=2',root).href);
+    await load(new URL('class-pointer-prototype/poll.js?v=2',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261122-presenting1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261116-myfiles2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261117-send1',root).href).catch(()=>{});
@@ -139,6 +139,7 @@
       shareArea.appendChild(holder);
     }
     else document.body.appendChild(holder);
+    let lessonOnAir=false,sharePaused=false;   // teacher presenting (own tab) / told to pause by the own tab (sharing tab)
     let active=null,peer=null,call=null,stream=null,busy=false,latestSession=null,permission={},permissionKey='',permissionRequest=0,permissionReady=false;
     // Remembered per tab (sessionStorage survives a refresh of the same tab): this student was sharing from this tab
     // when the page was unloaded. A deliberate stop, the end of the lesson or a "no" from the teacher clear it.
@@ -148,7 +149,7 @@
     const clearResume=()=>{try{sessionStorage.removeItem(RESUME_KEY)}catch{}};
     // In the sharing tab the real control replaces the start-up placeholder button in the same step it is shown or hidden.
     function setHolderDisplay(value){
-      holder.style.display=value;
+      holder.style.display=sharePaused?'none':value;
       if(persistentShareWindow){try{document.getElementById('fttShareShell')?.remove()}catch{}}
     }
     const rememberSharing=()=>{try{sessionStorage.setItem(RESUME_KEY,id)}catch{}};
@@ -194,6 +195,18 @@
     // settled: this page has had its first answer about the lesson and this student's permission.
     let holderState=null,holderSeen=0,autoTried=false,settled=false;
     const tell=message=>{try{channel?.postMessage({...message,studentId:id})}catch{}};
+    // Whatever the teacher presents (whiteboard, screen, PDF, webpage) comes first for everybody: while it is on, no Share My Screen
+    // button is offered, and a share already running is paused (its picture stops being sent, nothing is torn down) until the teacher stops.
+    function applyPause(){
+      const paused=persistentShareWindow?sharePaused:lessonOnAir;
+      try{stream?.getVideoTracks?.().forEach(t=>{t.enabled=!paused})}catch{}
+    }
+    function setPresenting(on){
+      on=!!on;if(lessonOnAir===on)return;lessonOnAir=on;
+      try{document.dispatchEvent(new CustomEvent('classpointer:teacher-presenting',{detail:{on}}))}catch{}
+      if(persistentShareWindow)return;
+      tell({type:'presenting',on});applyPause();showLinked();
+    }
     const headline=persistentShareWindow&&typeof document.getElementById==='function'?document.getElementById('fttShareHeadline'):null;
     const shareLine=persistentShareWindow&&typeof document.getElementById==='function'?document.getElementById('fttShareLine'):null;
     function report(){
@@ -202,9 +215,9 @@
       // open, so the student's own tab goes back to its ordinary button instead of showing Cancel.
       tell({type:'holder',open:!settled||!!stream||!!active||busy,sharing:!!stream});
       // While sharing: a title and one short line. Otherwise nothing but the big button.
-      if(headline)headline.textContent=stream?'Sharing your screen ✅':'';
-      if(shareLine)shareLine.textContent=stream?'Keep this tab open':'';
-      try{document.title=stream?'📺 Sharing your screen':'Share My Screen'}catch{}
+      if(headline)headline.textContent=sharePaused?'Paused ⏸':stream?'Sharing your screen ✅':'';
+      if(shareLine)shareLine.textContent=sharePaused?'Your teacher is presenting. Keep this tab open: sharing continues when they stop.':stream?'Keep this tab open':'';
+      try{document.title=sharePaused?'⏸ Sharing paused':stream?'📺 Sharing your screen':'Share My Screen'}catch{}
     }
     // The student ended it (Stop here, Stop in his other tab, or the browser's own Stop sharing bar).
     function studentStop(){
@@ -221,15 +234,15 @@
       const s=holderState;
       fallback.hidden=true;
       // No sharing tab could be opened, so this page is sharing by itself: keep its Stop button and its status line.
-      if(stream){btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';holder.style.display='flex';return}
+      if(stream){btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';holder.style.display=lessonOnAir?'none':'flex';return}
       if(s?.sharing){btn.textContent='⏹ Stop Sharing';btn.style.background='#a91f37';label.textContent='📺 You’re sharing your screen. Keep working here.'}
       else if(s?.open){btn.textContent='✖ Cancel';btn.style.background='#64748b';label.textContent='Choose Entire Screen in the sharing tab that opened.'}
       else{btn.textContent='🖥 Share My Screen';btn.style.background='#1d4ed8';label.textContent=IDLE_TEXT}
       // A sharing tab that is open keeps its Stop / Cancel button here whatever else happens.
-      holder.style.display=(active&&permissionReady)||s?.open?'flex':'none';
+      holder.style.display=((active&&permissionReady)||s?.open)&&!lessonOnAir?'flex':'none';
     }
     function openHolder(){
-      if(busy||!active||!sameStudent())return;
+      if(busy||!active||!sameStudent()||lessonOnAir)return;
       // Opened straight from the click so the browser allows the new tab.
       const opened=openShareWindowOnce(window,new URL('class-pointer-prototype/student-share-window.html?pointerShare=1',root).href,HOLDER_NAME);
       // The browser would not open the sharing tab (pop-ups blocked): share from this page as before, so the
@@ -253,9 +266,11 @@
         if(persistentShareWindow){
           if(m.type==='ping')report();
           else if(m.type==='stop')studentStop();
+          else if(m.type==='presenting'&&typeof m.on==='boolean'&&m.on!==sharePaused){sharePaused=m.on;applyPause();setHolderDisplay(stream||active||resumeNeeded?'flex':'none');report()}
           return;
         }
         if(m.type!=='holder')return;
+        if(m.open&&lessonOnAir)tell({type:'presenting',on:true});
         const wasSharing=holderState?.sharing===true;
         holderState=m.open?{open:true,sharing:m.sharing===true}:null;holderSeen=Date.now();
         // My screen is no longer shared: take the teacher's marks off this page.
@@ -271,6 +286,7 @@
         tell({type:'ping'});
         const pinger=typeof setInterval==='function'?setInterval(()=>{
           tell({type:'ping'});
+          if(holderState?.open)tell({type:'presenting',on:lessonOnAir});
           if(holderState&&Date.now()-holderSeen>15000){const was=holderState.sharing;holderState=null;if(was)window.ClassPointerBoards?.clearScreenMarks?.();showLinked()}
         },5000):null;
         pinger?.unref?.();
@@ -810,7 +826,7 @@
     }
     function clearLesson(){
       lessonLevel='none';lessonDraft=null;lessonMarks={points:{},strokes:[],members:[]};redrawToolbar();renderLessonMarks();
-      admitted=false;lessonActive=false;lessonId='';cancelLater(pendingLessonTimer);cancelLater(lessonRetryTimer);pendingLessonTimer=null;lessonRetryTimer=null;
+      admitted=false;lessonActive=false;setPresenting(false);lessonId='';cancelLater(pendingLessonTimer);cancelLater(lessonRetryTimer);pendingLessonTimer=null;lessonRetryTimer=null;
       const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none';
     }
     function retryLesson(){
@@ -848,8 +864,8 @@
     function announceLesson(message){
       refreshPresentationLock();
       if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
-      if(!message.active){if(message.id===lessonId){lessonActive=false;cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
-      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;userClosed=false;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
+      if(!message.active){if(message.id===lessonId){lessonActive=false;setPresenting(false);cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
+      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;setPresenting(true);userClosed=false;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
@@ -1080,7 +1096,7 @@
       setHolderDisplay(active||resumeNeeded?'flex':'none');
       report();
       // The sharing tab asks for the screen by itself as soon as it knows sharing is allowed.
-      if(active&&!autoTried&&!stream&&!busy){autoTried=true;void beginShare()}
+      if(active&&!autoTried&&!stream&&!busy&&!sharePaused){autoTried=true;void beginShare()}
     }
     // ---------- Teacher connection drops (issue #801) ----------
     // When the teacher's page loses its database connection, the lesson is stamped teacherOfflineAt
@@ -1241,6 +1257,7 @@
     }
     async function beginShare(){
       if(stream){studentStop();return}
+      if(sharePaused||lessonOnAir)return;   // the teacher's presentation comes first
       if(!active&&resumeNeeded&&!busy){status('One moment…');return}
       if(busy||!active||!sameStudent())return;
       const lesson=active;

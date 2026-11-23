@@ -28,7 +28,7 @@ test('all student tools load the corrected activity screen-sharing script withou
     const html = fs.readFileSync(path.join(root, page), 'utf8');
     const refs = html.match(/activity-share[.]js[?]v=[^"']+/g) || [];
     assert.equal(refs.length, 1, page + ' must include exactly one activity-share script');
-    assert.equal(refs[0], 'activity-share.js?v=20261120-locks1', page + ' must use the release version');
+    assert.equal(refs[0], 'activity-share.js?v=20261122-presenting1', page + ' must use the release version');
   }
 });
 
@@ -37,7 +37,7 @@ test('the classroom loads the updated PeerJS reconnection handling', () => {
   assert.match(html, /classroom[.]js[?]v=combo2/);
   // The teacher's screen tiles and the "student stopped" message changed with the sharing tab (#700).
   assert.match(html, /activity-screen-teacher[.]js[?]v=20261120-sharetab3/);
-  assert.match(html, /student-boards[.]js[?]v=20261120-sharetab3/);
+  assert.match(html, /student-boards[.]js[?]v=20261122-presenting1/);
 });
 test('student pages refresh the shared gate for locked-classroom presentation controls',()=>{
   for(const page of [...pages,'halacha/index.html','class-pointer-prototype/student-view.html']) {
