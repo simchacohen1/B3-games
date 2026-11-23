@@ -3,9 +3,6 @@
 <html lang="en">
 <head><script src="/domain-redirect.js"></script>
 <meta charset="UTF-8">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="../guest-mode.js?v=20261011-guest"></script>
@@ -28,7 +25,7 @@
   window.B3_QUIZ_MODE = p.get('mode') === 'quiz' || p.get('tool') === 'test-me';
   document.documentElement.classList.toggle('quiz-mode', window.B3_QUIZ_MODE);
   if(window.B3_QUIZ_MODE){
-    document.title = 'Chumash חידון';
+    document.title = 'Chumash Quiz · SOLS'; (function(l){ if(l) l.href = '/assets/favicons/quiz.svg'; })(document.querySelector('link[rel="icon"]'));
     document.addEventListener('DOMContentLoaded', function(){
       var h = document.querySelector('header.top h1'), d = document.querySelector('header.top p');
       if(h) h.textContent = '🧠 Chumash חידון';
@@ -42,7 +39,8 @@
   html.quiz-mode #comprehensionPanel .step-chip{ display:none; }
   html:not(.quiz-mode) #tabComprehensionBtn{ display:none; }
 </style>
-<title>Posuk Practice Scroll</title>
+<title>Posuk · SOLS</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicons/posuk.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Quicksand:wght@500;600;700&family=Noto+Serif+Hebrew:wght@500;700&display=swap" rel="stylesheet">
 <style>

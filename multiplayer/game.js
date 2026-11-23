@@ -763,7 +763,7 @@
     }
     studentId = savedId;
     setTitle();
-    document.title = game.name + ' — Fun Torah Tools';
+    document.title = game.name + ' · Arcade · SOLS';
     hint.textContent = gameKey === 'memory-match' ? 'Flip cards to find pairs. A match earns another turn.' : gameKey === 'bingo' ? 'The host draws numbers. Your card is marked as numbers are called.' : gameKey === 'go-fish' ? 'Ask for a rank already in your hand and collect four-of-a-kind books.' : gameKey === 'uno-style' ? 'Play a matching color or number. Wild cards let you pick a color.' : 'Take turns, make your move, and see who wins!';
     try {
       if (!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
