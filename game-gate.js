@@ -637,7 +637,13 @@
       if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
       // A starred tool stays open while the class is locked (same idea as the ET/WT star; saved in access/stars/<tool> as the
       // time it switches itself off). The emergency lock above and the tool switch just before still win.
-      var starOpen=Number(assignedClass.access&&assignedClass.access.stars&&assignedClass.access.stars[grantId])>Date.now();
+      // The Chumash Cheder tool serves four tiles from two pages (practice and ?mode=quiz); each tile has its own star.
+      var starKey=grantId;
+      if(grantId==="posuk-practice-scroll"){
+        var sp=new URLSearchParams(location.search),quizTile=sp.get("mode")==="quiz"||sp.get("tool")==="test-me",mishTile=location.pathname.indexOf("record-mishnayos")!==-1;
+        starKey=mishTile?(quizTile?"record-mishnayos-quiz":"record-mishnayos"):(quizTile?"chumash-quiz":"posuk-practice-scroll");
+      }
+      var starOpen=Number(assignedClass.access&&assignedClass.access.stars&&assignedClass.access.stars[starKey])>Date.now();
       if(!starOpen&&!followActivityOpen&&!teacherOverrideOpen()&&!(Number(assignedClass.access&&assignedClass.access.openUntil)>Date.now())&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }

@@ -3,6 +3,8 @@ const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
 const CLASS_TOOL_GRANTS=Object.freeze(['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','multiplayer-center','homework','gallery','tag','davening','chavrusa','name-picker','daily-checklist','class-pointer','sync-to-nigri']);
 const CLASS_TOOL_GRANT_SET=new Set(CLASS_TOOL_GRANTS);
+// The Chumash Cheder tool shows four tiles; each can be starred on its own (it is one tool grant, four star keys).
+const STAR_TILE_KEYS=new Set(['chumash-quiz','record-mishnayos','record-mishnayos-quiz']);
 const DAYS=['sun','mon','tue','wed','thu','fri','sat'];
 const validWindows=value=>{
  if(!value||typeof value!=='object'||Array.isArray(value))return false;
@@ -69,7 +71,7 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  }
  if(action==='platformStar'){
   // A starred tool stays open while the class is locked; it switches itself off at expiresAt (at most 24 hours ahead).
-  if(!CLASS_TOOL_GRANT_SET.has(body.toolId)||typeof body.keepOpen!=='boolean')fail(400,'Invalid star setting.');
+  if(!(CLASS_TOOL_GRANT_SET.has(body.toolId)||STAR_TILE_KEYS.has(body.toolId))||typeof body.keepOpen!=='boolean')fail(400,'Invalid star setting.');
   const until=Math.min(Number(body.expiresAt)||now+86400000,now+86400000+60000);
   await store.update({[`${root}/access/stars/${body.toolId}`]:body.keepOpen&&until>now?until:null});
   return {ok:true};

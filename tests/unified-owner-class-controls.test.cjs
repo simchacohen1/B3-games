@@ -14,6 +14,8 @@ function harness(classId='testing') {
     open:{dataset:{cpBig:'open'}},
     timed15:{dataset:{cpNewTimed:'15'}},
     starHalacha:{dataset:{cpNewstar:'halacha'}},
+    starQuiz:{dataset:{cpNewstar:'chumash-quiz'}},
+    lockMishnayos:{dataset:{cpTilelock:'record-mishnayos'}},
     halacha:{dataset:{cpGrant:'halacha'}},
     posuk:{dataset:{cpGrant:'posuk-practice-scroll'}}
   };
@@ -21,8 +23,9 @@ function harness(classId='testing') {
     innerHTML:'',
     querySelectorAll(query){
       if(query==='[data-cp-big]')return [controls.open,controls.lock];
-      if(query==='[data-cp-newstar]')return [controls.starHalacha];
+      if(query==='[data-cp-newstar]')return [controls.starHalacha,controls.starQuiz];
       if(query==='[data-cp-new-timed]')return [controls.timed15];
+      if(query==='[data-cp-tilelock]')return [controls.lockMishnayos];
       if(query==='[data-cp-grant]')return [controls.halacha,controls.posuk];
       return [];
     }
@@ -105,6 +108,22 @@ test('star: a starred tool stays open while the class is locked (saved as access
   assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setFeature',featureId:'halacha',locked:false}]);
 });
 
+test('each Chumash Cheder tile has its own star and its own lock',async()=>{
+  const x=harness('testing');
+  x.render();
+  assert.match(x.panel.innerHTML,/Chumash/);
+  for(const key of ['posuk-practice-scroll','chumash-quiz','record-mishnayos','record-mishnayos-quiz'])assert.match(x.panel.innerHTML,new RegExp('data-cp-newstar="'+key+'"'));
+  for(const key of ['posuk-practice-scroll','chumash-quiz','record-mishnayos','record-mishnayos-quiz'])assert.match(x.panel.innerHTML,new RegExp('data-cp-tilelock="'+key+'"'));
+  await x.controls.starQuiz.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(x.writes)),[
+    {path:ROOT+'/testing/toolGrants/posuk-practice-scroll',method:'set',value:true},
+    {path:ROOT+'/testing/access/stars/chumash-quiz',method:'set',value:1900000000000}],'only the quiz tile is starred; the tool is switched on first');
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setFeature',featureId:'chumash-quiz',locked:false}],'only that tile feature is unlocked');
+  x.lockCalls.length=0;
+  await x.controls.lockMishnayos.onclick();
+  assert.deepEqual(JSON.parse(JSON.stringify(x.lockCalls)),[{id:'testing',action:'setFeature',featureId:'record-mishnayos',locked:true}],'locking one tile locks only that tile');
+});
+
 test('LOCK keeps a starred tool open and OPEN clears every star',async()=>{
   const x=harness('testing');
   x.ctx.cpRecords.testing.access={stars:{halacha:Date.now()+3600000}};
@@ -118,7 +137,8 @@ test('LOCK keeps a starred tool open and OPEN clears every star',async()=>{
 
 test('student pages honour the timed unlock and stars: game gate, student home page, Arcade server rule',()=>{
   const gate=fs.readFileSync('game-gate.js','utf8'),home=fs.readFileSync('index.html','utf8');
-  assert.match(gate,/assignedClass\.access\.stars\[grantId\]/);
+  assert.match(gate,/access\.stars\[starKey\]/);
+  assert.match(gate,/record-mishnayos-quiz/);assert.match(gate,/chumash-quiz/);
   assert.match(gate,/assignedClass\.access&&assignedClass\.access\.openUntil/);
   assert.match(home,/accessNow\.openUntil/);
   assert.match(home,/accessNow\.stars/);

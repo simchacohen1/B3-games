@@ -43,6 +43,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 .cp-status small{display:block;font-size:14px;font-weight:700;opacity:.85;margin-top:3px}
 .cp-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
 .cp-modes button{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:13px 6px;font-size:15px;font-weight:900;cursor:pointer;color:#334155}
+.cp-row.cp-sub{padding-left:22px;background:#f8fafc}
 .cp-bigswitch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
 .cp-bigswitch button{border:3px solid #cbd5e1;background:#fff;border-radius:18px;padding:26px 8px;font-size:28px;font-weight:900;letter-spacing:.04em;cursor:pointer;color:#475569}
 .cp-bigswitch button.open.on{background:#16a34a;border-color:#16a34a;color:#fff}.cp-bigswitch button.lock.on{background:#dc2626;border-color:#dc2626;color:#fff}
@@ -323,12 +324,16 @@ function renderOwnerControl(){
 // New classes use their own access and tool grants, never B3's shared ET/WT settings.
 // A tool's id in the Class Access list -> its id in the per-feature lock list (a few differ).
 function cpFeatureOf(tool){return tool==="gallery"||tool==="tag"?"class-gallery":tool}
+// Chumash Cheder is ONE tool grant but four tiles; each tile has its own star and its own lock (feature) under its tile key.
+const CP_TILES=[{key:"posuk-practice-scroll",name:"Posuk Practice Scroll"},{key:"chumash-quiz",name:"Chumash חידון"},{key:"record-mishnayos",name:"Mishnayos Practice"},{key:"record-mishnayos-quiz",name:"Mishnayos חידון"}];
+const CP_TILE_KEYS=CP_TILES.map(t=>t.key);
+function cpGrantOf(tool){return CP_TILE_KEYS.includes(tool)?"posuk-practice-scroll":tool}
 function renderOwnerPlatformClass(panel){
  const id=cpClass,row=cpRecords[id],w=frame.contentWindow,teacherMode=w?.B3SiteSettings?.getCurrentAccess?.().role==="teacher";
  if(!row){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading class settings…</div></div>';return}
  const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",openUntil=Number(row.access?.openUntil)||0,isOpen=cpSettings?.siteEnabled!==false&&(openUntil>Date.now()||(row.siteEnabled!==false&&mode!=="locked"));
  // Per-feature locks from the retired Class Locks panel: classes/<id>/locks, written only by the studentLocks function.
- const lockedFeatures=Object.values(row.locks?.features||{}).filter(f=>f&&f.locked===true).length,
+ const lockedFeatures=Object.entries(row.locks?.features||{}).filter(([k,f])=>f&&f.locked===true&&!CP_TILE_KEYS.includes(k)).length,
    lockOverrides=Object.entries(row.locks?.overrides||{}).filter(([,o])=>o&&Number(o.until)>Date.now()).map(([k])=>k),
    lockSchedules=Object.keys(row.locks?.schedules||{}).length;
  const starCount=Object.values(row.access?.stars||{}).filter(v=>Number(v)>Date.now()).length;
@@ -340,6 +345,13 @@ function renderOwnerPlatformClass(panel){
  const known=new Set(),distinct=tools.filter(t=>{if(known.has(t.id))return false;known.add(t.id);return true});
  const rows=distinct.map(t=>{
    const on=row.toolGrants?.[t.id]===true,starMs=Number(row.access?.stars?.[t.id])||0,starred=starMs>Date.now();
+   if(t.id==="posuk-practice-scroll"){
+     const tileRows=CP_TILES.map(tk=>{
+       const ms=Number(row.access?.stars?.[tk.key])||0,st=ms>Date.now(),lk=row.locks?.features?.[tk.key]?.locked===true;
+       return '<div class="cp-row cp-sub"><button type="button" class="cp-star'+(st?" on":"")+'" data-cp-newstar="'+cpEsc(tk.key)+'" title="'+(st?"Remove the star: this tile locks with the class":"Keep this tile open for students while the class is locked")+'" aria-label="Star '+cpEsc(tk.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button><div class="cp-name">↳ '+cpEsc(tk.name)+(st?'<small>'+(isOpen?"⭐ will stay open if you lock the class":"⭐ open for students even though the class is locked")+' · until '+new Date(ms).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+'</small>':'')+'</div><button type="button" class="cp-toggle '+(lk?"closed":"open")+'" data-cp-tilelock="'+cpEsc(tk.key)+'"'+(cpBusy?" disabled":"")+'>'+(lk?"🔒 Locked":"🔓 Open")+'</button></div>';
+     }).join("");
+     return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+' — all 4 tiles<small>One switch for the whole Chumash Cheder tool. Each tile below has its own star and lock.</small></div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>'+tileRows;
+   }
    return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-newstar="'+cpEsc(t.id)+'" title="'+(starred?"Remove the star: this tool locks with the class":"Keep this tool open for students while the class is locked")+'" aria-label="Star '+cpEsc(t.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button><div class="cp-name">'+cpEsc(t.name)+(starred?'<small>'+(isOpen?"⭐ will stay open if you lock the class":"⭐ open for students even though the class is locked")+' · until '+new Date(starMs).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+'</small>':'')+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
  }).join("");
  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
@@ -373,7 +385,7 @@ function renderOwnerPlatformClass(panel){
        else await db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
        await api.manageStudentLocks(id,{action:"setAll",locked:true});
        // Starred tools stay open: put their feature lock back to open after locking everything.
-       for(const t of distinct){if(Number(row.access?.stars?.[t.id])>Date.now()){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:cpFeatureOf(t.id),locked:false})}catch(e){console.warn("Could not keep starred tool open",t.id,e)}}}
+       for(const [k,v] of Object.entries(row.access?.stars||{})){if(Number(v)>Date.now()){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:cpFeatureOf(k),locked:false})}catch(e){console.warn("Could not keep starred tool open",k,e)}}}
      }
    },open?name+" is OPEN: class, features and all tools ✓":name+" is LOCKED ✓");
  });
@@ -408,17 +420,27 @@ function renderOwnerPlatformClass(panel){
        return;
      }
      // Like ET/WT: starring a switched-off tool switches it on first.
-     if(row.toolGrants?.[tool]!==true)await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:tool,enabled:true}):db.ref(base+"/toolGrants/"+tool).set(true));
+     const grantKey=cpGrantOf(tool);
+     if(row.toolGrants?.[grantKey]!==true)await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:grantKey,enabled:true}):db.ref(base+"/toolGrants/"+grantKey).set(true));
      await write(true);
      try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not open the tool's feature lock",e)}
    },starred?tool+" will lock with the class ✓":tool+" will stay open while the class is locked ✓");
+ });
+ // Each Chumash Cheder tile has its own lock: the same per-feature lock the big switch sets, but for one tile.
+ panel.querySelectorAll("[data-cp-tilelock]").forEach(b=>b.onclick=()=>{
+   const key=b.dataset.cpTilelock,api=cpApi(),locked=row.locks?.features?.[key]?.locked===true,starred=Number(row.access?.stars?.[key])>Date.now();
+   return cpSave(async()=>{
+     await api.manageStudentLocks(id,{action:"setFeature",featureId:key,locked:!locked});
+     // Like ET/WT: closing a tile also removes its star.
+     if(!locked&&starred)await (teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:key,keepOpen:false}):db.ref(base+"/access/stars/"+key).set(null));
+   },(CP_TILES.find(t=>t.key===key)?.name||key)+(locked?" unlocked ✓":" locked ✓"));
  });
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
    const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true,api=cpApi(),fid=cpFeatureOf(tool);
    cpSave(async()=>{
      await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on}):db.ref(base+"/toolGrants/"+tool).set(!on));
      // Like ET/WT: switching a tool off also removes its star.
-     if(on&&Number(row.access?.stars?.[tool])>Date.now())await (teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:tool,keepOpen:false}):db.ref(base+"/access/stars/"+tool).set(null));
+     if(on)for(const k of (tool==="posuk-practice-scroll"?CP_TILE_KEYS:[tool])){if(Number(row.access?.stars?.[k])>Date.now())await (teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:k,keepOpen:false}):db.ref(base+"/access/stars/"+k).set(null));}
      // Turning a tool ON also clears an old per-feature lock on that same tool, so the two cannot disagree.
      if(!on&&row.locks?.features?.[fid]?.locked===true){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not clear the feature lock",e)}}
    },tool+(on?" disabled":" enabled")+" for "+name+" ✓");

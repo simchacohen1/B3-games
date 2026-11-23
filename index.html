@@ -21,6 +21,7 @@
   h1{font-size:46px;margin:8px 0 8px;color:#26364a}
   .subtitle{color:#64748b;margin-bottom:24px}
   .hidden{display:none!important}
+  .tile-locked-out{display:none!important}
   /* Keep the login form hidden until saved student and teacher sessions are checked. */
   #homeAuthLoading{display:none;max-width:520px;margin:24px auto;padding:30px;color:#475569;background:#fff;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
   html.b3-home-auth-pending #homeAuthLoading{display:block!important}
@@ -1624,19 +1625,24 @@ document.addEventListener("DOMContentLoaded",function(){
       const timedOpen=Number(accessNow.openUntil)>nowMs;
       const classLocked=!timedOpen&&(myClassRecord?.siteEnabled===false||accessNow.mode==="locked");
       const starOpen=id=>Number((accessNow.stars||{})[id==="class-gallery"?"gallery":id])>nowMs;
-      const anyStar=classLocked&&gameDefinitions.some(game=>starOpen(game.id)&&window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id));
+      // Tiles that share one tool (Chumash Cheder has four) each keep their own star, under their own tile key.
+      const tileKeyOf=card=>card.dataset.tileKey||card.dataset.gameId;
+      const familyStar=gameId=>gameCards.some(card=>card.dataset.gameId===gameId&&starOpen(tileKeyOf(card)));
+      const anyStar=classLocked&&gameDefinitions.some(game=>familyStar(game.id)&&window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id));
       if(myClassRecord?.active===false||(classLocked&&!anyStar)){
         el("gamesArea").classList.add("hidden");el("lockedCard").classList.remove("hidden");el("lockedTitle").textContent="Your class is locked";el("lockedMessage").textContent="Your teacher can reopen your class.";return;
       }
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id)&&(!classLocked||starOpen(game.id));
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id)&&(!classLocked||familyStar(game.id));
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
         if(show)visible++;
       });
+      // While locked, only the tiles with their own star stay (the other tiles of the same tool are hidden individually).
+      gameCards.forEach(card=>card.classList.toggle("tile-locked-out",classLocked&&!starOpen(tileKeyOf(card))));
       updateGameGroupVisibility();
       const className=String(myClassRecord?.name||myClassId||"Class");
       el("studentClassLabel").textContent=className;
