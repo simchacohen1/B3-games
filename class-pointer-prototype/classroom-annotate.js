@@ -181,8 +181,14 @@
     return out;
   }
   function sendItems(){
+    // A whiteboard with several pages: send the page on the screen (one picture, as always) or every page (one page each).
+    const pages=window.ClassPointerPdf?.pagesInfo?.(),send=window.FTTSavedWork?.sendCurrent;
+    const board=pages&&pages.count>1?[
+      {icon:'📝',label:'This page (page '+(pages.current+1)+')',disabled:!send,onClick:()=>window.FTTSavedWork?.sendCurrent?.({page:pages.current+1})},
+      {icon:'📚',label:'All '+pages.count+' pages',disabled:!send,onClick:()=>window.FTTSavedWork?.sendCurrent?.({all:true})}
+    ]:[{icon:'📝',label:'This whiteboard',disabled:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()}];
     return [
-      {icon:'📝',label:'This whiteboard',disabled:!window.FTTSavedWork?.sendCurrent,onClick:()=>window.FTTSavedWork?.sendCurrent?.()},
+      ...board,
       {icon:'📄',label:'A PDF from my library',disabled:!window.PointerPdfLibrary?.openForSend,onClick:()=>window.PointerPdfLibrary?.openForSend?.()}
     ];
   }

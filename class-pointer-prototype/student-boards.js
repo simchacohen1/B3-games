@@ -117,6 +117,7 @@
     return{value:raw.value,size:round(raw.size),color:raw.color.toLowerCase(),x:round(raw.x),y:round(raw.y)};
   }
   function paintActivity(ctx,w,h,board){
+    if(board.bg){const bg=pictureOf(board.bg);if(bg)ctx.drawImage(bg,0,0,w,h)}
     if(activity?.kind==='image'){
       if(activityImage?.complete&&activityImage.naturalWidth)ctx.drawImage(activityImage,0,0,w,h);
     }else if(activity?.kind==='tiles'){
@@ -138,7 +139,28 @@
       ctx.restore();
     }
   }
-  function emptyBoard(){return{strokes:[],drafts:{student:null,teacher:null},text:defaultWord(),tiles:activity?.kind==='tiles'?Tiles.defaultState(activity):null}}
+  // ---------- Pages (slides) ----------
+  // A board is a list of pages. `board` (the "set") answers for the page being shown (its strokes, drafts, text, tiles
+  // and background), so everything that draws or edits a board works on that page unchanged. Page ids are how the two
+  // sides name a page on the network; the first page of every board is FIRST_PAGE. Without board-pages-core.js there
+  // is only ever that one page.
+  const Pages=window.ClassPointerPages||null,FIRST_PAGE='pg0',PAGE_BG_MAX=200000;
+  // Teacher: pictures that were sent as pages [{id,bg}] (+ send info), so every board starts with them.
+  let classPages=null;
+  function cleanBg(raw){return typeof raw==='string'&&raw.length<=PAGE_BG_MAX&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(raw)?raw:''}
+  function newPage(id,bg){return{id:id||FIRST_PAGE,strokes:[],drafts:{student:null,teacher:null},text:defaultWord(),tiles:activity?.kind==='tiles'?Tiles.defaultState(activity):null,bg:bg||''}}
+  function makeSet(pages){
+    const set={pages:pages&&pages.length?pages:[newPage()],viewId:'',curId:''};
+    set.viewId=set.curId=set.pages[0].id;
+    Object.defineProperty(set,'at',{get(){const i=set.pages.findIndex(p=>p.id===set.viewId);return i<0?0:i}});
+    for(const key of ['strokes','drafts','text','tiles','bg'])Object.defineProperty(set,key,{get(){return set.pages[set.at][key]},set(value){set.pages[set.at][key]=value}});
+    return set;
+  }
+  const pageId=set=>set.pages[set.at].id;
+  // A change to the page being shown names that page, so it still lands on the right page if the other side is elsewhere.
+  const pagedOp=(set,op)=>Pages&&!/^board-page/.test(op.type)?{...op,pg:pageId(set)}:op;
+  const clearDrafts=set=>{if(set)for(const page of set.pages)page.drafts={student:null,teacher:null}};
+  function emptyBoard(){return makeSet(classPages?classPages.map(p=>newPage(p.id,p.bg)):null)}
   // Student line ids start with "s", teacher line ids with "t". Each side may remove or clear only its own lines;
   // only the teacher may clear a whole board.
   function applyOp(board,op,by){
@@ -193,6 +215,43 @@
     }
     return false;
   }
+  // Where a change from the network goes: the page it names (`pg`), or the page being shown when it names none.
+  function applyTo(set,op,by){
+    if(!op||typeof op.type!=='string')return false;
+    if(op.type.startsWith('board-page'))return applyPageOp(set,op,by);
+    const page=op.pg===undefined?set.pages[set.at]:set.pages.find(item=>item.id===op.pg);
+    return page?applyOp(page,op,by):false;
+  }
+  // Only the student changes the pages of their own board (the teacher can look at any page, and send pages to everyone).
+  function applyPageOp(set,op,by){
+    if(!Pages||by!=='student')return false;
+    const list=set.pages;
+    if(op.type==='board-page-add'){
+      if(!Pages.validId(op.id)||list.length>=Pages.MAX_PAGES||list.some(p=>p.id===op.id))return false;
+      const at=typeof op.after==='string'?list.findIndex(p=>p.id===op.after):-1;
+      set.pages=Pages.insert(list,(at<0?list.length-1:at)+1,newPage(op.id));return true;
+    }
+    if(op.type==='board-page-remove'){
+      const place=Pages.after(list,op.id),next=Pages.remove(list,op.id);
+      if(next===list)return false;
+      const wasCurrent=set.curId===op.id,wasShown=set.viewId===op.id;
+      set.pages=next;
+      if(wasCurrent)set.curId=next[place].id;
+      if(wasShown)set.viewId=wasCurrent?set.curId:next[place].id;
+      return true;
+    }
+    if(op.type==='board-page-at'){
+      if(!list.some(p=>p.id===op.pg))return false;
+      const following=set.viewId===set.curId;
+      set.curId=op.pg;if(following)set.viewId=op.pg;return true;
+    }
+    if(op.type==='board-page-move'){
+      const next=Pages.reorder(list,op.order);
+      if(next===list)return false;
+      set.pages=next;return true;
+    }
+    return false;
+  }
   // The shared drawing toolbar hands over the whole list of one side's marks; turn the difference into board changes.
   // A picture that was only moved keeps its picture: send its new place, not the whole picture again.
   function syncBoardItems(board,by,list,act){
@@ -225,12 +284,73 @@
     syncBoardItems(board,'teacher',mine,act);
     for(const item of fresh)if(item.id[0]==='s')act({type:'board-put',stroke:strip(item),owner:'student'});
   }
-  function boardFromMessage(list,rawText,rawTiles){
-    const board=emptyBoard();
-    if(activity?.kind==='word')board.text=cleanWord(rawText)||defaultWord();
-    if(activity?.kind==='tiles')board.tiles=Tiles.cleanState(activity,rawTiles);
-    if(Array.isArray(list))for(const raw of list.slice(0,MAX_STROKES)){const s=cleanStroke(raw);if(s&&!(s.image&&pictureCount(board)>=MAX_IMAGES)){s.by=raw.by==='teacher'?'teacher':'student';board.strokes.push(s)}}
-    return board;
+  function pageFromMessage(id,bg,list,rawText,rawTiles){
+    const page=newPage(id,bg);
+    if(activity?.kind==='word')page.text=cleanWord(rawText)||defaultWord();
+    if(activity?.kind==='tiles')page.tiles=Tiles.cleanState(activity,rawTiles);
+    if(Array.isArray(list))for(const raw of list.slice(0,MAX_STROKES)){const s=cleanStroke(raw);if(s&&!(s.image&&pictureCount(page)>=MAX_IMAGES)){s.by=raw.by==='teacher'?'teacher':'student';page.strokes.push(s)}}
+    return page;
+  }
+  // The board a student gets from the teacher: one page the old way, or the list of pages when there is more than one.
+  function boardFromMessage(list,rawText,rawTiles,extra){
+    if(Pages&&Array.isArray(extra?.pages)&&extra.pages.length){
+      const pages=[],seen=new Set();
+      for(const raw of extra.pages.slice(0,Pages.MAX_PAGES)){
+        if(!raw||!Pages.validId(raw.id)||seen.has(raw.id))continue;
+        seen.add(raw.id);pages.push(pageFromMessage(raw.id,cleanBg(raw.bg),raw.strokes,raw.text,raw.tiles));
+      }
+      if(pages.length){
+        const set=makeSet(pages);
+        set.viewId=set.curId=pages.some(p=>p.id===extra.at)?extra.at:pages[0].id;
+        return set;
+      }
+    }
+    return makeSet([pageFromMessage(FIRST_PAGE,'',list,rawText,rawTiles)]);
+  }
+
+  // ---------- Page strip (shared by the student and the teacher looking at a student's board) ----------
+  // Page 2 of 4, previous / next, and (for a student's own board) add, delete and move; "Pages" shows a small picture of each.
+  function pageStrip(o){
+    const root=el('span','boards-group board-pages-group'),panel=el('div','board-pages-thumbs'),label=el('span','board-pages-label');
+    panel.hidden=true;let open=false,sig='';
+    const edit=o.canEdit===true,set=()=>o.set();
+    const go=to=>{const s=set();if(s&&to>=0&&to<s.pages.length)o.go(s.pages[to].id)};
+    const prev=button('\u25C0','Previous page',()=>{const s=set();if(s)go(s.at-1)},'board-pages-step'),
+      next=button('\u25B6','Next page',()=>{const s=set();if(s)go(s.at+1)},'board-pages-step'),
+      more=button('\u25B4 Pages','Show a small picture of every page',()=>{open=!open;sig='';update()});
+    root.append(prev,label,next);
+    let add,del,left,right;
+    if(edit){
+      add=button('\uFF0B Page','Add a blank page after this one',()=>o.add());
+      left=button('\u21E6','Move this page earlier',()=>{const s=set();if(s)o.move(pageId(s),s.at-1)});
+      right=button('\u21E8','Move this page later',()=>{const s=set();if(s)o.move(pageId(s),s.at+1)});
+      del=button('\uD83D\uDDD1 Page','Delete this page',()=>{const s=set();if(s)o.remove(pageId(s))},'danger');
+      root.append(add,left,right,del);
+    }
+    root.append(more);
+    function update(){
+      const s=set(),show=!!s&&!!Pages&&(!o.visible||o.visible());
+      root.hidden=!show;panel.hidden=!show||!open;
+      if(!show)return;
+      const n=s.pages.length,at=s.at,studentAt=s.pages.findIndex(p=>p.id===s.curId);
+      label.textContent='Page '+(at+1)+' of '+n+(!edit&&s.viewId!==s.curId?' \u00B7 student is on page '+(studentAt+1):'');
+      prev.disabled=at===0;next.disabled=at>=n-1;
+      if(edit){add.disabled=n>=Pages.MAX_PAGES;del.disabled=n<=1;left.disabled=at===0;right.disabled=at>=n-1}
+      more.textContent=(open?'\u25BE':'\u25B4')+' Pages';
+      if(!open)return;
+      let waiting=false;
+      const mark=s.pages.map(p=>{const last=p.strokes[p.strokes.length-1];if(p.bg&&!pictureOf(p.bg))waiting=true;return p.id+':'+p.strokes.length+':'+(last?last.id+':'+last.points.length:'')+':'+(p.bg?1:0)});
+      const now=[s.viewId,s.curId,...mark].join('|');
+      if(now===sig&&!waiting)return;
+      sig=waiting?'':now;
+      panel.replaceChildren(...s.pages.map((page,i)=>{
+        const c=el('canvas');c.width=128;c.height=72;
+        const ctx=c.getContext('2d');if(ctx)paintOn(ctx,128,72,page,[]);
+        const b=el('button','board-page-thumb'+(i===at?' current':''));b.type='button';b.title='Go to page '+(i+1);b.setAttribute('aria-label','Page '+(i+1));
+        b.append(c,el('span','board-page-num',String(i+1)));b.addEventListener('click',()=>go(i));return b;
+      }));
+    }
+    return{root,panel,update};
   }
 
   // ---------- Drawing on a canvas ----------
@@ -546,6 +666,13 @@
     const focus=el('div','boards-focus'),surface=el('div','board-fit'),canvas=el('canvas');
     canvas.setAttribute('aria-label','My whiteboard. Draw with the mouse, pen or finger.');
     bar.append(title,drawGroup);
+    // Pages (slides): add, delete, move and look at every page of my own board.
+    const studentPages=pageStrip({canEdit:true,set:()=>board,visible:()=>on&&mode==='boards'&&!blocked,
+      go:id=>act({type:'board-page-at',pg:id}),
+      add:()=>{if(board.pages.length>=Pages.MAX_PAGES){B.status('A whiteboard can have up to '+Pages.MAX_PAGES+' pages.');return}const id=Pages.newId();act({type:'board-page-add',id,after:pageId(board)});act({type:'board-page-at',pg:id})},
+      remove:id=>{if(board.pages.length>1&&confirm('Delete this page and everything on it?'))act({type:'board-page-remove',id})},
+      move:(id,to)=>{const order=Pages.move(board.pages,id,to).map(p=>p.id);act({type:'board-page-move',order})}});
+    bar.append(studentPages.root);
     const tools=makeTools(drawGroup,COLORS[0],st=>{drawer?.cancel();surface.classList.toggle('erasing',st.tool==='eraser');surface.classList.toggle('moving',st.tool==='move')});
     drawGroup.append(
       button('↶ Undo','Undo my last line',()=>{const mine=board.strokes.filter(s=>s.by==='student');const last=mine[mine.length-1];if(last)act({type:'board-remove',ids:[last.id]})}),
@@ -577,7 +704,7 @@
     sharePanel.append(shareText,shareBtn,preview,shareNote);
     // Paused panel.
     const pausedPanel=el('div','board-panel');pausedPanel.append(el('p','board-panel-text','⏸ Your teacher paused this for you.'),el('p','board-panel-note','Please wait. Your teacher can turn it back on.'));
-    surface.appendChild(canvas);focus.append(surface,sharePanel,pausedPanel);view.append(bar,focus);stage.appendChild(view);shield(view);
+    surface.appendChild(canvas);focus.append(surface,sharePanel,pausedPanel);view.append(bar,studentPages.panel,focus);stage.appendChild(view);shield(view);
 
     function ui(){
       const boardsOn=on&&mode==='boards'&&!blocked,screensOn=on&&mode==='screens'&&!blocked;
@@ -586,7 +713,7 @@
       // The slim top bar keeps the title, Paste, Copy board, Save, My files, Back to Activity and Full screen.
       const oneToolbar=boardsOn&&!!window.FTTAnnotate;view.classList.toggle('boards-annotated',oneToolbar);
       drawGroup.hidden=!boardsOn||oneToolbar;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
-      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';announceBoard();
+      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';studentPages.update();announceBoard();
       clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
       shareBtn.hidden=teacherPresenting;
@@ -624,7 +751,7 @@
       shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
       void startShare('screen');
     }
-    function act(op){if(!on||mode!=='boards'||blocked)return;if(applyOp(board,op,'student'))B.sendTeacher(op);redraw()}
+    function act(op){if(!on||mode!=='boards'||blocked)return;const sent=pagedOp(board,op);if(applyTo(board,sent,'student'))B.sendTeacher(sent);redraw()}
     // My whiteboard as a surface for the shared drawing toolbar. Its marks are ordinary board lines, so the teacher
     // sees them live in my tile, and my own Undo / Clear / Eraser work on them too.
     const boardOpen=()=>on&&mode==='boards'&&!blocked;
@@ -635,7 +762,7 @@
       setItems(list){syncBoardItems(board,'student',list,act)},
       // Hebrew word tiles can be picked up with any drawing tool.
       grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
-      live(draft){if(!boardOpen())return;const op={type:'board-draft',stroke:draft||null};applyOp(board,op,'student');B.sendTeacher(op);redraw()}};
+      live(draft){if(!boardOpen())return;const op=pagedOp(board,{type:'board-draft',stroke:draft||null});applyTo(board,op,'student');B.sendTeacher(op);redraw()}};
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
       const FA=window.FTTAnnotate;if(!FA)return;
@@ -643,7 +770,7 @@
       FA.setReason('whiteboard',boardOpen());
       if(!boardOpen())FA.release(boardSurface);
     }
-    drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(op)},redraw});
+    drawer=attachDrawing(canvas,{by:'student',tools,enabled:()=>on&&mode==='boards'&&!blocked,board:()=>board,apply:act,send:op=>{if(on&&mode==='boards'&&!blocked)B.sendTeacher(pagedOp(board,op))},redraw});
 
     async function startShare(){
       shareNote.textContent='';
@@ -762,7 +889,9 @@
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
         // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
         if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,id:activity.id,subject:activity.subject,important:activity.important});
-        board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text,message.tiles):emptyBoard();
+        board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text,message.tiles,message):emptyBoard();
+        // Pictures the teacher sent as pages: keep this student's own copy in My files (saved-work.js).
+        if(on&&mode==='boards'&&!blocked&&message.send&&Pages&&Array.isArray(message.pages)&&board.pages.length&&board.pages.every(p=>p.bg))window.FTTSavedWork?.keepTeacherPages?.({id:message.send.id,subject:message.send.subject,important:message.send.important,pages:board.pages.map(p=>({bg:p.bg}))});
         // In embedded mode, screens are shared via the existing activity button;
         // never cover Shorashim with the old Pointer screen-sharing panel.
         show(on&&!(B.embedded&&mode==='screens'));
@@ -770,23 +899,33 @@
         else if(blocked){if(!wasBlocked)B.status('Your teacher paused your board for now.')}
         else if(!was||wasMode!==mode||wasBlocked)B.status(mode==='screens'?'Your teacher asked you to share your screen. Click Share my screen.':'Your teacher opened your own whiteboard. Draw with the pen. Your teacher can see your board.');
         syncAnnotate();
-      }else if(on&&mode==='boards'&&!blocked)applyOp(board,message,'teacher');
+      }else if(on&&mode==='boards'&&!blocked)applyTo(board,message,'teacher');
       redraw();return true;
     }
     new ResizeObserver(redraw).observe(stage);document.addEventListener('fullscreenchange',redraw);
     // ---------- Save and restore (used by "Save whiteboard") ----------
     // Everything on my board, in drawing order. A pasted picture is a mark with an `image`; `images` lists their ids.
+    // One page of my board: its marks (a pasted picture is a mark with an `image`; `images` lists their ids), words, tiles and background.
+    function pageData(page){
+      return{strokes:page.strokes.map(s=>({...s,points:s.points.map(p=>({x:p.x,y:p.y}))})),
+        images:page.strokes.filter(s=>s.image).map(s=>s.id),text:page.text?{...page.text}:null,
+        // Where every Hebrew tile is (the words themselves are in `activity`).
+        ...(activity?.kind==='tiles'&&page.tiles?{tiles:page.tiles.map(t=>({...t}))}:{}),
+        ...(page.bg?{bg:page.bg}:{})};
+    }
+    // A board with one page and no page background is saved exactly as it always was (version 1). More pages, or a
+    // background that came as a page from the teacher, make a version 2 file that lists the pages (board-pages-core.js).
     function exportBoard(){
       if(!boardOpen())return null;
-      return{version:1,kind:'student-board',strokes:board.strokes.map(s=>({...s,points:s.points.map(p=>({x:p.x,y:p.y}))})),
-        images:board.strokes.filter(s=>s.image).map(s=>s.id),text:board.text?{...board.text}:null,activity:activity?{...activity}:null,
-        // Where every Hebrew tile is (the words themselves are in `activity`).
-        ...(activity?.kind==='tiles'&&board.tiles?{tiles:board.tiles.map(t=>({...t}))}:{})};
+      if(!Pages||(board.pages.length===1&&!board.pages[0].bg)){
+        const one=pageData(board.pages[0]);
+        return{version:1,kind:'student-board',strokes:one.strokes,images:one.images,text:one.text,activity:activity?{...activity}:null,...(one.tiles?{tiles:one.tiles}:{})};
+      }
+      return{...Pages.wrap('student-board',board.pages.map(pageData),board.at),activity:activity?{...activity}:null};
     }
-    // Replaces my own marks with the saved ones. Saved data is checked like anything from the network, sent to the
-    // teacher as normal board changes (so every limit holds), and the teacher's marks and activity are left alone.
-    function importBoard(data){
-      if(!boardOpen()||!data||data.version!==1||data.kind!=='student-board'||!Array.isArray(data.strokes))return false;
+    // Puts the saved marks of ONE page on the page being shown. Saved data is checked like anything from the network,
+    // sent to the teacher as normal board changes (so every limit holds), and the teacher's marks and activity are left alone.
+    function restorePage(data){
       act({type:'board-clear'});
       for(const raw of data.strokes.slice(0,MAX_STROKES)){
         if(!raw||raw.by==='teacher')continue;
@@ -811,6 +950,31 @@
           for(const tile of wanted)act({type:'board-tile',tile});
         }
       }
+    }
+    // Replaces my own marks with the saved ones. A version 1 file is one page; a version 2 file brings back its pages.
+    function importBoard(data){
+      if(!boardOpen()||!data||data.kind!=='student-board')return false;
+      if(data.version===1){
+        if(!Array.isArray(data.strokes))return false;
+        // One page: any other pages on my board go, and the saved marks fill the first page.
+        if(Pages){for(const page of board.pages.slice(1))act({type:'board-page-remove',id:page.id});act({type:'board-page-at',pg:board.pages[0].id})}
+        restorePage(data);return true;
+      }
+      const list=Pages?Pages.pagesOf(data,'student-board'):null;
+      if(!list)return false;
+      // My pages become the saved file's pages: the extra ones go, then one page is made for each saved page.
+      for(const page of board.pages.slice(1))act({type:'board-page-remove',id:page.id});
+      const ids=[board.pages[0].id];
+      act({type:'board-page-at',pg:ids[0]});
+      list.forEach((raw,index)=>{
+        if(index>0){const id=Pages.newId();act({type:'board-page-add',id,after:ids[ids.length-1]});ids.push(id);act({type:'board-page-at',pg:id})}
+        restorePage({strokes:Array.isArray(raw.strokes)?raw.strokes:[],text:raw.text,tiles:raw.tiles,activity:data.activity});
+        // A page picture from the teacher comes back as the background of this page, on this board only.
+        const bg=cleanBg(raw.bg),page=board.pages.find(p=>p.id===ids[index]);
+        if(bg&&page&&!page.bg)page.bg=bg;
+      });
+      act({type:'board-page-at',pg:ids[Pages.currentOf(data,ids.length)]});
+      redraw();
       return true;
     }
     const exportPng=()=>boardOpen()?boardPng(board):Promise.reject(Error('Your whiteboard is not open.'));
@@ -965,7 +1129,7 @@
     pendingPaste=value;previewBody.replaceChildren();
     if(value.kind==='word')previewBody.append(el('p',null,value.text));
     else{
-      const img=el('img');img.src=URL.createObjectURL(value.file);img.alt='Copied picture preview';img.style.cssText='max-width:100%;max-height:45vh;object-fit:contain';
+      const img=el('img');img.src=URL.createObjectURL(value.kind==='pages'?value.files[0]:value.file);img.alt=value.kind==='pages'?'First page preview':'Copied picture preview';img.style.cssText='max-width:100%;max-height:45vh;object-fit:contain';
       img.addEventListener('load',()=>URL.revokeObjectURL(img.src),{once:true});
       previewBody.append(img);
       // Each student's copy is saved in their My files; if ticked it arrives already starred (they can unstar it).
@@ -984,6 +1148,7 @@
     const important=!!previewBody.querySelector('#boardsImportant')?.checked;
     closePreview();
     if(item.kind==='image')await sendImageFile(item.file,{subject:item.subject,important});
+    else if(item.kind==='pages')await sendPagesFiles(item.files,{subject:item.subject,important});
     else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
   }
   // The gallery of all boards: Ctrl+V and the 📋 Paste to All Boards button both end in the same preview, and
@@ -1056,7 +1221,7 @@
     finally{sendImage.disabled=false;updateActivityLabel()}
   }
 
-  function pictureData(file){
+  function pictureData(file,limit){
     return new Promise((resolve,reject)=>{
       const url=URL.createObjectURL(file),img=new Image();
       img.onload=()=>{
@@ -1073,10 +1238,16 @@
             ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
           }
           draw();let data=c.toDataURL('image/jpeg',0.76);
-          if(data.length>MAX_ACTIVITY_IMAGE){
+          const most=limit||MAX_ACTIVITY_IMAGE;
+          if(data.length>most){
             c.width=900;c.height=506;draw();data=c.toDataURL('image/jpeg',0.55);
           }
-          resolve(data.length<=MAX_ACTIVITY_IMAGE?data:null);
+          // Sending several pages: keep stepping down until it fits.
+          for(const [width,height,quality] of limit?[[800,450,0.5],[640,360,0.45],[640,360,0.35]]:[]){
+            if(data.length<=most)break;
+            c.width=width;c.height=height;draw();data=c.toDataURL('image/jpeg',quality);
+          }
+          resolve(data.length<=most?data:null);
         }catch(e){reject(e)}
       };
       img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This image could not be opened.'))};
@@ -1084,7 +1255,7 @@
     });
   }
   function updateActivityLabel(){
-    activityLabel.textContent=activity?.kind==='tiles'?'Hebrew tiles sent: '+activity.tiles.length+' tile'+(activity.tiles.length===1?'':'s'):activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all students':'Boards are blank now';
+    activityLabel.textContent=classPages?'Pages sent: '+classPages.length+' page'+(classPages.length===1?'':'s'):activity?.kind==='tiles'?'Hebrew tiles sent: '+activity.tiles.length+' tile'+(activity.tiles.length===1?'':'s'):activity?.kind==='word'?'Showing: '+activity.text:activity?.kind==='image'?'Coloring page sent to all students':'Boards are blank now';
   }
 
   // Focus bar: one student large.
@@ -1110,10 +1281,14 @@
     button('🧽 Clear mine','Erase only my marks on this board',()=>act({type:'board-clear'})),
     button('🗑 Clear board','Erase this whole board, including the student’s work',()=>{const m=focusMember();if(m&&confirm('Erase '+m.name+'’s whole board?'))act({type:'board-clear',all:true})},'danger'));
 
+  // The teacher can look at any page of the student's board (it follows the page the student is on until a page is chosen).
+  const focusPages=pageStrip({canEdit:false,set:()=>focusBoard(),visible:()=>mode==='boards'&&!!focusMember()&&!isBlocked(focusMember()),
+    go:id=>{const set=focusBoard();if(set){set.viewId=id;drawer?.cancel();if(focusId)dirty(focusId)}}});
+  focusBar.append(focusPages.root);
   const grid=el('div','boards-grid'),empty=el('p','boards-empty','No students have joined yet. Their tiles appear here as they join.');
   // Screens mode: who is in the class but has not started sharing yet (live; see renderWaiting).
   const waiting=el('div','boards-waiting');waiting.hidden=true;waiting.setAttribute('role','status');waiting.setAttribute('aria-live','polite');
-  view.append(gridBar,gridPermissions,waiting,activityBar,focusBar,grid,empty,focus);stage.appendChild(view);shield(view);
+  view.append(gridBar,gridPermissions,waiting,activityBar,focusBar,focusPages.panel,grid,empty,focus);stage.appendChild(view);shield(view);
 
   // Include students verified by the background activity connection without
   // sending them to a separate Pointer page. Choose one tab per student.
@@ -1144,7 +1319,14 @@
     if(!on||suspended||excluded(m,mode)){if(!on||excluded(m,mode))closeScreen(m);B.send(m.connection,{type:'board-mode',on:false});return}
     const paused=isBlocked(m);if(paused||mode!=='screens')closeScreen(m);
     const message={type:'board-mode',on:true,mode,blocked:paused};
-    if(mode==='boards'){message.activity=activity;if(!paused){const b=boardFor(m);b.drafts={student:null,teacher:null};message.strokes=b.strokes;message.text=b.text;message.tiles=b.tiles}}
+    if(mode==='boards'){message.activity=activity;if(!paused){
+      const b=boardFor(m);clearDrafts(b);message.strokes=b.strokes;message.text=b.text;message.tiles=b.tiles;
+      // More than one page, a page that is not the first one, or pictures sent as pages: the whole list goes along.
+      if(Pages&&(b.pages.length>1||b.pages[0].id!==FIRST_PAGE||b.pages[0].bg)){
+        message.pages=b.pages.map(p=>({id:p.id,strokes:p.strokes,text:p.text,tiles:p.tiles,...(p.bg?{bg:p.bg}:{})}));message.at=b.curId;
+        if(classPages?.send&&b.pages.every(p=>p.bg))message.send=classPages.send;
+      }
+    }}
     B.send(m.connection,message);
   }
 
@@ -1185,7 +1367,7 @@
         focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
-        focusClip.root.hidden=screens||paused||!Clip;focusClip.update();
+        focusClip.root.hidden=screens||paused||!Clip;focusClip.update();focusPages.update();
         if(screens&&!paused){const stopped=!!live&&stoppedOf(m);setVideo(screenVideo,live);screenVideo.hidden=!live;screenNote.hidden=!!live&&!stopped;screenNote.textContent=stopped?'⏸ '+m.name+' stopped sharing. Waiting for them to resume…':'Waiting for '+m.name+' to share their screen…'}
         else setVideo(screenVideo,null);
         screenInk?.refresh();
@@ -1274,13 +1456,56 @@
     clearAll.hidden=mode!=='boards';activityBar.hidden=mode!=='boards'||!!focusId;
     updateActivityLabel();
   }
+  // Is there anything on a student's board that a new send would erase? (Marks, answers, or pages they added.)
+  function hasStudentWork(){
+    return Array.from(boards.values()).some(set=>set.pages.length>1||set.pages.some(b=>b.strokes.length||(activity?.kind==='word'&&b.text&&JSON.stringify(b.text)!==JSON.stringify(defaultWord()))||(activity?.kind==='tiles'&&b.tiles&&JSON.stringify(b.tiles)!==JSON.stringify(Tiles.defaultState(activity)))));
+  }
+  // Pictures sent to every board as pages: pages=[{id,bg}] (bg = a small JPEG picture), info={id,subject,important}.
+  // Each student gets every picture as the background of one page, with a private drawing layer on each, and keeps
+  // their own copy in My files. Like any new activity it replaces what is on the boards, so the teacher is asked first.
+  async function sendPages(pages,info={}){
+    if(!Pages||!on||mode!=='boards')return false;
+    const clean=[],seen=new Set(),given=Array.isArray(pages)?pages.slice(0,Pages.MAX_PAGES):[];
+    for(const page of given){
+      const bg=cleanBg(page?.bg);
+      if(bg&&Pages.validId(page.id)&&!seen.has(page.id)){seen.add(page.id);clean.push({id:page.id,bg})}
+    }
+    if(!clean.length||clean.length!==given.length){B.status('Those pages could not be sent. Try again.');return false}
+    if(hasStudentWork()&&!confirm('This will erase the students\' current marks and pages and start the new pages. Continue?'))return false;
+    const subject=String(info.subject||'').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
+    const id=/^[A-Za-z0-9_-]{8,48}$/.test(String(info.id||''))?String(info.id):newSendId();
+    boards.clear();chooseActivity(null,dirtyAll);
+    classPages=clean;classPages.send={id,...(subject?{subject}:{}),...(info.important===true?{important:true}:{})};
+    for(const m of admitted())sendMode(m);
+    dirtyAll();updateActivityLabel();
+    const here=admitted(),skipped=here.filter(m=>excluded(m,'boards')||isBlocked(m)),got=here.length-skipped.length;
+    B.status('Sent '+clean.length+' page'+(clean.length===1?'':'s')+' to '+got+' of '+here.length+' student'+(here.length===1?'':'s')+'. '+(skipped.length?'Not sent to '+skipped.slice(0,5).map(m=>m.name).join(', ')+(skipped.length>5?' and more':'')+' (their whiteboard is paused or off).':'Each student gets their own copy in My files.'));
+    return true;
+  }
+  // The same, from picture files (one PNG per page): each is made small enough that every student can also save a copy.
+  async function sendPagesFiles(files,extra={}){
+    if(!Pages||!files.length){return false}
+    sendImage.disabled=true;activityLabel.textContent='Preparing '+files.length+' page'+(files.length===1?'':'s')+'…';
+    try{
+      // The student's saved copy must fit in their 3 MB file, so the pictures share about 2.4 MB between them.
+      const budget=Math.max(60000,Math.min(PAGE_BG_MAX,Math.floor(2400000/files.length)));
+      const pages=[];
+      for(const file of files){
+        const bg=await pictureData(file,budget);
+        if(!bg)throw Error('A page is too detailed to send. Remove a big picture from it, or send fewer pages.');
+        pages.push({id:Pages.newId(),bg});
+      }
+      return await sendPages(pages,{id:newSendId(),subject:extra.subject,important:extra.important===true});
+    }catch(e){B.fail(e.message||'Could not prepare the pages.');return false}
+    finally{sendImage.disabled=false;updateActivityLabel()}
+  }
   function sendActivity(next){
     if(!on||mode!=='boards')return;
     const item=cleanActivity(next);
     if(next&&!item){B.fail('Please enter a word or choose a valid picture.');return}
-    const hasWork=Array.from(boards.values()).some(b=>b.strokes.length||(activity?.kind==='word'&&b.text&&JSON.stringify(b.text)!==JSON.stringify(defaultWord()))||(activity?.kind==='tiles'&&b.tiles&&JSON.stringify(b.tiles)!==JSON.stringify(Tiles.defaultState(activity))));
+    const hasWork=hasStudentWork();
     if(hasWork&&!confirm('This will erase the students\' current marks and start a new activity. Continue?'))return;
-    boards.clear();chooseActivity(item,dirtyAll);
+    classPages=null;boards.clear();chooseActivity(item,dirtyAll);
     for(const m of admitted())sendMode(m);
     dirtyAll();updateActivityLabel();
     if(item?.kind==='image'){
@@ -1295,7 +1520,7 @@
     if(!m)setVideo(screenVideo,null);
     screenInk?.refresh();
     controls();gridSize='';syncTiles();if(m)dirty(m.id);else dirtyAll();
-    syncAnnotate();
+    focusPages.update();syncAnnotate();
   }
   function setOn(next){
     if(next&&!B.started())return;
@@ -1392,9 +1617,9 @@
     B.status(blocked.has(key)?m.name+' is paused.':m.name+' is allowed again.');
   }
   // The teacher writes on the board that is open large; the same change goes to that student.
-  function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;if(applyOp(boardFor(m),op,'teacher'))B.send(m.connection,op);dirty(m.id)}
+  function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;const set=boardFor(m),sent=pagedOp(set,op);if(applyTo(set,sent,'teacher'))B.send(m.connection,sent);dirty(m.id)}
   drawer=attachDrawing(canvas,{by:'teacher',tools,enabled:()=>{const m=focusMember();return on&&mode==='boards'&&!!m&&!isBlocked(m)&&(!window.FTTAnnotate||tools.tool==='move')},board:()=>focusBoard()||emptyBoard(),apply:act,
-    send:op=>{const m=focusMember();if(m&&on&&mode==='boards')B.send(m.connection,op)},redraw:()=>{if(focusId)dirty(focusId)}});
+    send:op=>{const m=focusMember();if(m&&on&&mode==='boards')B.send(m.connection,pagedOp(boardFor(m),op))},redraw:()=>{if(focusId)dirty(focusId)}});
 
   // ---------- The shared drawing toolbar on the student board that is open large ----------
   // This is the same toolbar as on my main whiteboard (annotation-toolbar.js). Its marks become ordinary board lines
@@ -1416,8 +1641,8 @@
     grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
     live(draft){
       const m=focusMember();if(!m||!boardOpen())return;
-      const op={type:'board-draft',stroke:draft||null};
-      applyOp(boardFor(m),op,'teacher');B.send(m.connection,op);dirty(m.id);
+      const set=boardFor(m),op=pagedOp(set,{type:'board-draft',stroke:draft||null});
+      applyTo(set,op,'teacher');B.send(m.connection,op);dirty(m.id);
     }};
   // The grid of all the boards: nothing can be drawn there, so the toolbar and the drawing layer step aside
   // (a click always opens the board, whatever tool was picked) and the full toolbar comes back inside one board.
@@ -1466,6 +1691,19 @@
       showPaste({kind:'image',file:blob,subject:options.subject||'',note:note||'Every student gets their own copy to draw on. What they draw stays on their own board.'});
       return true;
     },
+    // Teacher: offer one picture per whiteboard page to every student whiteboard, as pages. Opens the same
+    // "Send to every whiteboard?" preview and sends nothing until the teacher confirms.
+    async sendPagesToAll(blobs,note,options={}){
+      if(!Pages)return this.sendPictureToAll(blobs[0],note,options);
+      if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return false}
+      const files=Array.isArray(blobs)?blobs:[];
+      if(!files.length||!files.every(blob=>blob&&/^image\/(png|jpeg|webp)$/.test(blob.type||''))){B.fail('There is no whiteboard picture to send.');return false}
+      if(!on||mode!=='boards'||suspended||view.hidden)await sendEveryone('boards');
+      if(!on||mode!=='boards')return false;
+      showPaste({kind:'pages',files,subject:options.subject||'',note:note||'Every student gets their own copy of these pages to draw on. What they draw stays on their own board.'});
+      return true;
+    },
+    sendPages,
     navigateWorkspace(destination){
       if(destination==='teach'){hideWorkspace();return true}
       if(destination!=='screens'&&destination!=='whiteboards')return false;
@@ -1480,7 +1718,7 @@
       if(m.presence&&admitted().find(entry=>entry.studentId===m.studentId)!==m)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}
       if(mode!=='boards'||isBlocked(m)||excluded(m,'boards'))return;
-      if(applyOp(boardFor(m),message,'student'))dirty(m.id);
+      if(applyTo(boardFor(m),message,'student'))dirty(m.id);
     },
     // A student's screen arrives as a one-way media call (student → teacher). Only accepted in Screens mode.
     incomingCall(call){
@@ -1492,14 +1730,14 @@
       call.on('close',end);call.on('error',end);
       call.answer();return true;
     },
-    studentJoined(m){window.ClassPointerScreenMarks?.resend(m);const b=boardFor(m);b.drafts={student:null,teacher:null};renderPermissions();if(on){sendMode(m);syncTiles()}},
-    studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))boards.get(m.boardKey).drafts={student:null,teacher:null};if(on)syncTiles()},
+    studentJoined(m){window.ClassPointerScreenMarks?.resend(m);clearDrafts(boardFor(m));renderPermissions();if(on){sendMode(m);syncTiles()}},
+    studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))clearDrafts(boards.get(m.boardKey));if(on)syncTiles()},
     endClass(){
       window.ClassPointerScreenMarks?.reset();drawer?.cancel();for(const m of B.members().values())closeScreen(m);
       // The enclosing classroom ends by deleting the entire Firebase session.
       // Do not send an asynchronous child update here: it could recreate an
       // orphan studentScreenSharing flag after the session is removed.
-      boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';suspended=false;screenPermissionEnabled=false;++workspaceRevision;controls();
+      classPages=null;boards.clear();blocked.clear();denied.screens.clear();denied.boards.clear();classStudents=[];permissionsLoad=null;renderPermissions();chooseActivity(null,dirtyAll);mode='screens';suspended=false;screenPermissionEnabled=false;++workspaceRevision;controls();
       for(const tile of tiles.values()){tile.video.srcObject=null;tile.node.remove()}tiles.clear();
       if(on){on=false;focusId=null;view.hidden=true}
       if(toggle){toggle.setAttribute('aria-pressed','false');toggle.textContent='🖥 Student Screens';toggle.disabled=true}

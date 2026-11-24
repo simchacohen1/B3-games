@@ -131,7 +131,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=hlshapes2"'),'classroom-core');
  assert.match(html,/"classroom\.js\?v=20261123-tiles2"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261122-resume1"/,'pdf-mode');
+ assert.match(html,/"pdf-mode\.js\?v=20261124-pages1"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -350,7 +350,7 @@ test('the toolbar menus and the Students tip are not hidden behind the tabs row'
  assert.match(toolbar,/fly\.hidden=false;root\.classList\.add\('fa-fly-open'\);placeFly\(\);/);
  assert.match(toolbar,/function closeFly\(\)\{flyOpen=null;flySig='';fly\.hidden=true;root\.classList\.remove\('fa-fly-open'\)\}/);
  assert.match(css,/\.app-header\.cp-header:has\(\.cp-students-hint:not\(\[hidden\]\)\)\{position:relative;z-index:2147483647\}/);
- assert.match(html,/teacher-dashboard\.css\?v=20261118-onebar/);
+ assert.match(html,/teacher-dashboard\.css\?v=20261124-pages1/);
 });
 
 // ---------- Typing right in the words on the board (no popup) ----------

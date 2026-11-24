@@ -55,11 +55,11 @@ test('session: a student sees a clear "Waiting for your teacher" screen, and is 
 
 test('versions: the changed scripts have new cache versions', () => {
   const html = read('classroom.html');
-  const want = { 'student-boards': '20261123-tiles2', 'saved-work': '20261117-send1', 'classroom-annotate': '20261123-tiles2', classroom: '20261123-tiles2', 'teacher-dashboard': '20261122-resume1', 'activity-share': '20261123-tiles2' };
+  const want = { 'student-boards': '20261124-pages1', 'saved-work': '20261124-pages1', 'classroom-annotate': '20261124-pages1', classroom: '20261123-tiles2', 'teacher-dashboard': '20261122-resume1', 'activity-share': '20261124-pages1' };
   for (const [f, v] of Object.entries(want)) assert.match(html, new RegExp(f + '\\.js\\?v=' + v), f);
-  assert.match(html, /teacher-dashboard\.css\?v=20261118-onebar/);
+  assert.match(html, /teacher-dashboard\.css\?v=20261124-pages1/);
   for (const page of ['chazara/index.html', 'chavrusa/index.html', 'gematria/index.html', 'halacha/index.html', 'shorashim/index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261123-tiles2/, page);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', page), 'utf8'), /activity-share\.js\?v=20261124-pages1/, page);
 });
 
 // ---------- black / blue screen and the connection signs ----------
