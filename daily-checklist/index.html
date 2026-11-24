@@ -147,7 +147,7 @@ function renderSummary(){
   var yd=viewDay===yesterday;
   $("doneMsg").textContent=items.every(function(it){return answers[it.id]!=null})?(yd?"All done for yesterday! 🎉":"All done for today! 🎉"):(yd?"Tap YES or NO for what you did yesterday.":"Tap YES or NO for each one.");
   $("list").innerHTML=items.map(function(it,i){var a=answers[it.id];
-    return '<div class="row"><div class="pic" aria-hidden="true">'+C.iconFor(it)+'</div><div class="nm" dir="auto">'+nameHtml(it)+'</div>'+
+    return '<div class="row">'+(C.iconFor(it)?'<div class="pic" aria-hidden="true">'+esc(C.iconFor(it))+'</div>':'')+'<div class="nm" dir="auto">'+nameHtml(it)+'</div>'+
       (canSpeak?'<button type="button" class="spk" data-s="'+i+'" aria-label="Read aloud: '+esc(it.name)+'">🔊</button>':'')+'<div class="mini">'+
       '<button type="button" class="yes'+(a===1?' on':'')+'" data-i="'+i+'" data-v="1">YES</button>'+
       '<button type="button" class="no'+(a===0?' on':'')+'" data-i="'+i+'" data-v="0">NO</button></div></div>'}).join("");

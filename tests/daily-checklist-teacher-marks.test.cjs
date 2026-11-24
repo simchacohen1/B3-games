@@ -58,3 +58,18 @@ test('day arrows: shiftDate crosses month/year edges and every standard item has
   C.DEFAULT_ITEMS.forEach(it => assert.ok(C.iconFor(it) && C.iconFor(it) !== '📝', it.id));
   assert.equal(C.iconFor({ id: 'i123', name: 'Something new' }), '📝');
 });
+
+test('teacher-chosen pictures: stored on the item, "-" means none, survive a Mashpia sync', () => {
+  const items = C.itemsFromConfig({ a: { name: 'A', order: 0, icon: '🍎' }, b: { name: 'B', order: 1, icon: '-' }, c: { name: 'C', order: 2 } }, false);
+  assert.deepEqual(items.map(i => C.iconFor(i)), ['🍎', '', '📝']);
+  assert.equal(C.iconFor({ id: 'mincha', name: 'Mincha' }), '☀️');
+  assert.equal(C.cleanIcon(' 🍎 and more'), '🍎');
+  assert.equal(C.cleanIcon('👨‍👩‍👦x'), '👨‍👩‍👦');
+  assert.equal(C.cleanIcon('abc'), '');
+  assert.equal(C.cleanIcon('7'), '');
+  const M = require('../daily-checklist/mashpia-core.js');
+  const cfg = { a: { name: 'A', order: 0, star: false, removed: false, icon: '🍎' } };
+  const out = M.mergeItems(cfg, [{ name: 'A', gridId: 1 }, { name: 'New', gridId: 2 }], []);
+  assert.equal(out.a.icon, '🍎');
+  assert.equal(out.m2.icon, undefined);
+});
