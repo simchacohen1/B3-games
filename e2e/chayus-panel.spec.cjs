@@ -10,6 +10,12 @@ const ROOT = path.join(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.mp3': 'audio/mpeg', '.svg': 'image/svg+xml' };
 let server, origin;
 
+// The generated-tone microphone below only works in Chromium (Firefox and WebKit refuse an AudioContext
+// started without a click). Real school computers are checked by hand on the staging preview.
+test.skip(({ browserName }) => browserName !== 'chromium', 'generated-tone microphone needs Chromium');
+// The quiet-versus-shout test runs about 40 seconds of real time on purpose.
+test.setTimeout(120000);
+
 test.beforeAll(async () => {
   server = http.createServer((req, res) => {
     const file = path.normalize(path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname)));
