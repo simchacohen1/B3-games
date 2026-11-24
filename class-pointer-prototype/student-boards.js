@@ -54,6 +54,8 @@
     if(tool!==null&&!ITEM_TOOLS.includes(tool))return null;
     if(!(tool?ITEM_SIZES:SIZE_VALUES).includes(s.size))return null;
     const out={id:s.id,color:s.color,size:s.size,points:s.points.map(p=>({x:round(p.x),y:round(p.y)}))};
+    // On a group board the teacher's page marks each line with the code of the student who drew it ("m3").
+    if(typeof s.who==='string'&&/^m[0-9]{1,5}$/.test(s.who))out.who=s.who;
     if(tool){
       if(tool==='text'){if(typeof s.text!=='string'||!s.text.trim()||s.text.length>200||out.points.length!==1)return null;out.text=s.text}
       else if(tool!=='highlight'&&out.points.length!==2)return null;
@@ -254,8 +256,9 @@
   }
   // The shared drawing toolbar hands over the whole list of one side's marks; turn the difference into board changes.
   // A picture that was only moved keeps its picture: send its new place, not the whole picture again.
-  function syncBoardItems(board,by,list,act){
-    const mine=board.strokes.filter(item=>item.by===by),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
+  function syncBoardItems(board,by,list,act,own){
+    // `own` (a group board): only my own lines are mine to add, remove or move; my group's other lines are left alone.
+    const mine=board.strokes.filter(item=>item.by===by&&(!own||own(item))),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
     const gone=mine.filter(item=>!keep.has(item.id)),moved=new Set();
     for(const item of list){
       const from=!had.has(item.id)&&item.image?gone.find(old=>old.image===item.image&&!moved.has(old.id)):null;
@@ -283,6 +286,12 @@
     const mine=list.filter(item=>item.id[0]==='t'&&(!owner.has(item.id)||owner.get(item.id)==='teacher'));
     syncBoardItems(board,'teacher',mine,act);
     for(const item of fresh)if(item.id[0]==='s')act({type:'board-put',stroke:strip(item),owner:'student'});
+  }
+  function cleanGroup(raw){
+    if(!raw||typeof raw!=='object'||!/^g[0-9]{1,4}$/.test(String(raw.id))||!/^m[0-9]{1,5}$/.test(String(raw.me)))return null;
+    const text=value=>String(value==null?'':value).replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/g,' ').replace(/\s+/g,' ').trim().slice(0,30);
+    const members=(Array.isArray(raw.members)?raw.members:[]).slice(0,12).map(text).filter(Boolean);
+    return{id:raw.id,name:text(raw.name)||'Group',me:raw.me,members};
   }
   function pageFromMessage(id,bg,list,rawText,rawTiles){
     const page=newPage(id,bg);
@@ -647,6 +656,9 @@
   // The teacher may pause ("block") one student; then that student sees a short message instead.
   // =====================================================================
   if(!isTeacher){
+    // My group (when the teacher put me in one): {id, name, me, members}. `me` is the code my lines carry.
+    let group=null;
+    const ownItem=item=>!group||!item.who||item.who===group.me;
     let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null,teacherPresenting=false;
     // Tell the page when this student's whiteboard is actually on display (activity-share.js hides Share My Screen meanwhile).
     let announced=null;
@@ -675,8 +687,8 @@
     bar.append(studentPages.root);
     const tools=makeTools(drawGroup,COLORS[0],st=>{drawer?.cancel();surface.classList.toggle('erasing',st.tool==='eraser');surface.classList.toggle('moving',st.tool==='move')});
     drawGroup.append(
-      button('↶ Undo','Undo my last line',()=>{const mine=board.strokes.filter(s=>s.by==='student');const last=mine[mine.length-1];if(last)act({type:'board-remove',ids:[last.id]})}),
-      button('🗑 Clear','Clear everything I drew',()=>{if(board.strokes.some(s=>s.by==='student')&&confirm('Clear everything you drew on your board?'))act({type:'board-clear'})},'danger'));
+      button('↶ Undo','Undo my last line',()=>{const mine=board.strokes.filter(s=>s.by==='student'&&ownItem(s));const last=mine[mine.length-1];if(last)act({type:'board-remove',ids:[last.id]})}),
+      button('🗑 Clear','Clear everything I drew',()=>{if(board.strokes.some(s=>s.by==='student'&&ownItem(s))&&confirm(group?'Clear everything you drew on this page? Your group\'s other lines stay.':'Clear everything you drew on your board?'))clearMine()},'danger'));
     // What is picked with the drawing toolbar's Select tool (when the toolbar reports it).
     const pickedId=()=>{const state=window.FTTAnnotate?.state?.();return state?.surface==='board'?state.selected||null:null};
     const clip=clipboardTools(bar,{by:'student',priority:3,tools,open:()=>on&&mode==='boards'&&!blocked&&!view.hidden&&canvas.getClientRects().length>0,key:()=>'mine',board:()=>board,act:op=>act(op),point:()=>drawer?.point(),selected:pickedId});
@@ -708,7 +720,7 @@
 
     function ui(){
       const boardsOn=on&&mode==='boards'&&!blocked,screensOn=on&&mode==='screens'&&!blocked;
-      title.textContent=mode==='screens'?'🖥 Share my screen':'📝 My board';
+      title.textContent=mode==='screens'?'🖥 Share my screen':group?'\uD83D\uDC65 '+group.name:'📝 My board';title.title=group&&mode!=='screens'?'Your group: '+group.members.join(', '):'';
       // The left drawing toolbar carries Pen, Eraser, colors, Undo and Clear, so the old tool row is hidden (one toolbar).
       // The slim top bar keeps the title, Paste, Copy board, Save, My files, Back to Activity and Full screen.
       const oneToolbar=boardsOn&&!!window.FTTAnnotate;view.classList.toggle('boards-annotated',oneToolbar);
@@ -751,6 +763,12 @@
       shareNote.textContent='Your browser blocked the separate window. You can share from this page, but navigation will stop sharing.';
       void startShare('screen');
     }
+    // Clear what I drew: my own lines on this page. On a group board that must never remove my group's lines.
+    function clearMine(){
+      if(!group){act({type:'board-clear'});return}
+      const ids=board.strokes.filter(s=>s.by==='student'&&ownItem(s)).map(s=>s.id);
+      if(ids.length)act({type:'board-remove',ids});
+    }
     function act(op){if(!on||mode!=='boards'||blocked)return;const sent=pagedOp(board,op);if(applyTo(board,sent,'student'))B.sendTeacher(sent);redraw()}
     // My whiteboard as a surface for the shared drawing toolbar. Its marks are ordinary board lines, so the teacher
     // sees them live in my tile, and my own Undo / Clear / Eraser work on them too.
@@ -758,8 +776,8 @@
     const boardSurface={id:'board',idPrefix:'s',defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
-      getItems:()=>board.strokes.filter(item=>item.by==='student'),
-      setItems(list){syncBoardItems(board,'student',list,act)},
+      getItems:()=>board.strokes.filter(item=>item.by==='student'&&ownItem(item)),
+      setItems(list){syncBoardItems(board,'student',list,act,group?ownItem:null)},
       // Hebrew word tiles can be picked up with any drawing tool.
       grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
       live(draft){if(!boardOpen())return;const op=pagedOp(board,{type:'board-draft',stroke:draft||null});applyTo(board,op,'student');B.sendTeacher(op);redraw()}};
@@ -887,6 +905,7 @@
         on=message.on===true;mode=message.mode==='screens'?'screens':'boards';blocked=on&&message.blocked===true;
         if(!on||mode!=='screens'||blocked)stopShare(false);
         chooseActivity(on&&mode==='boards'?message.activity:null,redraw);
+        group=on&&mode==='boards'&&!blocked?cleanGroup(message.group):null;
         // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
         if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,id:activity.id,subject:activity.subject,important:activity.important});
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text,message.tiles,message):emptyBoard();
@@ -899,6 +918,9 @@
         else if(blocked){if(!wasBlocked)B.status('Your teacher paused your board for now.')}
         else if(!was||wasMode!==mode||wasBlocked)B.status(mode==='screens'?'Your teacher asked you to share your screen. Click Share my screen.':'Your teacher opened your own whiteboard. Draw with the pen. Your teacher can see your board.');
         syncAnnotate();
+      }else if(message.type==='board-peer'){
+        // A line, page change or draft from someone in my group (the teacher's page passes it on after checking it).
+        if(on&&mode==='boards'&&!blocked&&group)applyTo(board,message.op,'student');
       }else if(on&&mode==='boards'&&!blocked)applyTo(board,message,'teacher');
       redraw();return true;
     }
@@ -926,7 +948,7 @@
     // Puts the saved marks of ONE page on the page being shown. Saved data is checked like anything from the network,
     // sent to the teacher as normal board changes (so every limit holds), and the teacher's marks and activity are left alone.
     function restorePage(data){
-      act({type:'board-clear'});
+      clearMine();
       for(const raw of data.strokes.slice(0,MAX_STROKES)){
         if(!raw||raw.by==='teacher')continue;
         const stroke=cleanStroke({...raw,id:newId('s')});
@@ -993,6 +1015,22 @@
   // changing classmates' access or his independent Pointer/Highlight settings.
   const denied={screens:new Set(),boards:new Set()};
   let classStudents=[],permissionsLoad=null,permissionsWrite=Promise.resolve();
+  // ---------- Groups: students who share one board ----------
+  // The teacher puts the students who are here into groups (board-groups-core.js). A group has ONE board, kept on the
+  // teacher's page: a line a member draws is checked here, marked with that member's code, and passed on to the others in
+  // the group, so everyone sees the same board live. The teacher watches one tile for each group and can draw on it.
+  // Who is in which group is remembered in this browser for the rest of the day, so a student who leaves and comes back
+  // returns to the same group.
+  const Groups=window.ClassPointerGroups||null;
+  const GROUP_STORE='fttPointerGroups:'+(()=>{try{return new URLSearchParams(location.search).get('class')||''}catch(_){return ''}})();
+  const GROUP_KEEP_MS=12*60*60*1000;
+  function loadGroups(){
+    if(!Groups)return null;
+    try{const saved=JSON.parse(localStorage.getItem(GROUP_STORE)||'null');if(saved&&Date.now()-Number(saved.at)<GROUP_KEEP_MS)return Groups.clean(saved.state)}catch(_){}
+    return Groups.empty();
+  }
+  let gstate=loadGroups();
+  function saveGroups(){if(!Groups)return;try{if(gstate.groups.length)localStorage.setItem(GROUP_STORE,JSON.stringify({at:Date.now(),state:gstate}));else localStorage.removeItem(GROUP_STORE)}catch(_){}}
   const policy=()=>Object.fromEntries(['screens','boards'].map(kind=>[kind,Object.fromEntries(Array.from(denied[kind],id=>[id,true]))]));
   function personId(m){
     if(m.studentId&&classStudents.some(student=>student.id===m.studentId&&student.name.toLowerCase()===String(m.name).toLowerCase()))return m.studentId;
@@ -1092,6 +1130,12 @@
     if(!confirm('Erase every student whiteboard? This cannot be undone.'))return;
     boards.clear();for(const m of admitted())sendMode(m);dirtyAll();
   },'danger');
+  // Groups: students who share one board.
+  const groupsBtn=button('\uD83D\uDC65 Groups','Put the students in small groups. Each group shares one board',()=>openGroupsDialog());
+  const saveGroupsBtn=button('\uD83D\uDCBE Save group boards','Save every group\u2019s board in your whiteboard files',()=>void saveGroupBoards());
+  groupsBtn.hidden=!Groups;saveGroupsBtn.hidden=true;
+  const groupsDialog=el('div','boards-groups-dialog');groupsDialog.hidden=true;groupsDialog.setAttribute('role','dialog');groupsDialog.setAttribute('aria-label','Groups');
+  groupsDialog.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
   gridBar.append(el('strong','boards-title','🧑‍🎨 Students'),count,modes,chooseParticipants,el('span','boards-hint','Click a tile to open it large · 🚫 pauses a student'),el('span','boards-spacer'),clearAll,
     button('✕ Close boards','Return everyone to the lesson. Whiteboards are kept until the class ends.',()=>setOn(false)));
 
@@ -1168,6 +1212,134 @@
   const sendTiles=button('🔤 Hebrew tiles','Type or paste Hebrew words. Each word becomes a tile students drag into word boxes',()=>openTilesDialog());
   const tilesDialog=el('div','boards-tiles-dialog');tilesDialog.hidden=true;tilesDialog.setAttribute('role','dialog');tilesDialog.setAttribute('aria-label','Hebrew word tiles');
   tilesDialog.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
+  // Every student gets the board they now belong to (a group's, or their own again), and the gallery is redrawn.
+  function applyGroups(){
+    saveGroups();
+    const live=new Set(gstate.groups.map(g=>'group:'+g.id));
+    for(const key of Array.from(boards.keys()))if(key.startsWith('group:')&&!live.has(key))boards.delete(key);
+    for(const key of Array.from(blocked))if(key.startsWith('group:')&&!live.has(key))blocked.delete(key);
+    drawer?.cancel();
+    for(const m of admitted())sendMode(m);
+    controls();gridSize='';syncTiles();dirtyAll();syncAnnotate();
+  }
+  const hasGroupWork=()=>Array.from(boards.entries()).some(([key,set])=>key.startsWith('group:')&&set.pages.some(p=>p.strokes.length));
+  function openGroupsDialog(){
+    if(!Groups||mode!=='boards')return;
+    if(!B.started()){B.fail('Wait for your classroom to finish opening, then try again.');return}
+    const panel=el('div','boards-groups-panel');
+    panel.style.cssText='background:white;color:#142642;border-radius:15px;padding:18px;width:min(720px,95vw);max-height:90vh;overflow:auto;box-shadow:0 16px 55px #0005;display:grid;gap:12px';
+    const box='padding:6px;border:2px solid #94a3b8;border-radius:9px;font:600 15px system-ui';
+    const note=el('p');note.setAttribute('role','status');note.style.cssText='margin:0;min-height:1.3em;font-weight:700;color:#475569';
+    const say=(text,bad)=>{note.style.color=bad?'#b91c1c':'#475569';note.textContent=text||''};
+    const close=()=>{Groups.dropEmpty(gstate);applyGroups();groupsDialog.hidden=true;groupsDialog.style.display='none';groupsDialog.replaceChildren()};
+    function people(){
+      const rows=[],seen=new Set();
+      for(const m of admitted()){
+        if(excluded(m,'boards'))continue;
+        const key=personKeyOf(m);if(seen.has(key))continue;seen.add(key);rows.push({key,name:m.name,here:true});
+      }
+      for(const key of Object.keys(gstate.assign))if(!seen.has(key)){seen.add(key);rows.push({key,name:gstate.assign[key].n||key,here:false})}
+      return rows;
+    }
+    function render(){
+      panel.replaceChildren();
+      const rows=people(),here=rows.filter(p=>p.here);
+      // 1. Make random groups
+      const make=el('div');make.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+      const how=el('select');how.style.cssText=box;
+      for(const [value,label] of [['count','Number of groups'],['size','Students in each group']]){const o=el('option',null,label);o.value=value;how.append(o)}
+      const amount=el('input');amount.type='number';amount.min='1';amount.max='30';amount.value=String(Math.max(2,Math.round(here.length/3))||2);amount.style.cssText=box+';width:80px';amount.setAttribute('aria-label','How many');
+      how.addEventListener('change',()=>{amount.value=how.value==='size'?'3':String(Math.max(2,Math.round(here.length/3))||2)});
+      const go=button('\uD83C\uDFB2 Make random groups','Shuffle the students who are here into groups',()=>{
+        const result=Groups.split(gstate,here.map(p=>({key:p.key,name:p.name})),how.value==='size'?{size:amount.value}:{count:amount.value});
+        if(result.error){say(result.error,true);return}
+        if(hasGroupWork()&&!confirm('Making new groups starts new group boards, and the old group boards are erased. (Save group boards first to keep them.) Continue?'))return;
+        gstate=result.state;applyGroups();render();
+        say(gstate.groups.length+' group'+(gstate.groups.length===1?'':'s')+' made. Every student now sees their group\u2019s board. You can move students below.');
+      },'main');
+      make.append(how,amount,go);
+      // 2. Group names
+      const names=el('div');names.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+      for(const g of gstate.groups){
+        const input=el('input');input.type='text';input.maxLength=Groups.LIMITS.name;input.value=g.name;input.style.cssText=box+';width:150px';input.setAttribute('aria-label','Name of '+g.name);
+        input.addEventListener('change',()=>{
+          if(Groups.rename(gstate,g.id,input.value)){saveGroups();for(const m of admitted())if(groupIdOf(m)===g.id)sendMode(m);syncTiles()}
+          input.value=Groups.groupById(gstate,g.id)?.name||g.name;
+        });
+        names.append(input);
+      }
+      // 3. Each student: which group
+      const list=el('div');list.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px';
+      for(const p of rows){
+        const row=el('label');row.style.cssText='display:flex;gap:8px;align-items:center;justify-content:space-between;font-weight:700';
+        const select=el('select');select.style.cssText=box;
+        const choices=[['','No group'],...gstate.groups.map(g=>[g.id,g.name]),['__new','\uFF0B New group']];
+        for(const [value,label] of choices){const o=el('option',null,label);o.value=value;select.append(o)}
+        select.value=Groups.groupOf(gstate,p.key);
+        select.addEventListener('change',()=>{
+          let target=select.value;
+          if(target==='__new'){const g=Groups.newGroup(gstate);if(!g){say('There can be at most '+Groups.LIMITS.groups+' groups.',true);render();return}target=g.id}
+          if(Groups.move(gstate,p.key,target,p.name))applyGroups();
+          render();
+        });
+        row.append(el('span',null,p.name+(p.here?'':' (away)')),select);list.append(row);
+      }
+      const buttons=el('div');buttons.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
+      const ungroup=button('Ungroup everyone','Everyone goes back to their own board (group boards are erased)',()=>{
+        if(!gstate.groups.length){say('There are no groups.');return}
+        if(hasGroupWork()&&!confirm('The group boards will be erased. (Save group boards first to keep them.) Ungroup everyone?'))return;
+        gstate=Groups.ungroup();for(const key of Array.from(boards.keys()))if(key.startsWith('group:'))boards.delete(key);
+        applyGroups();render();say('Everyone is back on their own board.');
+      },'danger');
+      const done=button('Done','Close',close,'main');
+      buttons.append(done,ungroup);
+      panel.append(el('h3',null,'\uD83D\uDC65 Groups'),
+        el('p',null,here.length?here.length+' student'+(here.length===1?' is':'s are')+' here. Each group shares one board: whatever one student draws, the others see.':'No students are here yet.'),
+        make,note,gstate.groups.length?el('strong',null,'Group names'):el('span'),names,el('strong',null,'Students'),list,buttons);
+    }
+    render();
+    groupsDialog.replaceChildren(panel);groupsDialog.hidden=false;groupsDialog.style.display='flex';
+  }
+  // ---------- Save group boards: each group's board becomes a whiteboard file of the teacher's own ----------
+  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  async function pageJpeg(page,limit){
+    for(const data of new Set([page.bg,...page.strokes.map(line=>line.image)].filter(Boolean)))for(let i=0;i<30&&!pictureOf(data);i++)await pause(100);
+    const c=document.createElement('canvas');c.width=1280;c.height=720;
+    paintOn(c.getContext('2d'),c.width,c.height,page,[]);
+    let data='';
+    for(const quality of [0.85,0.7,0.55,0.4]){data=c.toDataURL('image/jpeg',quality);if(data.length<=limit)break}
+    c.width=0;
+    return data.length<=limit?data:null;
+  }
+  // One group's board as something saved-work.js can save: its name, a picture of every page, and a picture of page 1.
+  // null when the board has nothing on it yet.
+  async function groupItem(g){
+    const set=boards.get('group:'+g.id);
+    if(!set||!set.pages.some(page=>page.strokes.length||page.bg))return null;
+    const limit=Math.max(150000,Math.min(600000,Math.floor(8500000/set.pages.length)));
+    const pages=[];
+    for(const page of set.pages){
+      const jpeg=await pageJpeg(page,limit);
+      if(!jpeg)throw Error('A page of '+g.name+' is too detailed to save.');
+      pages.push(jpeg);
+    }
+    const members=Groups.membersOf(gstate,g.id).map(key=>gstate.assign[key].n).filter(Boolean).join(', ');
+    return{name:g.name+(members?' - '+members:''),pages,picture:await boardPng(set.pages[0])};
+  }
+  // The group board that is open large right now (its group id), or ''. The regular Save on the toolbar saves this one.
+  const openGroupId=()=>mode==='boards'&&on&&!suspended&&!view.hidden&&typeof focusId==='string'&&focusId.startsWith('g:')&&Groups?.groupById(gstate,focusId.slice(2))?focusId.slice(2):'';
+  async function saveGroupBoards(){
+    const api=window.FTTSavedWork;
+    if(typeof api?.saveGroupBoards!=='function'){B.status('Saving is not ready yet. Try again in a moment.');return}
+    saveGroupsBtn.disabled=true;
+    try{
+      const items=[];
+      for(const g of gstate.groups){const item=await groupItem(g);if(item)items.push(item)}
+      if(!items.length){B.status('The group boards are empty. There is nothing to save yet.');return}
+      await api.saveGroupBoards(items);
+    }catch(error){B.fail(error?.message||'Could not save the group boards.')}
+    finally{saveGroupsBtn.disabled=false}
+  }
   function openTilesDialog(){
     if(!Tiles)return;
     const panel=el('div','boards-tiles-panel');
@@ -1202,8 +1374,10 @@
   }
   tilesDialog.addEventListener('keydown',e=>{if(e.key==='Escape')tilesDialog.querySelector('button:last-child')?.click()});
   stage.appendChild(tilesDialog);shield(tilesDialog);
+  stage.appendChild(groupsDialog);shield(groupsDialog);
   if(!Tiles)sendTiles.hidden=true;
-  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendTiles,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
+  // Groups sit first in this bar: it is the bar that shows on the teacher page (the gallery's own top bar is hidden there).
+  activityBar.append(groupsBtn,saveGroupsBtn,el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendTiles,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
   imageFile.addEventListener('change',async()=>{
     const file=imageFile.files?.[0];imageFile.value='';
@@ -1305,9 +1479,56 @@
     if(!m.boardKey){const base='name:'+String(m.name||'student').toLowerCase();m.boardKey=admitted().some(o=>o!==m&&o.boardKey===base)?base+'#'+m.id:base}
     return m.boardKey;
   }
-  function boardFor(m){const key=keyFor(m);let b=boards.get(key);if(!b){b=emptyBoard();boards.set(key,b)}return b}
-  const isBlocked=m=>blocked.has(keyFor(m));
-  const focusMember=()=>focusId?admitted().find(m=>m.id===focusId)||null:null;
+  const groupsOn=()=>!!Groups&&gstate.groups.length>0;
+  const personKeyOf=m=>personId(m)||keyFor(m);
+  const groupIdOf=m=>groupsOn()?Groups.groupOf(gstate,personKeyOf(m)):'';
+  const groupNameOf=gid=>Groups?.groupById(gstate,gid)?.name||'Group';
+  // The board a student draws on: their group's board, or their own.
+  const boardKeyOf=m=>{const gid=groupIdOf(m);return gid?'group:'+gid:keyFor(m)};
+  function boardFor(m){const key=boardKeyOf(m);let b=boards.get(key);if(!b){b=emptyBoard();boards.set(key,b)}return b}
+  const isBlocked=m=>{const gid=groupIdOf(m);return blocked.has(keyFor(m))||(!!gid&&blocked.has('group:'+gid))};
+  // Everyone who shares this student's board (just the student when there is no group), who may still take part.
+  function audience(m){
+    const gid=groupIdOf(m);
+    if(!gid)return[m];
+    return admitted().filter(x=>groupIdOf(x)===gid&&!excluded(x,'boards')&&!isBlocked(x));
+  }
+  const sendBoard=(m,message)=>{for(const x of audience(m))B.send(x.connection,message)};
+  // A tile (and the large view) stands for one student, or for one whole group ("g:" + the group's id).
+  const unitIdOf=m=>mode==='boards'&&groupIdOf(m)?'g:'+groupIdOf(m):m.id;
+  function repOf(id){
+    if(typeof id==='string'&&id.startsWith('g:')){const gid=id.slice(2);return admitted().find(m=>groupIdOf(m)===gid)||null}
+    return admitted().find(m=>m.id===id)||null;
+  }
+  // What the teacher's page may pass on from a member of a group: it is checked against the board it is now on, marked with
+  // the member's code, and a member can only change their own lines. Anything else is dropped (null).
+  function groupOp(set,op,code){
+    if(!op||typeof op.type!=='string'||!code)return null;
+    const page=op.pg===undefined?set.pages[set.at]:set.pages.find(p=>p.id===op.pg);
+    const mineOf=ids=>(Array.isArray(ids)?ids:[]).filter(id=>{const line=page?.strokes.find(x=>x.id===id);return !!line&&line.by==='student'&&(!line.who||line.who===code)});
+    switch(op.type){
+      case 'board-add':case 'board-draft':
+        return{...op,stroke:op.stroke&&typeof op.stroke==='object'?{...op.stroke,who:code}:op.stroke};
+      case 'board-move':{
+        const line=page?.strokes.find(x=>x.by==='student'&&x.id===op.id);
+        return line&&(!line.who||line.who===code)?op:null;
+      }
+      case 'board-remove':{const ids=mineOf(op.ids);return ids.length?{...op,ids}:null}
+      case 'board-clear':{
+        const ids=(page?.strokes||[]).filter(x=>x.by==='student'&&(!x.who||x.who===code)).map(x=>x.id);
+        return ids.length?{type:'board-remove',...(op.pg!==undefined?{pg:op.pg}:{}),ids}:null;
+      }
+      case 'board-text':case 'board-tile':case 'board-page-add':case 'board-page-remove':case 'board-page-move':case 'board-page-at':return op;
+      default:return null;
+    }
+  }
+  function relayToGroup(m,op){
+    // Each member moves between pages on their own, so a page change of one is not copied to the others.
+    if(op.type==='board-page-at')return;
+    const message={type:'board-peer',op};
+    for(const x of audience(m))if(x!==m)B.send(x.connection,message);
+  }
+  const focusMember=()=>focusId?repOf(focusId):null;
   const focusBoard=()=>{const m=focusMember();return m?boardFor(m):null};
   const focusWord=wordEditor(focusBar,()=>focusBoard(),text=>act({type:'board-text',text}),tools);
   // Paste and Copy on the one board that is open large. What the teacher pastes goes to that student.
@@ -1321,6 +1542,11 @@
     const message={type:'board-mode',on:true,mode,blocked:paused};
     if(mode==='boards'){message.activity=activity;if(!paused){
       const b=boardFor(m);clearDrafts(b);message.strokes=b.strokes;message.text=b.text;message.tiles=b.tiles;
+      const gid=groupIdOf(m);
+      if(gid){
+        const code=Groups.codeOf(gstate,personKeyOf(m));
+        if(code)message.group={id:gid,name:groupNameOf(gid),me:code,members:Groups.membersOf(gstate,gid).map(k=>gstate.assign[k].n||'').filter(Boolean).slice(0,12)};
+      }
       // More than one page, a page that is not the first one, or pictures sent as pages: the whole list goes along.
       if(Pages&&(b.pages.length>1||b.pages[0].id!==FIRST_PAGE||b.pages[0].bg)){
         message.pages=b.pages.map(p=>({id:p.id,strokes:p.strokes,text:p.text,tiles:p.tiles,...(p.bg?{bg:p.bg}:{})}));message.at=b.curId;
@@ -1332,7 +1558,8 @@
 
   // ---------- Painting (only tiles that changed, once per frame) ----------
   const dirtySet=new Set();let frame=0;
-  function dirty(id){dirtySet.add(id);if(!frame)frame=requestAnimationFrame(flush)}
+  // `id` may be a student's id: on a group board it is the group's tile that has to be painted.
+  function dirty(id){const m=typeof id==='string'&&!id.startsWith('g:')?admitted().find(entry=>entry.id===id):null;dirtySet.add(m?unitIdOf(m):id);if(!frame)frame=requestAnimationFrame(flush)}
   function dirtyAll(){for(const id of tiles.keys())dirtySet.add(id);if(focusId)dirtySet.add(focusId);if(!frame)frame=requestAnimationFrame(flush)}
   function setVideo(video,stream){if(video.srcObject!==stream){video.srcObject=stream||null;if(stream)video.play().catch(()=>{})}}
   // A student's live screen. A boy who joined Pointer shares by a direct call (m.screenStream). A boy sharing from
@@ -1353,7 +1580,7 @@
   function flush(){
     frame=0;
     if(!view.hidden)for(const id of dirtySet){
-      const m=admitted().find(entry=>entry.id===id);if(!m)continue;
+      const m=repOf(id);if(!m)continue;
       const disabled=excluded(m,mode),paused=isBlocked(m)||disabled,screens=mode==='screens',tile=tiles.get(id),live=screens?streamOf(m):null;
       if(tile&&!grid.hidden){
         tile.node.classList.toggle('blocked',paused);tile.node.classList.toggle('screen',screens);
@@ -1364,7 +1591,7 @@
         if(!screens){const b=boardFor(m);paint(tile.canvas,b,null);tile.node.classList.toggle('drawing',!paused&&!!b.drafts.student)}else tile.node.classList.remove('drawing');
       }
       if(id===focusId){
-        focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+m.name;
+        focusBlock.textContent=paused?'✅ Allow':'🚫 Pause';focusBlock.title=(paused?'Allow ':'Pause ')+nameOf(m);
         drawGroup.hidden=screens||paused;surface.hidden=screens||paused;screenBox.hidden=!screens||paused;pausedBox.hidden=!paused;
         focusWord.update();focusWord.root.hidden=screens||paused||activity?.kind!=='word';
         focusClip.root.hidden=screens||paused||!Clip;focusClip.update();focusPages.update();
@@ -1378,15 +1605,32 @@
   }
 
   // ---------- Grid: one tile per student, as large as the lesson area allows ----------
-  function makeTile(m){
-    const node=el('div','board-tile'),c=el('canvas'),v=el('video'),note=el('span','board-note');
-    node.tabIndex=0;node.setAttribute('role','button');node.title='Open '+m.name+'’s tile large';
+  function makeTile(unit){
+    const node=el('div','board-tile'),c=el('canvas'),v=el('video'),note=el('span','board-note'),label=el('span','board-name',unit.name);
+    const tile={node,canvas:c,video:v,note,block:null,label,unit};
+    node.tabIndex=0;node.setAttribute('role','button');node.title='Open '+unit.name+'’s tile large';
     v.muted=true;v.autoplay=true;v.playsInline=true;v.hidden=true;
-    const block=button('🚫','Pause '+m.name,event=>{event.stopPropagation();toggleBlock(m)},'board-block');
-    node.append(c,v,note,el('span','board-name',m.name),block);
-    node.addEventListener('click',()=>setFocus(m.id));
-    node.addEventListener('keydown',event=>{if(event.target===node&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setFocus(m.id)}});
-    return{node,canvas:c,video:v,note,block};
+    const block=button('🚫','Pause '+unit.name,event=>{event.stopPropagation();toggleBlock(tile.unit.rep)},'board-block');
+    tile.block=block;
+    node.append(c,v,note,label,block);
+    node.addEventListener('click',()=>setFocus(tile.unit.id));
+    node.addEventListener('keydown',event=>{if(event.target===node&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setFocus(tile.unit.id)}});
+    return tile;
+  }
+  // The tiles of the gallery: one for each student, or (boards, with groups) one for each group and one for each student
+  // who is in no group. `rep` is the student who stands for the tile when something has to be sent or looked up.
+  function unitsOf(list){
+    if(mode!=='boards'||!groupsOn())return list.map(m=>({id:m.id,rep:m,name:m.name,group:''}));
+    const units=[],byGroup=new Map();
+    for(const m of list){
+      const gid=groupIdOf(m);
+      if(!gid){units.push({id:m.id,rep:m,name:m.name,group:''});continue}
+      let unit=byGroup.get(gid);
+      if(!unit){unit={id:'g:'+gid,rep:m,name:'',group:gid,members:[]};byGroup.set(gid,unit);units.push(unit)}
+      unit.members.push(m.name);
+    }
+    for(const unit of byGroup.values())unit.name='\uD83D\uDC65 '+groupNameOf(unit.group)+' · '+unit.members.join(', ');
+    return units;
   }
   // "Who has not started sharing?" Every boy on the class roster who may share his screen is either sharing (live
   // stream) or listed here. Boys who are connected to the class show in orange; boys not connected show in grey.
@@ -1424,12 +1668,18 @@
     const present=admitted();
     // Screen tiles exist only for streams that are actually live. One stream
     // therefore fills the available gallery; tiles shrink as more join.
-    const list=mode==='screens'?present.filter(m=>!excluded(m,'screens')&&!!streamOf(m)):present.filter(m=>!excluded(m,'boards'));
-    const ids=new Set(list.map(m=>m.id));
+    const people=mode==='screens'?present.filter(m=>!excluded(m,'screens')&&!!streamOf(m)):present.filter(m=>!excluded(m,'boards'));
+    const list=unitsOf(people);
+    const ids=new Set(list.map(u=>u.id));
     for(const [id,tile] of tiles)if(!ids.has(id)){tile.video.srcObject=null;tile.node.remove();tiles.delete(id)}
-    for(const m of list)if(!tiles.has(m.id)){const tile=makeTile(m);grid.appendChild(tile.node);tiles.set(m.id,tile);dirty(m.id)}
-    const paused=list.filter(isBlocked).length;
-    count.textContent=list.length?list.length+(list.length===1?(mode==='screens'?' screen':' whiteboard'):(mode==='screens'?' screens':' whiteboards'))+(paused?' · '+paused+' paused':''):'';
+    for(const unit of list){
+      let tile=tiles.get(unit.id);
+      if(!tile){tile=makeTile(unit);grid.appendChild(tile.node);tiles.set(unit.id,tile);dirty(unit.id)}
+      tile.unit=unit;
+      if(tile.label.textContent!==unit.name){tile.label.textContent=unit.name;tile.node.title='Open '+unit.name+'’s tile large';dirty(unit.id)}
+    }
+    const paused=list.filter(u=>isBlocked(u.rep)).length,grouped=list.some(u=>u.group);
+    count.textContent=list.length?list.length+(grouped?(list.length===1?' board':' boards'):list.length===1?(mode==='screens'?' screen':' whiteboard'):(mode==='screens'?' screens':' whiteboards'))+(paused?' · '+paused+' paused':''):'';
     empty.textContent=mode==='screens'?'Waiting for students to share their screens…':'Waiting for students to join their whiteboards…';
     if(focusId&&!ids.has(focusId)){setFocus(null);return}
     grid.hidden=!!focusId||!list.length;empty.hidden=!!focusId||!!list.length;
@@ -1454,6 +1704,7 @@
   function controls(){
     modeBoards.setAttribute('aria-pressed',String(mode==='boards'));modeScreens.setAttribute('aria-pressed',String(mode==='screens'));
     clearAll.hidden=mode!=='boards';activityBar.hidden=mode!=='boards'||!!focusId;
+    groupsBtn.hidden=!Groups||mode!=='boards';saveGroupsBtn.hidden=!groupsOn()||mode!=='boards';
     updateActivityLabel();
   }
   // Is there anything on a student's board that a new send would erase? (Marks, answers, or pages they added.)
@@ -1515,11 +1766,11 @@
     }else B.status(item?.kind==='tiles'?'The tiles and word boxes are on every student\'s board. Click a student\'s board to watch them move the words live.':item?.kind==='word'?'The word is on every student\'s board. Their answers appear live.':'All boards are blank.');
   }
   function setFocus(id){
-    drawer?.cancel();focusId=id&&admitted().some(m=>m.id===id)?id:null;const m=focusMember();
-    focusBar.hidden=!m;gridBar.hidden=!!m;activityBar.hidden=!!m||mode!=='boards';focus.hidden=!m;focusWord.root.hidden=!m||mode!=='boards'||activity?.kind!=='word';if(m)who.textContent=m.name+(mode==='screens'?'’s screen':'’s board');
+    drawer?.cancel();focusId=id&&repOf(id)?id:null;const m=focusMember();
+    focusBar.hidden=!m;gridBar.hidden=!!m;activityBar.hidden=!!m||mode!=='boards';focus.hidden=!m;focusWord.root.hidden=!m||mode!=='boards'||activity?.kind!=='word';if(m)who.textContent=mode==='boards'&&groupIdOf(m)?groupNameOf(groupIdOf(m))+' · '+groupMemberNames(groupIdOf(m)):m.name+(mode==='screens'?'’s screen':'’s board');
     if(!m)setVideo(screenVideo,null);
     screenInk?.refresh();
-    controls();gridSize='';syncTiles();if(m)dirty(m.id);else dirtyAll();
+    controls();gridSize='';syncTiles();if(m)dirty(focusId);else dirtyAll();
     focusPages.update();syncAnnotate();
   }
   function setOn(next){
@@ -1608,18 +1859,22 @@
     document.dispatchEvent(new Event('classpointer:sharing-state'));
     B.status('Back to My screen. Student screens and whiteboards are kept; open their tab any time.');
   }
+  function groupMemberNames(gid){return admitted().filter(x=>groupIdOf(x)===gid).map(x=>x.name).join(', ')}
+  const nameOf=m=>mode==='boards'&&groupIdOf(m)?groupNameOf(groupIdOf(m)):m.name;
   function toggleBlock(m){
-    const key=keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
-    drawer?.cancel();sendMode(m);syncTiles();dirty(m.id);syncAnnotate();
+    // On a group board the pause is the group's: everyone in the group is paused or allowed together.
+    const gid=mode==='boards'?groupIdOf(m):'';
+    const key=gid?'group:'+gid:keyFor(m);if(blocked.has(key))blocked.delete(key);else blocked.add(key);
+    drawer?.cancel();for(const x of gid?admitted().filter(y=>groupIdOf(y)===gid):[m])sendMode(x);syncTiles();dirty(m.id);syncAnnotate();
     // A student sharing from Shorashim or another activity is not joined to Pointer, so hiding his video is not enough:
     // record the pause as a screen-sharing permission so his browser stops capturing and the teacher stops receiving.
     if(mode==='screens'){const person=personId(m);if(person)updatePermission(person,'screens',!blocked.has(key))}
-    B.status(blocked.has(key)?m.name+' is paused.':m.name+' is allowed again.');
+    B.status(blocked.has(key)?nameOf(m)+' is paused.':nameOf(m)+' is allowed again.');
   }
   // The teacher writes on the board that is open large; the same change goes to that student.
-  function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;const set=boardFor(m),sent=pagedOp(set,op);if(applyTo(set,sent,'teacher'))B.send(m.connection,sent);dirty(m.id)}
+  function act(op){const m=focusMember();if(!m||!on||mode!=='boards'||isBlocked(m))return;const set=boardFor(m),sent=pagedOp(set,op);if(applyTo(set,sent,'teacher'))sendBoard(m,sent);dirty(m.id)}
   drawer=attachDrawing(canvas,{by:'teacher',tools,enabled:()=>{const m=focusMember();return on&&mode==='boards'&&!!m&&!isBlocked(m)&&(!window.FTTAnnotate||tools.tool==='move')},board:()=>focusBoard()||emptyBoard(),apply:act,
-    send:op=>{const m=focusMember();if(m&&on&&mode==='boards')B.send(m.connection,pagedOp(boardFor(m),op))},redraw:()=>{if(focusId)dirty(focusId)}});
+    send:op=>{const m=focusMember();if(m&&on&&mode==='boards')sendBoard(m,pagedOp(boardFor(m),op))},redraw:()=>{if(focusId)dirty(focusId)}});
 
   // ---------- The shared drawing toolbar on the student board that is open large ----------
   // This is the same toolbar as on my main whiteboard (annotation-toolbar.js). Its marks become ordinary board lines
@@ -1632,7 +1887,7 @@
     toolLabels:{select:['🖱️','Select','Click any mark on this board, the student’s or yours, to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
     keys:{h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
     historyKey:()=>'board:'+(focusMember()?.studentId||focusId||''),
-    label:()=>{const m=focusMember();return m?'You are writing on '+m.name+'’s board. They see it live.':''},
+    label:()=>{const m=focusMember();return m?(groupIdOf(m)?'You are writing on the board of '+groupNameOf(groupIdOf(m))+'. They see it live.':'You are writing on '+m.name+'’s board. They see it live.'):''},
     rect:()=>{if(!boardOpen())return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
     // Every mark on the board: the student's too, so Select, move, resize, recolor, nudge and delete work on them.
     getItems:()=>focusBoard()?.strokes.slice()||[],
@@ -1642,7 +1897,7 @@
     live(draft){
       const m=focusMember();if(!m||!boardOpen())return;
       const set=boardFor(m),op=pagedOp(set,{type:'board-draft',stroke:draft||null});
-      applyTo(set,op,'teacher');B.send(m.connection,op);dirty(m.id);
+      applyTo(set,op,'teacher');sendBoard(m,op);dirty(m.id);
     }};
   // The grid of all the boards: nothing can be drawn there, so the toolbar and the drawing layer step aside
   // (a click always opens the board, whatever tool was picked) and the full toolbar comes back inside one board.
@@ -1678,6 +1933,17 @@
   window.ClassPointerBoards={
     // What the teacher is looking at, for the tabs above the lesson: null (My screen), 'screens' or 'boards'.
     workspace:()=>on&&!suspended&&!view.hidden?mode:null,
+    // The regular Save (saved-work.js) saves a group board that is open large: is one open, and what is on it?
+    groupBoardOpen:()=>!!openGroupId(),
+    async openGroupBoardItem(){const gid=openGroupId();return gid?groupItem(Groups.groupById(gstate,gid)):null},
+    // Groups, for the drawing toolbar (classroom-annotate.js): the gallery's own top bar is hidden on the teacher page, so the
+    // toolbar carries the Groups button. `available` = student whiteboards are showing; `active` = there are groups.
+    groups:{
+      available:()=>!!Groups&&on&&!suspended&&!view.hidden&&mode==='boards',
+      active:()=>groupsOn(),
+      open:()=>openGroupsDialog(),
+      save:()=>saveGroupBoards()
+    },
     // A PNG picture of the student board that is open large.
     exportPng(){const board=focusBoard();return board&&mode==='boards'?boardPng(board):Promise.reject(Error('Open one student whiteboard first.'))},
     // Teacher: offer a picture (a PNG of a whiteboard) to every student whiteboard. It opens the usual
@@ -1718,7 +1984,11 @@
       if(m.presence&&admitted().find(entry=>entry.studentId===m.studentId)!==m)return;
       if(message.type==='board-screen'){if(message.sharing!==true){closeScreen(m);dirty(m.id)}return}
       if(mode!=='boards'||isBlocked(m)||excluded(m,'boards'))return;
-      if(applyTo(boardFor(m),message,'student'))dirty(m.id);
+      const set=boardFor(m);
+      if(!groupIdOf(m)){if(applyTo(set,message,'student'))dirty(m.id);return}
+      // A member of a group: checked, marked with their code, and shown to the whole group.
+      const checked=groupOp(set,message,Groups.codeOf(gstate,personKeyOf(m)));
+      if(checked&&applyTo(set,checked,'student')){dirty(m.id);relayToGroup(m,checked)}
     },
     // A student's screen arrives as a one-way media call (student → teacher). Only accepted in Screens mode.
     incomingCall(call){
@@ -1731,8 +2001,9 @@
       call.answer();return true;
     },
     studentJoined(m){window.ClassPointerScreenMarks?.resend(m);clearDrafts(boardFor(m));renderPermissions();if(on){sendMode(m);syncTiles()}},
-    studentLeft(m){closeScreen(m);if(m.boardKey&&boards.has(m.boardKey))clearDrafts(boards.get(m.boardKey));if(on)syncTiles()},
+    studentLeft(m){closeScreen(m);clearDrafts(boards.get(boardKeyOf(m)));if(on)syncTiles()},
     endClass(){
+      if(Groups){gstate=Groups.empty();saveGroups()}
       window.ClassPointerScreenMarks?.reset();drawer?.cancel();for(const m of B.members().values())closeScreen(m);
       // The enclosing classroom ends by deleting the entire Firebase session.
       // Do not send an asynchronous child update here: it could recreate an

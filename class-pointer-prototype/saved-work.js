@@ -367,6 +367,13 @@
   }
 
   async function saveCurrent(){
+    // Teacher with a student group's board open large: Save keeps that board (the same file Save group boards makes).
+    if(teacherPage&&window.ClassPointerBoards?.groupBoardOpen?.()){
+      let item=null;
+      try{item=await window.ClassPointerBoards.openGroupBoardItem()}catch(error){const ui=openDialog('Save group board');ui.fail(error);return false}
+      if(!item){openDialog('Save group board').say('This group board is empty. Draw something on it first, then press Save.');return false}
+      return saveGroupBoards([item]);
+    }
     const ui=openDialog(teacherPage?'Save whiteboard':'Save my whiteboard');
     ui.say('Getting ready…');
     try{
@@ -675,6 +682,31 @@
       return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     }catch(_){return null}
   }
+  // ---------- Teacher: save the boards of the student groups ----------
+  // student-boards.js hands over one entry for each group: {name, pages:[JPEG picture of each page], picture: PNG of page 1}.
+  // Each becomes a whiteboard file of the teacher's own: one page the old way, several pages as a pages file. The page
+  // pictures are the whole group board (everyone's lines), so opening the file shows exactly what the group made.
+  async function saveGroupBoards(items){
+    if(!teacherPage)return false;
+    const ui=openDialog('Save group boards');
+    ui.say('Saving…');
+    try{
+      const Pages=window.ClassPointerPages,size={w:1280,h:720},day=new Date().toLocaleDateString();
+      const state=await store.folders().catch(()=>NO_FOLDERS),folderId=state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'';
+      const saved=[];
+      for(const item of items){
+        const pages=item.pages.map(data=>({pictures:[{data,x:0,y:0,w:1,h:1}],strokes:[]}));
+        if(pages.length>1&&!Pages)throw Core.plain('Pages are not ready yet. Reload the page and try again.');
+        const data=pages.length===1?{version:1,kind:'lesson-whiteboard',size,...pages[0]}:{...Pages.wrap('lesson-whiteboard',pages,0),size};
+        ui.say('Saving '+(saved.length+1)+' of '+items.length+'…');
+        await store.saveBoard({name:Core.cleanName(item.name+' '+day),folderId,data,picture:item.picture});
+        saved.push(item.name);
+      }
+      ui.say('Saved '+saved.length+' group board'+(saved.length===1?'':'s')+' in your whiteboard files. Open 📂 My files to find '+(saved.length===1?'it':'them')+'.');
+      return true;
+    }catch(error){ui.fail(error);return false}
+  }
+
   // The same for pictures the teacher sent as pages: one file of my own with every page picture as the background of
   // a page and nothing drawn on it yet. Opening it later brings the pages back (student-boards.js importBoard).
   async function keepTeacherPages(sent){
@@ -747,5 +779,5 @@
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',back)};
   }
 
-  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,keepTeacherPages,store,worksheets,snapshot,watch,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,saveGroupBoards,keepTeacherCopy,keepTeacherPages,store,worksheets,snapshot,watch,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();

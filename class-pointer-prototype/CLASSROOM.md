@@ -78,6 +78,18 @@ A whiteboard can have up to **20 pages**, on the teacher's lesson whiteboard and
 - **Saving.** A one-page whiteboard is saved exactly as before (`version:1`). More than one page is saved as `version:2` (`{version:2, kind, current, pages:[...]}`, each page shaped like the old file). Old one-page files open as one page. Templates, folders and My files only name and list the file, so they work the same; a file with several pages shows *N pages* in its row and carries a `boardPages` note beside it.
 - **No Firebase rules, functions or Storage rules change.** A saved board is still one JSON file inside the same size limits (3 MB for a student, 10 MB for a teacher).
 
+## Group work: students who share one board
+
+In **Student boards → Whiteboards** the teacher's **👥 Groups** button splits the students who are here into groups (a number of groups, or students per group), shuffled at random, and then lets the teacher move any student to another group, add a group, rename groups, or **Ungroup everyone** (each student returns to their own board, which was kept).
+
+- **One board per group.** The board lives on the teacher's page, like every student board. A line a member draws is checked there, marked with that member's code (`who`, e.g. `m3`; set by the teacher's page, never by the sender) and passed on to the other members as a `board-peer` message. A member can only remove, move or clear their own lines. Pages work as on any board: adding, deleting or moving a page is shared; moving to a page is each member's own. Live drawing previews show one member at a time; finished lines always show.
+- **Teacher.** The gallery shows one tile for each group (and one for each student in no group). A click opens it large with the usual toolbar and page strip; the teacher's lines go to every member. 🚫 pauses the whole group.
+- **Send to class.** Words, tiles, pictures and **All pages** go to group boards too.
+- **Save group boards.** One whiteboard file for each group that has something on it, in the teacher's own files: a picture of every page (everyone's lines), with the group name and members in the file name. Students can still save their own copy of the group board.
+- **Rejoining.** Who is in which group is remembered in the teacher's browser for 12 hours, so a student who leaves and comes back returns to the same group and the same lines. **End class** forgets the groups.
+- **The teacher's page must stay open**: group boards are kept there. If it closes the groups stop syncing; each student still has what they last saw.
+- **No Firebase rules, functions or Storage rules change.**
+
 ## Send a word or coloring page to all student whiteboards
 
 Teachers can open **Student boards → Whiteboards** to see each boy’s private board in a live grid. The new **Send to all boards** bar lets the teacher enter a Hebrew word or shoresh, optionally add a short instruction, and click **Send word**. Alternatively, click **Coloring page** to upload a JPEG, PNG, WebP or GIF. Uploaded pictures are resized and converted into a bounded JPEG background before being sent over the existing PeerJS connections; animated GIFs display as a still image. All students receive the same fixed word/picture but can draw, mark, underline, or color independently. The word or image is locked beneath the drawing layer; erasers and clear only affect marks.

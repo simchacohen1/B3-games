@@ -192,6 +192,13 @@
       {icon:'📄',label:'A PDF from my library',disabled:!window.PointerPdfLibrary?.openForSend,onClick:()=>window.PointerPdfLibrary?.openForSend?.()}
     ];
   }
+  function groupItems(){
+    const groups=window.ClassPointerBoards?.groups,active=!!groups?.active?.();
+    return [
+      {icon:'\u{1F3B2}',label:active?'Change groups':'Make groups',title:'Split the students into groups, move a student, or rename a group',onClick:()=>groups?.open?.()},
+      {icon:'\u{1F4BE}',label:'Save group boards',title:'Save every group\u2019s board in your whiteboard files',disabled:!active,onClick:()=>groups?.save?.()}
+    ];
+  }
   function actions(){
     const panel=window.ClassPointerStudentsPanel,waiting=panel?.waiting?.()||0;
     return [
@@ -204,6 +211,8 @@
       {id:'quick-save',icon:'💾',label:'Save',title:'Save this whiteboard in My files',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
       {id:'quick-files',icon:'📂',label:'My files',title:'Open your saved whiteboards',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.open?.()},
       {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy',hidden:!window.FTTSavedWork?.sendCurrent&&!window.PointerPdfLibrary?.openForSend,items:sendItems},
+      // Groups: students who share one board (shown while the student whiteboards are on screen).
+      {id:'groups',icon:'\u{1F9D1}\u200D\u{1F91D}\u200D\u{1F9D1}',label:'Groups',title:'Groups: put the students in small groups. Each group shares one board',hidden:!window.ClassPointerBoards?.groups?.available?.(),pressed:!!window.ClassPointerBoards?.groups?.active?.(),items:groupItems},
       {id:'poll',icon:'📊',label:'Poll',title:'Ask the class a poll',onClick:()=>window.ClassPointerPoll?.open()},
       {id:'lesson',icon:'🖥',label:'Switch presentation',title:'Switch presentation: change what students see',items:lessonItems},
       {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight',items:moreItems}
@@ -213,7 +222,7 @@
   // Everything the buttons and menus show, as one string: the toolbar is redrawn only when it changes.
   function signature(){
     const panel=window.ClassPointerStudentsPanel;
-    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.PointerPdfLibrary?.openForSend,
+    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.PointerPdfLibrary?.openForSend,!!window.ClassPointerBoards?.groups?.available?.(),!!window.ClassPointerBoards?.groups?.active?.(),
       SOURCES.map(s=>$(s[0])?usable(s[0]):'-').join(),VIEW.map(v=>$(v[0])?usable(v[0]):'-').join(),$('viewZoomLabel')?.textContent||'',$('viewMove')?.getAttribute('aria-pressed')||''].join('|');
   }
 
