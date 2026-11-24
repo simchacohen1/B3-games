@@ -23,6 +23,9 @@ async function serveRepo(page: Page) {
 const API = '**/studentRewardsAutoAward**';
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
 
+// Sections are practice-only until the teacher opens them; these tests are about recording and sending, so every section is open.
+const OPEN_FOR_SENDING = Object.fromEntries(['zayin', 'bet', 'tsadi', 'alef', 'tsadisofit', 'memsofit', 'shin', 'samech', 'finalreview', 'words2', 'words3', 'words4'].map(id => [id, true]));
+
 type Server = { sections: Record<string, any>; submits: any[]; failNext: number; };
 
 async function openStudentPage(page: Page, server: Server, progress: any = { currentUnitIndex: 1, currentPhase: 'letter' }) {
@@ -40,7 +43,7 @@ async function openStudentPage(page: Page, server: Server, progress: any = { cur
       server.sections[section] = { status: 'pending' };
       return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ok: true, status: 'pending' }) });
     }
-    return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ok: true, sections: server.sections }) });
+    return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ ok: true, sections: server.sections, open: OPEN_FOR_SENDING }) });
   });
   // Everything that would reach the real internet is replaced.
   await page.route(/gstatic\.com|googleapis\.com\/css|fonts\.g/, r => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
