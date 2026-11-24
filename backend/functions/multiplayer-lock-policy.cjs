@@ -39,6 +39,7 @@ function inRange(value, range) {
 
 function scheduledOpen(settings, classId, date = new Date()) {
   const access = settings?.classAccess?.[classId] || {};
+  if (Number(access.openUntil) > date.getTime()) return true; // timed unlock from Class Access
   if (access.mode === 'open') return true;
   if (access.mode === 'locked') return false;
   const local = newYorkNow(date);
@@ -50,6 +51,8 @@ function allowsMultiplayer({ actorRole, classId, studentId, settings = {}, class
   if (actorRole === 'teacher') return true; // Caller must verify the active class assignment.
   if (settings.games?.[TOOL] === false || settings.classGames?.[classId]?.[TOOL] === false) return false;
   if (classId !== 'et' && classId !== 'wt') {
+    if (Number(classRow.access?.openUntil) > date.getTime()) return settings.siteEnabled !== false;
+    if (Number(classRow.access?.stars?.[TOOL]) > date.getTime()) return settings.siteEnabled !== false; // starred: open while the class is locked
     return settings.siteEnabled !== false && classRow.siteEnabled !== false && classRow.access?.mode !== 'locked';
   }
   const overrideList = String(settings.classLockedGameOverride?.[classId] || '').split(',').map(value => value.trim());

@@ -306,7 +306,10 @@
       lockWindows = deepClone(fallback.lockWindows);
     }
 
-    return { mode: mode, lockWindows: lockWindows };
+    const result = { mode: mode, lockWindows: lockWindows };
+    const openUntil = Number(source.openUntil);
+    if (openUntil > 0) result.openUntil = openUntil; // a timed unlock: open until this moment (ms), whatever the mode says
+    return result;
   }
 
   function normalizeStudentGameOverrides(value) {
@@ -829,6 +832,23 @@
   function manageClassAccessAction(classId, action, fields) {
     return saveTeacherClassAccess(classId,Object.assign({action:action},fields||{}));
   }
+  // The per-feature locks (classes/<id>/locks) can only be written by the studentLocks function (no client write rule).
+  function manageStudentLocks(classId, payload) {
+    if (typeof classId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(classId)) return Promise.reject(new Error("Choose a class."));
+    const services = ensureFirebase();
+    const user = services && services.auth && services.auth.currentUser;
+    if (!user) return Promise.reject(new Error("Google sign-in required."));
+    return user.getIdToken().then(function (token) {
+      return fetch("https://us-central1-b3-games.cloudfunctions.net/studentLocks", {
+        method:"POST", headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({classId:classId},payload))
+      });
+    }).then(async function (response) {
+      const result = await response.json().catch(function(){ return {}; });
+      if (!response.ok || result.ok === false) throw new Error(result.error || "Could not change the feature locks.");
+      return result;
+    });
+  }
 
   function updateSiteEnabled(enabled) {
     return readOnce().then(function (settings) {
@@ -957,6 +977,12 @@
     return best ? at(best) : midnight;
   }
 
+  // When a star on a new class switches itself off: the next New York midnight (a manual lock has no end time).
+  function newYorkMidnightMs() {
+    const d = new Date(), now = getNewYorkNow(d);
+    return d.getTime() - (d.getTime() % 60000) + (1440 - now.minutes) * 60000;
+  }
+
   function classHasLockedGameOverride(settings, classId, gameId, date) {
     if (!["et", "wt"].includes(classId) || !gameId) return false;
     return activeLockedGameList(settings, classId, date).indexOf(String(gameId)) !== -1;
@@ -1005,6 +1031,21 @@
     if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"mode",mode:mode});
     return readOnce().then(function (settings) {
       settings.classAccess[classId].mode = mode;
+      delete settings.classAccess[classId].openUntil; // choosing a mode ends any timed unlock
+      return save(settings);
+    });
+  }
+
+  // Timed unlock: the class is open for `minutes` (15/30/45), then goes back to whatever it was (locked, or the schedule).
+  // 0 ends it now. Same data for owner and teachers, so every student page reads one place.
+  function updateClassTimedOpen(classId, minutes) {
+    if (!["et", "wt"].includes(classId)) return Promise.reject(new Error("Unknown class."));
+    minutes = Math.round(Number(minutes));
+    if (!(minutes >= 0 && minutes <= 180)) return Promise.reject(new Error("Choose 15, 30 or 45 minutes."));
+    const until = minutes ? Date.now() + minutes * 60000 : 0;
+    if (currentAccess.role === "teacher") return saveTeacherClassAccess(classId,{action:"timedOpen",minutes:minutes});
+    return readOnce().then(function (settings) {
+      if (until) settings.classAccess[classId].openUntil = until; else delete settings.classAccess[classId].openUntil;
       return save(settings);
     });
   }
@@ -1071,6 +1112,7 @@
     if (!["et", "wt"].includes(classId)) return false;
 
     const access = normalized.classAccess[classId];
+    if (access.openUntil && access.openUntil > (date instanceof Date ? date : new Date()).getTime()) return true;
     if (access.mode === "open") return true;
     if (access.mode === "locked") return false;
     return !isInLockedPeriod(access.lockWindows, date);
@@ -1082,6 +1124,7 @@
     if (!["et", "wt"].includes(classId)) return { open: false, reason: "Class not assigned" };
 
     const access = normalized.classAccess[classId];
+    if (access.openUntil && access.openUntil > (date instanceof Date ? date : new Date()).getTime()) return { open: true, reason: "Timed unlock", openUntil: access.openUntil };
     if (access.mode === "open") return { open: true, reason: "Manual override: OPEN" };
     if (access.mode === "locked") return { open: false, reason: "Manual override: LOCKED" };
     const locked = isInLockedPeriod(access.lockWindows, date);
@@ -1559,6 +1602,8 @@
     updateGameEnabled: updateGameEnabled,
     updateClassGameEnabled: updateClassGameEnabled,
     manageClassAccessAction: manageClassAccessAction,
+    manageStudentLocks: manageStudentLocks,
+    newYorkMidnightMs: newYorkMidnightMs,
     updateClassesGameEnabled: updateClassesGameEnabled,
     isGameEnabledForClass: isGameEnabledForClass,
     updateStudentGameOverride: updateStudentGameOverride,
@@ -1570,6 +1615,7 @@
     setClassLockedGame: setClassLockedGame,
     lockedGameList: lockedGameList,
     updateClassMode: updateClassMode,
+    updateClassTimedOpen: updateClassTimedOpen,
     updateClassLockWindows: updateClassLockWindows,
     getDefaultClassLockWindows: function (classId) {
       if (!["et", "wt"].includes(classId)) return blankLockWindows();

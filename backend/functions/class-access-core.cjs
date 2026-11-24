@@ -3,6 +3,8 @@ const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
 const CLASS_TOOL_GRANTS=Object.freeze(['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','multiplayer-center','homework','gallery','tag','davening','chavrusa','name-picker','daily-checklist','class-pointer','sync-to-nigri']);
 const CLASS_TOOL_GRANT_SET=new Set(CLASS_TOOL_GRANTS);
+// The Chumash Cheder tool shows four tiles; each can be starred on its own (it is one tool grant, four star keys).
+const STAR_TILE_KEYS=new Set(['chumash-quiz','record-mishnayos','record-mishnayos-quiz']);
 const DAYS=['sun','mon','tue','wed','thu','fri','sat'];
 const validWindows=value=>{
  if(!value||typeof value!=='object'||Array.isArray(value))return false;
@@ -30,16 +32,20 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  if(!isAdmin&&!assigned)fail(403,'You are not assigned to this class.');
  if(!cls||cls.active===false)fail(404,'This class is unavailable.');
  const action=body.action,root=`b3Games/workspaces/b3-2026/classes/${classId}`;
- if(['mode','lockWindows','game','star'].includes(action)){
+ if(['mode','lockWindows','game','star','timedOpen'].includes(action)){
   if(!store.updateSettings)fail(503,'Class access settings are unavailable.');
   if(action==='mode'&&!['auto','open','locked'].includes(body.mode))fail(400,'Choose Automatic, Open, or Locked.');
+  if(action==='timedOpen'&&!(Number.isInteger(body.minutes)&&body.minutes>=0&&body.minutes<=180))fail(400,'Choose 15, 30 or 45 minutes.');
   if(action==='lockWindows'&&!validWindows(body.lockWindows))fail(400,'Invalid class schedule.');
   if(action==='game'&&(!validId(body.gameId)||typeof body.enabled!=='boolean'||!['et','wt'].includes(classId)))fail(400,'Invalid activity setting.');
   if(action==='star'&&(!validId(body.gameId)||typeof body.keepOpen!=='boolean'))fail(400,'Invalid starred exception.');
   const result=await store.updateSettings(current=>{
    const updated=structuredClone(current||{});
    if(action==='mode'){
-    const row=updated.classAccess?.[classId];if(!row)return null;row.mode=body.mode;
+    const row=updated.classAccess?.[classId];if(!row)return null;row.mode=body.mode;delete row.openUntil;
+   }else if(action==='timedOpen'){
+    const row=updated.classAccess?.[classId];if(!row)return null;
+    if(body.minutes)row.openUntil=now+body.minutes*60000;else delete row.openUntil;
    }else if(action==='lockWindows'){
     if(!updated.classAccess?.[classId])return null;
     updated.classAccess[classId].lockWindows=body.lockWindows;
@@ -60,7 +66,19 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  }
  if(action==='platform'){
   if(!['open','locked'].includes(body.mode))fail(400,'Choose Open or Locked.');
-  await store.update({[`${root}/access/mode`]:body.mode,[`${root}/siteEnabled`]:body.mode==='open'});
+  await store.update({[`${root}/access/mode`]:body.mode,[`${root}/siteEnabled`]:body.mode==='open',[`${root}/access/openUntil`]:null,...(body.mode==='open'?{[`${root}/access/stars`]:null}:{})});
+  return {ok:true};
+ }
+ if(action==='platformStar'){
+  // A starred tool stays open while the class is locked; it switches itself off at expiresAt (at most 24 hours ahead).
+  if(!(CLASS_TOOL_GRANT_SET.has(body.toolId)||STAR_TILE_KEYS.has(body.toolId))||typeof body.keepOpen!=='boolean')fail(400,'Invalid star setting.');
+  const until=Math.min(Number(body.expiresAt)||now+86400000,now+86400000+60000);
+  await store.update({[`${root}/access/stars/${body.toolId}`]:body.keepOpen&&until>now?until:null});
+  return {ok:true};
+ }
+ if(action==='platformTimedOpen'){
+  if(!(Number.isInteger(body.minutes)&&body.minutes>=0&&body.minutes<=180))fail(400,'Choose 15, 30 or 45 minutes.');
+  await store.update({[`${root}/access/openUntil`]:body.minutes?now+body.minutes*60000:null});
   return {ok:true};
  }
  if(action==='grant'){

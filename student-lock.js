@@ -16,6 +16,9 @@
   window.__b3StudentLockLoaded = true;
   var script = document.currentScript;
   var feature = script && script.getAttribute('data-feature') || '';
+  // A page that serves two tiles (practice and ?mode=quiz) names the quiz tile's feature in data-feature-quiz.
+  var featureQuiz = script && script.getAttribute('data-feature-quiz') || '';
+  if (featureQuiz) { try { var qp = new URLSearchParams(location.search); if (qp.get('mode') === 'quiz' || qp.get('tool') === 'test-me') feature = featureQuiz; } catch (e) { /* practice tile */ } }
   var base = new URL('./', script && script.src || location.href);
   var WS = 'b3-2026', FB = 'https://www.gstatic.com/firebasejs/12.15.0/';
   var CACHE_KEY = 'b3StudentLockCache', CACHE_MS = 30 * 60 * 1000;
@@ -65,7 +68,7 @@
   var TILE_ALIAS = { 'gallery': 'class-gallery', 'tag': 'class-gallery', 'rashi': 'rashi-letters' };
   function decorateTiles() {
     Array.prototype.forEach.call(document.querySelectorAll('.game-card[data-game-id]'), function (card) {
-      var id = card.getAttribute('data-game-id'), f = TILE_ALIAS[id] || id, st = states[f];
+      var id = card.getAttribute('data-tile-key') || card.getAttribute('data-game-id'), f = TILE_ALIAS[id] || id, st = states[f];
       var locked = !!(st && st.locked);
       card.toggleAttribute('data-teacher-locked', locked);
       if (locked) card.setAttribute('aria-disabled', 'true'); else card.removeAttribute('aria-disabled');

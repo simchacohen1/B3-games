@@ -16,3 +16,4 @@ exports.studentRewardsCancel = require('./student-rewards-functions').studentRew
 // Staging-only functions that were deployed from other branches. Kept here so a staging deploy of this codebase does not delete them.
 exports.classGalleryRead = require('./class-gallery-read').classGalleryRead;
 exports.stagingOwnerSignIn = require('./staging-owner-signin').stagingOwnerSignIn;
+exports.funTorahClassAccess = require('./class-access').funTorahClassAccess;

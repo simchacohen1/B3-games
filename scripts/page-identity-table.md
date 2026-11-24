@@ -19,7 +19,6 @@
 | `chossid-lamdan.html` | Weekly Marks · SOLS | `nigri.svg` |
 | `class-dashboard/index.html` | Class Dashboard · SOLS | `dashboard.svg` |
 | `class-gallery/index.html` | Class Wall · SOLS | `gallery.svg` |
-| `class-locks/index.html` | Class Locks · SOLS | `locks.svg` |
 | `class-pointer-prototype/classroom.html` | Pointer Classroom · SOLS | `pointer.svg` |
 | `class-pointer-prototype/dashboard.html` | Class Pointer · SOLS | `pointer-teacher.svg` |
 | `class-pointer-prototype/index.html` | Pointer Home · SOLS | `pointer.svg` |
