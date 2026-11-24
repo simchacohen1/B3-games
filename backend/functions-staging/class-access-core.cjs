@@ -1,4 +1,8 @@
 'use strict';
+const submissionOpen=require('./submission-open-core.cjs');
+const rashiRecording=require('./rashi-recording-core.cjs');
+// A Rashi item may be one section, or a whole Vayeira perek / all of Vayeira (a prefix of the passage ids).
+const rashiRuleOk=id=>rashiRecording.isSection(id)||Object.keys(rashiRecording.PASSAGES).some(key=>key.startsWith(id+'-'));
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
 const CLASS_TOOL_GRANTS=Object.freeze(['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','multiplayer-center','homework','gallery','tag','davening','chavrusa','name-picker','daily-checklist','class-pointer','sync-to-nigri']);
@@ -84,6 +88,25 @@ async function manageClassAccess(store,identity,body,now=Date.now()){
  if(action==='grant'){
   if(!CLASS_TOOL_GRANT_SET.has(body.toolId)||typeof body.enabled!=='boolean')fail(400,'Invalid tool setting.');
   await store.update({[`${root}/toolGrants/${body.toolId}`]:body.enabled});return {ok:true};
+ }
+ if(action==='submissionOpenRead'){
+  // What is open for sending in this class: the whole class, and each boy who has his own items.
+  const node=(await store.get(`${root}/submissionOpen`))||{};
+  const out={ok:true,...submissionOpen.publicStatus(node,'',rashiRecording.sectionLabel),students:{}};
+  for(const [id,own] of Object.entries(node.students||{})){
+   if(!submissionOpen.validKey(id)||!own||typeof own!=='object')continue;
+   const status=submissionOpen.publicStatus({items:own.items,all:own.all},'',rashiRecording.sectionLabel);
+   if(status.all||status.rules.length)out.students[id]=status;
+  }
+  return out;
+ }
+ if(action==='submissionOpenChange'){
+  // Open or close items for sending, for the whole class or for one boy. Everything else stays practice-only.
+  let changes;
+  try{changes=submissionOpen.changesFor(body,rashiRuleOk,id=>cls.members?.[id]&&cls.members[id].active!==false);}
+  catch(message){fail(400,String(message));}
+  await store.update(Object.fromEntries(Object.entries(changes).map(([path,value])=>[`${root}/${path}`,value])));
+  return {ok:true};
  }
  fail(400,'Unknown class access action.');
 }

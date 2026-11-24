@@ -62,3 +62,34 @@ test("Posuk approval counts follow the active class rosters and pending grade qu
   stop();
   assert.equal(listeners.size, 0);
 });
+
+test("Posuk approval counts can be limited to the teacher's own classes (the owner's 'All classes' switch removes the limit)", () => {
+  const run = options => {
+    const listeners = new Map();
+    const db = {ref: path => ({on: (e, onValue) => listeners.set(path, {onValue}), off: () => listeners.delete(path)})};
+    const window = {};
+    vm.runInNewContext(source, {window});
+    const queue = window.B3PosukGradingQueue;
+    let counts;
+    queue.watchClassCounts(db, "fictional-school", next => { counts = JSON.parse(JSON.stringify(next)); }, assert.fail, options);
+    const emit = (path, value) => { if (listeners.has(path)) listeners.get(path).onValue({val: () => value}); };
+    emit("b3Games/workspaces/fictional-school/classes", {
+      et: {name: "B3 ET", members: {a: {}}},
+      wt: {name: "B3 WT", members: {b: {}}},
+      afternoon: {name: "B4 WT · Afternoon", members: {c: {}}}
+    });
+    const pending = n => Object.fromEntries(Array.from({length: n}, (_, i) => ["p" + i, {id: "p" + i, status: "pending"}]));
+    emit(queue.submissionsPath + "/a", pending(1));
+    emit(queue.submissionsPath + "/b", pending(2));
+    emit(queue.submissionsPath + "/c", pending(20));
+    return {counts, watched: [...listeners.keys()].filter(path => path.startsWith(queue.submissionsPath))};
+  };
+  const mine = run({classIds: ["et", "wt"]});
+  assert.equal(mine.counts.total, 3, "the other teacher's 20 recordings are not counted");
+  assert.deepEqual(mine.counts.classes.map(c => c.id).sort(), ["et", "wt"]);
+  assert.equal(mine.watched.length, 2, "boys in other classes are not even listened to");
+  const all = run();
+  assert.equal(all.counts.total, 23);
+  assert.deepEqual(all.counts.classes.map(c => c.id).sort(), ["afternoon", "et", "wt"]);
+  assert.equal(run({classIds: []}).counts.total, 0);
+});

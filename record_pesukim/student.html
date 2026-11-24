@@ -1246,6 +1246,10 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
   .combined-state.pending{ background:#eef4ff; border:2px solid #9db8e8; color:#1f3d73; }
   .combined-state.gold{ background:#fff7dc; border:2px solid var(--gold); color:#6b4a00; }
   .combined-state.retry{ background:#fff0ec; border:2px solid #e8a797; color:#7a2a17; }
+  .combined-open{ margin:10px 0; padding:10px 14px; border-radius:14px; font-weight:800; line-height:1.4; }
+  .combined-open.is-open{ background:#e3f6e8; border:2px solid #7cc38f; color:#14532d; }
+  .combined-open.is-practice{ background:#f1f1f6; border:2px solid #c7c7d6; color:#40405a; }
+  .combined-open small{ display:block; font-weight:600; margin-top:4px; }
   .combined-history{ margin-top:14px; }
   .combined-history h4{ margin:0 0 6px; font-size:.95rem; }
   .combined-history-row{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:8px 10px; border-radius:10px; background:#faf6ec; margin-bottom:6px; font-size:.86rem; }
@@ -1348,6 +1352,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
           <h3>🎙️ Read &amp; Translate</h3>
         </div>
         <div id="combinedStateBox" class="combined-state hidden"></div>
+        <div id="combinedOpenBox" class="combined-open is-practice hidden" role="status"></div>
         <div class="record-stage" id="combinedRecordStage">
           <div class="record-row">
             <button class="seal-btn" id="combinedRecordBtn" title="Start recording" aria-label="Start or stop recording">🎙️</button>
@@ -1359,6 +1364,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
         </div>
         <div style="text-align:center;margin-top:10px;">
           <button class="btn gold hidden" id="combinedSubmitBtn" type="button">📤 Send to my teacher (costs 5 points)</button>
+          <span class="status-tag hidden" id="combinedPracticeOnlyTag">🎧 Practice only</span>
         </div>
         <div class="comp-status" id="combinedMsg"></div>
         <div class="combined-history" id="combinedHistory"></div>
@@ -2472,10 +2478,21 @@ async function checkAccess(name,pin,idHint=''){
   const typed=String(name||'').trim(),enteredPin=String(pin||'').trim();
   if(!typed.replace(/[^a-z0-9]/gi,'')||!enteredPin)return {ok:false,reason:'Enter your name and passcode.'};
   let data;
-  try{
+  // A boy in two classes picked one on the main site. Ask for THAT class: with none named the server starts him in his
+  // first class, and the new token would then not match the class this page reads (every class read is refused).
+  let pickedClass='';
+  try{if(idHint&&sessionStorage.getItem('b3Games_studentId')===idHint)pickedClass=String(sessionStorage.getItem('b3Games_studentClass')||'').trim();}catch(_e){}
+  const loginOnce=async classId=>{
     const response=await fetch(STUDENT_AUTH_URL,{method:'POST',signal:AbortSignal.timeout(15000),
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',name:typed,pin:enteredPin})});
-    data=await response.json().catch(()=>({}));
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',name:typed,pin:enteredPin,...(classId?{classId}:{})})});
+    return {response,data:await response.json().catch(()=>({}))};
+  };
+  try{
+    let out=await loginOnce(pickedClass);
+    // The picked class may have been closed to him since: fall back to the server's own choice, as before.
+    if(!out.response.ok&&pickedClass&&out.response.status===403)out=await loginOnce('');
+    const response=out.response;
+    data=out.data;
     if(!response.ok)return {ok:false,reason:data.error||'Check your name and passcode. Sign in from the main site if needed.'};
   }catch(err){
     return {ok:false,reason:'Could not check your login. Try again.'};
@@ -6756,6 +6773,45 @@ function combinedRefLabel(s){
   return 'Perek ' + perek + ' · Posuk ' + a + (b > a ? '–' + b : '');
 }
 
+/* Open for sending. A boy can always record, listen and practice any posuk. He can only SEND to the teacher when the
+   teacher has opened that posuk for him or his class. The server enforces this; this only shows it clearly. */
+let combinedSendOpen = false, combinedOpenKey = null;
+// Read-only check (no points, nothing saved), so unlike sending it also works on the staging site, where the staging build points it at the staging function.
+const SUBMISSION_OPEN_STATUS_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
+async function fetchCombinedOpen(key){
+  const user = window.firebase && firebase.auth && firebase.auth().currentUser;
+  if(!user) return null;
+  const idToken = await user.getIdToken();
+  const response = await fetch(SUBMISSION_OPEN_STATUS_URL, {
+    method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
+    body: JSON.stringify({ action:'submission-open-status', kind:'posuk', selectionKey:key })
+  });
+  const data = await response.json().catch(() => ({}));
+  if(!response.ok || !data.ok) throw new Error(data.error || ('The service returned ' + response.status));
+  return data;
+}
+function applyCombinedOpenUi(info, problem){
+  const box = combinedEl('combinedOpenBox'), sendBtn = combinedEl('combinedSubmitBtn'), tag = combinedEl('combinedPracticeOnlyTag');
+  combinedSendOpen = !!(info && info.selectionOpen === true);
+  const names = (info && Array.isArray(info.rules) ? info.rules : []).filter(r => r && r.rule && r.rule.charAt(0) === 'p').map(r => combinedEscape(r.label));
+  const openList = info && info.all ? 'Everything is open for sending right now.'
+    : names.length ? 'Open for sending now: ' + names.slice(0, 8).join(' · ') + (names.length > 8 ? ' · +' + (names.length - 8) + ' more' : '') : 'Nothing is open for sending right now.';
+  box.classList.remove('hidden');
+  if(problem){
+    box.className = 'combined-open is-practice';
+    box.innerHTML = '🎧 Practice only<small>Could not check whether your teacher opened this posuk. You can still record and practice. Reload to try again.</small>';
+  }else if(combinedSendOpen){
+    box.className = 'combined-open is-open';
+    box.innerHTML = '✅ Open for sending — you can send this one to your teacher<small>' + openList + '</small>';
+  }else{
+    box.className = 'combined-open is-practice';
+    box.innerHTML = '🎧 Practice only — your teacher has not opened this posuk for sending yet<small>You can record, listen and practice as much as you like. ' + openList + '</small>';
+  }
+  tag.classList.toggle('hidden', combinedSendOpen || combinedLocked);
+  if(!combinedSendOpen) sendBtn.classList.add('hidden');
+  else if(combinedBlob && !combinedLocked) sendBtn.classList.remove('hidden');
+}
+
 function stopCombinedStream(){
   if(combinedMaxTimer){ clearTimeout(combinedMaxTimer); combinedMaxTimer = null; }
   if(combinedStream){ combinedStream.getTracks().forEach(t => t.stop()); combinedStream = null; }
@@ -6817,8 +6873,10 @@ async function toggleCombinedRecording(){
       const audio = combinedEl('combinedAudioPlayback');
       audio.src = URL.createObjectURL(blob); audio.classList.remove('hidden');
       combinedEl('combinedDeleteBtn').classList.remove('hidden');
-      combinedEl('combinedSubmitBtn').classList.remove('hidden');
-      combinedEl('combinedStatus').textContent = '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Listen, then send it to your teacher.';
+      if(combinedSendOpen) combinedEl('combinedSubmitBtn').classList.remove('hidden');
+      combinedEl('combinedStatus').textContent = combinedSendOpen
+        ? '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Listen, then send it to your teacher.'
+        : '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Listen and practice. This posuk is practice only, so it cannot be sent.';
     };
     rec.start();
   }catch(err){
@@ -6831,7 +6889,7 @@ async function toggleCombinedRecording(){
 }
 
 async function submitCombinedRecording(){
-  if(!combinedBlob || combinedBusy || combinedLocked || !currentPosukKey) return;
+  if(!combinedBlob || combinedBusy || combinedLocked || !currentPosukKey || !combinedSendOpen) return;
   const msg = combinedEl('combinedMsg'), btn = combinedEl('combinedSubmitBtn');
   if(teacherPreview){ msg.textContent = 'Preview only — nothing is sent to the teacher and no points change.'; return; }
   if(!STUDENT_REWARDS_AUTO_AWARD_URL){ msg.textContent = 'Sending recordings to the teacher is not available on this site.'; return; }
@@ -6869,7 +6927,7 @@ async function submitCombinedRecording(){
   }catch(err){
     console.error('Posuk Practice submit failed', err);
     msg.textContent = '⚠️ ' + (err.message || 'Could not send. Please try again.');
-    if(/waiting for your teacher|gold standard/i.test(err.message || '')) await loadCombinedState(true);
+    if(/waiting for your teacher|gold standard|not opened this for sending/i.test(err.message || '')) await loadCombinedState(true);
   }finally{
     combinedBusy = false; btn.disabled = false;
   }
@@ -6879,7 +6937,7 @@ function setCombinedLocked(locked){
   combinedLocked = !!locked;
   combinedEl('combinedRecordStage').classList.toggle('hidden', combinedLocked);
   combinedEl('combinedRecordBtn').disabled = combinedLocked;
-  if(combinedLocked){ combinedEl('combinedSubmitBtn').classList.add('hidden'); }
+  if(combinedLocked){ combinedEl('combinedSubmitBtn').classList.add('hidden'); combinedEl('combinedPracticeOnlyTag').classList.add('hidden'); }
 }
 
 // Decides what the student may do on the current selection.
@@ -6929,15 +6987,17 @@ async function loadCombinedState(keepMessage){
   const box = combinedEl('combinedStateBox'), hist = combinedEl('combinedHistory');
   if(!keepMessage) combinedEl('combinedMsg').textContent = '';
   box.classList.add('hidden'); hist.innerHTML = '';
+  combinedSendOpen = false; combinedEl('combinedOpenBox').classList.add('hidden'); combinedEl('combinedPracticeOnlyTag').classList.add('hidden');
   setCombinedLocked(false);
   if(!key || teacherPreview) return;
-  let reviews = {}, subs = {};
+  let reviews = {}, subs = {}, openInfo = null, openProblem = false;
   try{
-    const [r, s] = await Promise.all([
+    const [r, s, o] = await Promise.all([
       db.ref('posukPractice/reviews/' + studentId).once('value'),
-      db.ref('posukPractice/submissions/' + studentId).once('value')
+      db.ref('posukPractice/submissions/' + studentId).once('value'),
+      fetchCombinedOpen(key).catch(err => { console.warn('Could not check what is open for sending', err); openProblem = true; return null; })
     ]);
-    reviews = r.val() || {}; subs = s.val() || {};
+    reviews = r.val() || {}; subs = s.val() || {}; openInfo = o;
   }catch(err){
     console.warn('Could not load Posuk Practice review status', err);
     if(token === combinedLoadToken) combinedEl('combinedMsg').textContent = '⚠️ Could not check this posuk’s status. Check your internet and reload.';
@@ -6972,6 +7032,7 @@ async function loadCombinedState(keepMessage){
     box.className = 'combined-state hidden';
   }
   if(box.className.indexOf('hidden') < 0) box.classList.remove('hidden');
+  applyCombinedOpenUi(openInfo, openProblem);
   if(mine.length){
     const firstMarked = mine.slice(0, 10).findIndex(x => combinedMarksHtml(x, false));
     hist.innerHTML = '<h4>📈 My recordings for this posuk</h4>' + mine.slice(0, 10).map((x, n) =>

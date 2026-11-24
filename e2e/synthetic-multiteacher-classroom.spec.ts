@@ -223,7 +223,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.route('https://us-central1-b3-games.cloudfunctions.net/gradeQuestionAnswer', route =>
     route.fulfill(syntheticJson({verdict: 'correct', feedback: 'You found the right words!', gradingVersion: 'semantic-v1'})));
   await page.route('https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward', route =>
-    /"action":"posuk-submit"/.test(route.request().postData() || '') ? route.fallback() : route.fulfill(syntheticJson({ok: true, awarded: false})));
+    /"action":"(posuk-submit|submission-open-status)"/.test(route.request().postData() || '') ? route.fallback() : route.fulfill(syntheticJson({ok: true, awarded: false})));
   // The server checks the recording in the production bucket name; send the
   // student's real upload to that bucket in the Storage emulator.
   await page.route(/\/v0\/b\/synthetic\.invalid\/o.*_combined_/, route =>
@@ -257,6 +257,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   // #732: the subtitle, the yellow instruction box and the mic caption are gone.
   for (const removed of ['#toolSubtitle', '#combinedPanel .instruction-card', '#combinedInstructionBtn', '#combinedPanel .record-caption']) await expect(page.locator(removed)).toHaveCount(0);
   await expect(page.locator('#combinedPanel h3')).toContainText('Read & Translate');
+  await expect(page.locator('#combinedRecordBtn')).toBeVisible();
+  // Closed by default: the boy can record and practice but there is no Send button until the teacher opens the posuk.
+  await expect(page.locator('#combinedOpenBox')).toContainText('Practice only');
+  await expect(page.locator('#combinedSubmitBtn')).toBeHidden();
+  await writeFixture(`b3Games/workspaces/${WORKSPACE}/classes/${CLASS_ID}/submissionOpen`, {items: {'p:Vayeira_18': true}});
+  await page.reload();
+  await expect(page.locator('#combinedOpenBox')).toContainText('Open for sending');
   await expect(page.locator('#combinedRecordBtn')).toBeVisible();
   const attemptsPath = `posukPractice/attempts/${ariId}/Vayeira_18_1`;
   const rewardBalancePath = `studentRewards/students/${ariId}/rewardBalance`;
