@@ -86,3 +86,58 @@ test('the sols.tools build puts the rule first in the one script every page load
   execFileSync(process.execPath,['--check',path.join(dir,'sols-brand.js')],{stdio:'pipe'});
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
+
+// A teacher opens a deeper page (e.g. /daily-checklist/teacher.html) in a NEW tab. The page's own sign-in first says "nobody"
+// and only afterwards receives the teacher's remembered Google login. That first answer must not send the teacher home.
+function runGate({path='/daily-checklist/teacher.html',full=false,session={},defaultUser=null,remembered='never'}={}){
+ const vm=require('node:vm');
+ const log={replaced:null,reloaded:0,visible:'unset'},timers=[],store={solsFullSite:full?'1':null};
+ let defaultCb=null,remCb=null;
+ const style={};
+ const win={
+  document:{documentElement:{style},head:null,readyState:'complete',getElementById:()=>null,addEventListener(){}},
+  location:{pathname:path,replace(u){log.replaced=u},reload(){log.reloaded++}},
+  localStorage:{getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v},removeItem:k=>{delete store[k]}},
+  sessionStorage:{getItem:k=>session[k]||null},
+  setTimeout:(f,ms)=>{timers.push({f,ms});return timers.length},setInterval:()=>1,clearInterval(){},MutationObserver:function(){this.observe=()=>{}},
+ };
+ const apps=[{options:{}}];
+ win.firebase={apps,auth:()=>({onAuthStateChanged:cb=>{defaultCb=cb}}),
+  app(name){if(!name)return apps[0];if(name!=='FTTRememberedTeacher'||!win.__rem)throw new Error('no app');return win.__rem},
+  initializeApp(opts,name){win.__rem={auth:()=>({onAuthStateChanged:cb=>{remCb=cb}})};return win.__rem}};
+ vm.createContext(win);win.window=win;
+ vm.runInContext(source,win);
+ defaultCb&&defaultCb(defaultUser);           // the page's own sign-in answers first
+ if(remembered==='user'&&remCb)remCb({email:'teacher@example.org'});
+ if(remembered==='nobody'&&remCb)remCb(null);
+ if(remembered==='never')timers.filter(t=>t.ms===4000).forEach(t=>t.f());   // it never answers: fall back after the wait
+ log.hooked=!!remCb;log.store=store;return log;
+}
+
+test('new tab, teacher remembered: the first "nobody" does not send a teacher home from a deeper page',()=>{
+ const r=runGate({remembered:'user'});
+ assert.equal(r.replaced,null);
+ assert.equal(r.store.solsFullSite,'1','and the whole-site view is remembered');
+});
+
+test('new tab, nobody signed in anywhere: still sent to the home page, only after the remembered login has answered too',()=>{
+ const before=runGate({remembered:'pending'});
+ assert.equal(before.replaced,null,'waits for the remembered login');
+ assert.equal(runGate({remembered:'nobody'}).replaced,'/');
+ assert.equal(runGate({remembered:'never'}).replaced,'/','fallback after a few seconds');
+});
+
+test('a teacher whose whole-site view was already saved is not flipped back and bounced in a new tab',()=>{
+ const r=runGate({full:true,remembered:'user'});
+ assert.equal(r.replaced,null);assert.equal(r.reloaded,0);assert.notEqual(r.store.solsFullSite,null);
+});
+
+test('a student tab never waits on or uses the remembered teacher login',()=>{
+ const r=runGate({session:{b3Games_studentId:'s1'},remembered:'user'});
+ assert.equal(r.hooked,false);
+ assert.equal(r.replaced,'/');
+});
+
+test('signed in on the page itself: no bounce',()=>{
+ assert.equal(runGate({defaultUser:{email:'t@example.org'},remembered:'pending'}).replaced,null);
+});

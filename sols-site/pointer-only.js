@@ -149,7 +149,33 @@
   }
 
   // Who is signed in? The site's own sign-in code already knows; this only listens.
+  // A teacher's Google login is remembered by a SECOND Firebase app ("FTTRememberedTeacher", see site-settings.js) and is copied
+  // into the page's own sign-in a moment after the page loads. In a new tab (a typed link, a bookmark) the page's own sign-in
+  // first answers "nobody" before that copy has happened, so that first answer alone must not send a teacher home: wait for the
+  // remembered login to answer too. Student tabs and tabs that chose "Switch student" never restore it, so they do not wait.
   var authKnown = false, user = null, hooked = false;
+  var rememberedKnown = false, rememberedUser = null, rememberedHooked = false;
+  var REMEMBERED_APP = 'FTTRememberedTeacher';
+  function noRememberedTeacher() {
+    try {
+      var s = root.sessionStorage;
+      return !!(s.getItem('b3Games_studentId') || s.getItem('b3ActingAsStudent') || s.getItem('b3NoTeacherRestore') === '1');
+    } catch (e) { return false; }
+  }
+  function hookRemembered() {
+    if (rememberedHooked) return;
+    var fb = root.firebase;
+    if (!fb || typeof fb.auth !== 'function' || !fb.apps || !fb.apps.length) return;
+    rememberedHooked = true;
+    if (noRememberedTeacher()) { rememberedKnown = true; return; }
+    try {
+      var app;
+      try { app = fb.app(REMEMBERED_APP); } catch (e) { app = fb.initializeApp(fb.app().options, REMEMBERED_APP); }
+      app.auth().onAuthStateChanged(function (next) { rememberedKnown = true; rememberedUser = next || null; check(); }, function () { rememberedKnown = true; check(); });
+    } catch (e) { rememberedKnown = true; }
+    // If it never answers, fall back to the page's own sign-in alone.
+    root.setTimeout(function () { if (!rememberedKnown) { rememberedKnown = true; check(); } }, 4000);
+  }
   function hookAuth() {
     if (hooked) return true;
     var fb = root.firebase;
@@ -159,11 +185,14 @@
       fb.auth().onAuthStateChanged(function (next) { authKnown = true; user = next || null; check(); });
       hooked = true;
     } catch (e) { return false; }
+    hookRemembered();
     return true;
   }
   function check() {
     hookAuth();
-    var kind = viewerKind(authKnown, user);
+    // Signed in on this page, or (once the remembered login has answered) signed in as the remembered teacher.
+    var known = authKnown && (!!user || rememberedKnown);
+    var kind = viewerKind(known, user || rememberedUser);
     if (!kind) return;
     if (pendingBounce && kind === 'limited') { pendingBounce = false; root.location.replace('/'); return; }
     var wantFull = kind === 'full';
