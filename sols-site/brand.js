@@ -29,17 +29,20 @@
     var tag = el.nodeName;
     return tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'TEXTAREA' || el.isContentEditable;
   }
-  // Tab title: always starts with "SOLS Tools" so students can tell this site from
-  // the real school site. Same rule as solsTitle() in sols-site/build.mjs.
+  // Tab title: always says "SOLS Tools" so students can tell this site from the real school
+  // site: "SOLS Tools | Shluchim Online School" on the home page, "<page name> | SOLS Tools"
+  // elsewhere (page name first so narrow tabs stay distinct). Same rule as solsTitle() in
+  // sols-site/build.mjs.
   function solsTitle(raw) {
     var text = String(raw || '').replace(/\s+/g, ' ').trim();
-    if (/^SOLS Tools\b/i.test(text)) return text;
+    if (/^SOLS Tools\b/i.test(text) || /\|\s*SOLS Tools$/i.test(text)) return text;
     var rest = text
       .replace(/Fun Torah Tools/gi, ' ')
       .replace(/Shluchim Online School/gi, ' ')
       .replace(/\s+/g, ' ')
       .replace(/^[\s|—–•:-]+|[\s|—–•:-]+$/g, '');
-    var page = rest.replace(/\s*·\s*SOLS$/i, '').trim(); return 'SOLS Tools | ' + (!page || page === 'Home' ? NAME : page);
+    var page = rest.replace(/\s*·\s*SOLS$/i, '').trim();
+    return !page || page === 'Home' ? 'SOLS Tools | ' + NAME : page + ' | SOLS Tools';
   }
   function fixText(node) {
     var parent = node.parentNode;
@@ -75,10 +78,16 @@
       if (node.nodeType === 3) fixText(node); else fixAttrs(node);
     }
   }
+  // The home page shows the school emblem. An inner page keeps its own section icon
+  // (/assets/favicons/*.svg) so tabs of different tools look different.
+  function isHome() { return location.pathname === '/' || location.pathname === '/index.html'; }
+  function ownIcon(link) {
+    return !isHome() && link.rel === 'icon' && /\/assets\/favicons\//.test(link.getAttribute('href') || '');
+  }
   function fixIcons() {
     var links = document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]');
     for (var i = 0; i < links.length; i += 1) {
-      if (links[i].getAttribute('data-sols') === '1') continue;
+      if (links[i].getAttribute('data-sols') === '1' || ownIcon(links[i])) continue;
       links[i].parentNode.removeChild(links[i]);
     }
     if (!document.head || document.querySelector('link[data-sols="1"]')) return;
@@ -88,7 +97,9 @@
       { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/sols-favicon-16x16.png' },
       { rel: 'apple-touch-icon', href: '/sols-apple-touch-icon.png' }
     ];
+    var keepOwn = !!document.querySelector('link[rel="icon"][href*="/assets/favicons/"]') && !isHome();
     for (var j = 0; j < icons.length; j += 1) {
+      if (keepOwn && icons[j].rel === 'icon') continue;
       var icon = document.createElement('link');
       icon.rel = icons[j].rel;
       if (icons[j].type) icon.type = icons[j].type;
