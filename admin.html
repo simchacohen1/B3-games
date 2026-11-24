@@ -361,7 +361,7 @@ function renderOwnerControl(){
     +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock '+CL+' for</span>'+[15,30,45].map(m=>'<button type="button" data-cp-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(info.openUntil?'<button type="button" data-cp-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
     +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(games.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-all="open"'+(cpBusy?" disabled":"")+'>✅ Open ALL</button><button type="button" class="all-closed" data-cp-all="closed"'+(cpBusy?" disabled":"")+'>⛔ Close ALL</button></div>':"")+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
-  cpBindClassTabs(panel);cpMountSubmissionOpen(panel,cls,cls.toUpperCase());
+  cpBindClassTabs(panel);if(typeof cpMountSubmissionOpen==="function")cpMountSubmissionOpen(panel,cls,cls.toUpperCase());
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
   panel.querySelectorAll("[data-cp-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpTimed);cpSave(()=>api.updateClassTimedOpen(cls,m),m?CL+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
@@ -415,7 +415,7 @@ function renderOwnerPlatformClass(panel){
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
   +(rows||'<div class="cp-row">No class activities found.</div>')+'</div>'
   +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
- cpBindClassTabs(panel);cpMountSubmissionOpen(panel,id,name);
+ cpBindClassTabs(panel);if(typeof cpMountSubmissionOpen==="function")cpMountSubmissionOpen(panel,id,name);
  const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
  // ONE switch sets every layer, so they cannot disagree: class access (access/mode, siteEnabled, openUntil),
  // per-feature locks (locks/features, timed locks) and, on OPEN, every tool grant.
