@@ -373,3 +373,31 @@ test('no rules, storage or function files are touched by group work',()=>{
   const board=read('class-pointer-prototype/student-boards.js');
   assert.doesNotMatch(board,/firebase\.(database|storage)\(\)/,'group boards live on the teacher\'s page; nothing is stored online');
 });
+
+// ---------- the teacher's toolbar carries the Groups button (the gallery's own top bar is hidden on the teacher page) ----------
+test('the gallery\'s own top bar is hidden on the teacher page, so the drawing toolbar has the Groups button',()=>{
+  assert.match(read('class-pointer-prototype/teacher-dashboard.css'),/body\.teacher-view\.cp-simple \.boards-view > \.boards-bar:first-child\{display:none!important\}/);
+  const bar=read('class-pointer-prototype/classroom-annotate.js');
+  assert.match(bar,/\{id:'groups',icon:'[^']+',label:'Groups'/);
+  assert.match(bar,/hidden:!window\.ClassPointerBoards\?\.groups\?\.available\?\.\(\)/,'only while the student whiteboards are on screen');
+  assert.match(bar,/label:active\?'Change groups':'Make groups'/);
+  assert.match(bar,/label:'Save group boards'/);
+  assert.match(read('class-pointer-prototype/classroom.html'),/classroom-annotate\.js\?v=20261124-groups1/);
+});
+
+test('the toolbar\'s Groups button works from the real boards: available with whiteboards, active with groups, opens the window, saves',async()=>{
+  const f=await teacherFixture();
+  const groups=f.boards.groups;
+  assert.equal(groups.available(),true);assert.equal(groups.active(),true);
+  groups.open();
+  assert.ok(f.button('Make random groups'),'the Groups window is open');
+  let saved=null;f.window.FTTSavedWork={saveGroupBoards:async items=>{saved=items}};
+  f.from(f.arik,{type:'board-add',pg:'pg0',stroke:stroke('s1')});
+  groups.save();
+  await wait(()=>saved,'it saved');
+  assert.equal(saved.length,1);
+  const none=await teacherFixture({grouped:false});
+  assert.equal(none.boards.groups.active(),false);
+  none.boards.navigateWorkspace('teach');
+  assert.equal(none.boards.groups.available(),false,'not while the teacher is showing the lesson');
+});

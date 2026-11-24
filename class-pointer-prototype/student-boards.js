@@ -1927,6 +1927,14 @@
   window.ClassPointerBoards={
     // What the teacher is looking at, for the tabs above the lesson: null (My screen), 'screens' or 'boards'.
     workspace:()=>on&&!suspended&&!view.hidden?mode:null,
+    // Groups, for the drawing toolbar (classroom-annotate.js): the gallery's own top bar is hidden on the teacher page, so the
+    // toolbar carries the Groups button. `available` = student whiteboards are showing; `active` = there are groups.
+    groups:{
+      available:()=>!!Groups&&on&&!suspended&&!view.hidden&&mode==='boards',
+      active:()=>groupsOn(),
+      open:()=>openGroupsDialog(),
+      save:()=>saveGroupBoards()
+    },
     // A PNG picture of the student board that is open large.
     exportPng(){const board=focusBoard();return board&&mode==='boards'?boardPng(board):Promise.reject(Error('Open one student whiteboard first.'))},
     // Teacher: offer a picture (a PNG of a whiteboard) to every student whiteboard. It opens the usual
