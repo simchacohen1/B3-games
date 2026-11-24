@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
-<head><script src="/domain-redirect.js"></script><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<head><script src="shared/chumash-parshiyos.js?v=20261124"></script><script src="submission-open-panel.js?v=20261124"></script>
+<script src="/domain-redirect.js"></script><script src="guest-mode.js?v=20261011-guest" data-guest="block"></script>
 
 <meta charset="utf-8">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -43,6 +44,12 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f1f5f9}
 .cp-status small{display:block;font-size:14px;font-weight:700;opacity:.85;margin-top:3px}
 .cp-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
 .cp-modes button{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:13px 6px;font-size:15px;font-weight:900;cursor:pointer;color:#334155}
+.cp-row.cp-sub{padding-left:22px;background:#f8fafc}
+.cp-bigswitch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.cp-bigswitch button{border:3px solid #cbd5e1;background:#fff;border-radius:18px;padding:26px 8px;font-size:28px;font-weight:900;letter-spacing:.04em;cursor:pointer;color:#475569}
+.cp-bigswitch button.open.on{background:#16a34a;border-color:#16a34a;color:#fff}.cp-bigswitch button.lock.on{background:#dc2626;border-color:#dc2626;color:#fff}
+.cp-bigswitch button:disabled{opacity:.5;cursor:wait}
+.cp-timed{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));align-items:center}.cp-timed-label{font-weight:900;color:#334155;grid-column:1/-1}
 .cp-modes button.on{background:#172033;border-color:#172033;color:#fff}
 .cp-emergency{background:#7f1d1d;color:#fff;border-radius:14px;padding:13px 16px;margin-bottom:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .cp-emergency button{border:0;border-radius:10px;padding:9px 13px;font-weight:900;cursor:pointer}
@@ -192,16 +199,21 @@ async function renderTeacherAccess(msg){
 // game with a one-tap Open/Closed switch. Starred games stay open while the
 // class is locked.
 let CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
-let cpRecords={},cpClassesUnsub=false;
+let cpRecords={},cpClassesUnsub=false,cpFallbackWatching=false,cpHostedClass="";
 let cpClass=requestedClassId||(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
 function cpClassTabs(){
  return CP_CLASSES.map(c=>'<button type="button" data-cp-class="'+cpEsc(c.id)+'" class="'+(c.id===cpClass?'on':'')+'"><span class="cp-dot"></span>'+cpEsc(c.name)+'</button>').join('');
 }
+// When this page is shown inside the owner home bar, tell it which class is showing (it names it in its title).
+function cpTellHost(){
+  try{if(window.parent!==window)window.parent.postMessage({type:"b3-class-access-class",classId:cpClass,className:(CP_CLASSES.find(c=>c.id===cpClass)||{}).name||cpClass},location.origin)}catch(e){}
+}
 function cpBindClassTabs(panel){
  panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{
    cpClass=b.dataset.cpClass;cpMsg="";
    try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}
+   cpTellHost();
    renderOwnerControl();
  });
 }
@@ -212,14 +224,7 @@ function cpWatchClasses(){
  if(access.role!=="admin"){
    const ids=(access.classIds||[]).filter(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,100}$/.test(id));
    if(!ids.length){CP_CLASSES=[];cpRecords={};return}
-   let loaded=0;
-   ids.forEach(id=>db.ref("b3Games/workspaces/"+ws+"/classes/"+id).on("value",snapshot=>{
-     const row=snapshot.val();if(row)cpRecords[id]=row;else delete cpRecords[id];loaded++;
-     if(loaded<ids.length)return;
-     CP_CLASSES=ids.filter(key=>cpRecords[key]?.active!==false&&cpRecords[key]).map(key=>({id:key,name:String(cpRecords[key].name||key)}));
-     if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
-     if(currentTab==="access"&&!isOwnerNow())renderOwnerControl();
-   },e=>{console.error("Could not load assigned class",id,e)}));
+   cpWatchClassIds(db,ws,ids,()=>currentTab==="access"&&!isOwnerNow());
    return;
  }
  db.ref("b3Games/workspaces/"+ws+"/classes").on("value",snapshot=>{
@@ -232,7 +237,37 @@ function cpWatchClasses(){
    CP_CLASSES=all.map(([id,row])=>({id,name:String(row.name||id)}));
    if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
    if(currentTab==="access"&&isOwnerNow())renderOwnerControl();
- },e=>{console.error("Could not load class registry",e);cpClassesUnsub=false});
+ },e=>{
+   console.error("Could not load class registry",e);cpClassesUnsub=false;
+   cpWatchOwnClassesFallback(db,ws,w);
+ });
+}
+// Some databases (the staging one) allow reading a class at a time but not the whole class list. Then an admin still gets
+// the classes they are assigned to, plus the class in the address or last used, instead of the ET/WT placeholders.
+async function cpWatchOwnClassesFallback(db,ws,w){
+  if(cpFallbackWatching)return;
+  cpFallbackWatching=true;
+  const ids=new Set([requestedClassId]);
+  try{const saved=localStorage.getItem("b3ControlClass");if(saved)ids.add(saved)}catch(e){}
+  try{
+    const uid=w.firebase.auth().currentUser?.uid;
+    const mine=uid?(await db.ref("b3Games/workspaces/"+ws+"/teachers/"+uid+"/classIds").once("value")).val()||{}:{};
+    Object.keys(mine).forEach(id=>{if(mine[id]===true)ids.add(id)});
+  }catch(e){}
+  const valid=[...ids].filter(id=>id&&id!=="*"&&/^[A-Za-z0-9_-]{1,100}$/.test(id));
+  if(!valid.length){cpFallbackWatching=false;return}
+  cpWatchClassIds(db,ws,valid,()=>currentTab==="access",true);
+}
+function cpWatchClassIds(db,ws,ids,shouldRender,isFallback){
+  let loaded=0;
+  ids.forEach(id=>db.ref("b3Games/workspaces/"+ws+"/classes/"+id).on("value",snapshot=>{
+    const row=snapshot.val();if(row)cpRecords[id]=row;else delete cpRecords[id];loaded++;
+    if(loaded<ids.length)return;
+    CP_CLASSES=ids.filter(key=>cpRecords[key]?.active!==false&&cpRecords[key]).map(key=>({id:key,name:String(cpRecords[key].name||key)}));
+    if(isFallback&&!CP_CLASSES.length)return;
+    if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
+    if(shouldRender())renderOwnerControl();
+  },e=>{console.error("Could not load class",id,e)}));
 }
 function cpApi(){return frame.contentWindow?.B3SiteSettings}
 function cpGames(){
@@ -270,7 +305,44 @@ function startOwnerControl(){
   if(!cpTimer)cpTimer=setInterval(()=>{if(currentTab==="access"&&isOwnerNow())renderOwnerControl()},30000);
   renderOwnerControl();
 }
+// ---- Open for sending (submission-open-panel.js) ----
+// Boys can always record and practice; they can only send what the teacher opens here, for the class or one boy.
+const cpNames={};
+function cpStudentList(classId){
+  return Object.entries(cpRecords[classId]?.members||{}).filter(([id,m])=>m&&m.active!==false)
+    .map(([id,m])=>({id,name:cpNames[id]||String(m.name||id)})).sort((a,b)=>a.name.localeCompare(b.name));
+}
+async function cpLoadNames(classId){
+  const db=frame.contentWindow?.firebase?.database?.();if(!db)return;
+  const ids=Object.keys(cpRecords[classId]?.members||{}).filter(id=>!(id in cpNames)&&/^[A-Za-z0-9_-]{1,100}$/.test(id));
+  if(!ids.length)return;
+  await Promise.all(ids.map(async id=>{try{cpNames[id]=String((await db.ref("b3Games/students/"+id+"/profile/name").once("value")).val()||"")||id}catch(e){cpNames[id]=id}}));
+  if(window.B3SubmissionOpenPanel)B3SubmissionOpenPanel.redraw();
+}
+function cpMountSubmissionOpen(panel,classId,className){
+  const api=cpApi(),host=panel.querySelector(".cp-wrap");
+  if(!api||!host||!window.B3SubmissionOpenPanel)return;
+  const teacherMode=api.getCurrentAccess?.().role==="teacher";
+  B3SubmissionOpenPanel.mount(host,{classId,className,before:host.querySelector(".cp-games"),
+    call:(action,fields)=>api.manageClassAccessAction(classId,action,teacherMode?fields:Object.assign({actorMode:"admin"},fields)),
+    students:()=>cpStudentList(classId)});
+  cpLoadNames(classId);
+}
+// The class panel is rebuilt on every class or settings change and every 30 seconds. That moves the "Open for sending" box
+// and closes any dropdown the teacher has open in it, so while the teacher is working inside that box the rebuild waits.
+let cpRenderPending=false;
+function cpUserIsEditingOpenForSending(){
+  const card=document.getElementById("submissionOpenCard");
+  return Boolean(card&&card.contains(document.activeElement));
+}
+document.addEventListener("focusout",()=>{
+  if(!cpRenderPending)return;
+  setTimeout(()=>{if(!cpRenderPending||cpUserIsEditingOpenForSending())return;cpRenderPending=false;if(currentTab==="access")renderOwnerControl();},0);
+});
 function renderOwnerControl(){
+  if(cpUserIsEditingOpenForSending()){cpRenderPending=true;return}
+  cpRenderPending=false;
+  if(cpClass!==cpHostedClass){cpHostedClass=cpClass;cpTellHost();}
   const panel=document.getElementById("ownerControlPanel"),api=cpApi();
   if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
   if(!CP_CLASSES.length){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">No active classes yet. Add one in Administration.</div></div>';return}
@@ -280,6 +352,7 @@ function renderOwnerControl(){
   const starUntil=id=>{const ms=api.lockedGameExpiry?api.lockedGameExpiry(s,cls,id):0;return ms?" · until "+new Date(ms).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):""};
   let detail;
   if(s.siteEnabled===false)detail="Emergency lock is on";
+  else if(info.openUntil)detail="Timed unlock · closes again at "+new Date(info.openUntil).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"});
   else if(access.mode==="open")detail="Opened by you · stays open until you press Automatic";
   else if(access.mode==="locked")detail="Locked by you · stays locked until you press Automatic";
   else detail="Following recess schedule · "+cpNextChange(access.lockWindows,!info.open);
@@ -298,10 +371,12 @@ function renderOwnerControl(){
     +(s.siteEnabled===false?'<div class="cp-emergency"><span>🚨 Emergency lock is ON — every class is locked.</span><button type="button" id="cpEmergencyOff">Turn emergency lock off</button></div>':"")
     +'<div class="cp-status '+(info.open?"open":"locked")+'"><div>'+(info.open?"✅ "+cls.toUpperCase()+" is OPEN":"🔒 "+cls.toUpperCase()+" is LOCKED")+'<small>'+cpEsc(detail)+'</small></div></div>'
     +'<div class="cp-modes">'+modes+'</div>'
+    +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock '+CL+' for</span>'+[15,30,45].map(m=>'<button type="button" data-cp-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(info.openUntil?'<button type="button" data-cp-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
     +'<div class="cp-games"><div class="cp-games-head">Games for '+cls.toUpperCase()+'<span>Tap to open/close · ⭐ = stays open during lock (turns itself off when the lock ends)</span></div>'+(games.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-all="open"'+(cpBusy?" disabled":"")+'>✅ Open ALL</button><button type="button" class="all-closed" data-cp-all="closed"'+(cpBusy?" disabled":"")+'>⛔ Close ALL</button></div>':"")+(rows||'<div class="cp-row"><div></div><div class="cp-name">No games yet.</div><div></div></div>')+'</div>'
     +'<div class="cp-msg" id="cpMsg">'+cpEsc(cpMsg)+'</div></div>';
-  cpBindClassTabs(panel);
+  cpBindClassTabs(panel);if(typeof cpMountSubmissionOpen==="function")cpMountSubmissionOpen(panel,cls,cls.toUpperCase());
   panel.querySelectorAll("[data-cp-mode]").forEach(b=>b.onclick=()=>cpSave(()=>api.updateClassMode(cls,b.dataset.cpMode),{auto:"Back on the recess schedule ✓",open:cls.toUpperCase()+" opened ✓",locked:cls.toUpperCase()+" locked ✓"}[b.dataset.cpMode]));
+  panel.querySelectorAll("[data-cp-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpTimed);cpSave(()=>api.updateClassTimedOpen(cls,m),m?CL+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
   panel.querySelectorAll("[data-cp-game]").forEach(b=>b.onclick=()=>{const id=b.dataset.cpGame,open=s.classGames?.[cls]?.[id]!==false,name=games.find(g=>g.id===id)?.name||id;
     cpSave(async()=>{await api.updateClassGameEnabled(cls,id,!open);if(open&&stars.includes(id))await api.setClassLockedGame(cls,id,false);},name+(open?" closed":" opened")+" for "+cls.toUpperCase()+" ✓")});
   panel.querySelectorAll("[data-cp-all]").forEach(b=>b.onclick=()=>{const open=b.dataset.cpAll==="open";
@@ -313,57 +388,133 @@ function renderOwnerControl(){
   const em=document.getElementById("cpEmergencyOff");if(em)em.onclick=()=>{if(confirm("Turn the emergency lock off? Classes go back to their normal settings."))cpSave(()=>api.updateSiteEnabled(true),"Emergency lock off ✓")};
 }
 // New classes use their own access and tool grants, never B3's shared ET/WT settings.
+// A tool's id in the Class Access list -> its id in the per-feature lock list (a few differ).
+function cpFeatureOf(tool){return tool==="gallery"||tool==="tag"?"class-gallery":tool}
+// Chumash Cheder is ONE tool grant but four tiles; each tile has its own star and its own lock (feature) under its tile key.
+const CP_TILES=[{key:"posuk-practice-scroll",name:"Posuk Practice Scroll"},{key:"chumash-quiz",name:"Chumash חידון"},{key:"record-mishnayos",name:"Mishnayos Practice"},{key:"record-mishnayos-quiz",name:"Mishnayos חידון"}];
+const CP_TILE_KEYS=CP_TILES.map(t=>t.key);
+function cpGrantOf(tool){return CP_TILE_KEYS.includes(tool)?"posuk-practice-scroll":tool}
 function renderOwnerPlatformClass(panel){
  const id=cpClass,row=cpRecords[id],w=frame.contentWindow,teacherMode=w?.B3SiteSettings?.getCurrentAccess?.().role==="teacher";
  if(!row){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading class settings…</div></div>';return}
- const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",isOpen=row.siteEnabled!==false&&mode!=="locked"&&cpSettings?.siteEnabled!==false;
+ const name=String(row.name||id),mode=row.access?.mode==="locked"?"locked":"open",openUntil=Number(row.access?.openUntil)||0,isOpen=cpSettings?.siteEnabled!==false&&(openUntil>Date.now()||(row.siteEnabled!==false&&mode!=="locked"));
+ // Per-feature locks from the retired Class Locks panel: classes/<id>/locks, written only by the studentLocks function.
+ const lockedFeatures=Object.entries(row.locks?.features||{}).filter(([k,f])=>f&&f.locked===true&&!CP_TILE_KEYS.includes(k)).length,
+   lockOverrides=Object.entries(row.locks?.overrides||{}).filter(([,o])=>o&&Number(o.until)>Date.now()).map(([k])=>k),
+   lockSchedules=Object.keys(row.locks?.schedules||{}).length;
+ const starCount=Object.values(row.access?.stars||{}).filter(v=>Number(v)>Date.now()).length;
+ const lockedOv=lockOverrides.filter(k=>row.locks.overrides[k].state==="locked");
+ // One state for the whole class: open means class access, feature locks and timed feature locks all agree.
+ const mixed=isOpen&&(lockedFeatures>0||lockedOv.length>0),bigState=mixed?"mixed":isOpen?"open":"locked";
  const tools=cpGames().map(t=>({id:t.id==="class-gallery"?"gallery":t.id,name:t.name}));
  tools.push({id:"tag",name:"Tag Game"});
  const known=new Set(),distinct=tools.filter(t=>{if(known.has(t.id))return false;known.add(t.id);return true});
  const rows=distinct.map(t=>{
-   const on=row.toolGrants?.[t.id]===true;
-   return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
+   const on=row.toolGrants?.[t.id]===true,starMs=Number(row.access?.stars?.[t.id])||0,starred=starMs>Date.now();
+   if(t.id==="posuk-practice-scroll"){
+     const tileRows=CP_TILES.map(tk=>{
+       const ms=Number(row.access?.stars?.[tk.key])||0,st=ms>Date.now(),lk=row.locks?.features?.[tk.key]?.locked===true;
+       return '<div class="cp-row cp-sub"><button type="button" class="cp-star'+(st?" on":"")+'" data-cp-newstar="'+cpEsc(tk.key)+'" title="'+(st?"Remove the star: this tile locks with the class":"Keep this tile open for students while the class is locked")+'" aria-label="Star '+cpEsc(tk.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button><div class="cp-name">↳ '+cpEsc(tk.name)+(st?'<small>'+(isOpen?"⭐ will stay open if you lock the class":"⭐ open for students even though the class is locked")+' · until '+new Date(ms).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+'</small>':'')+'</div><button type="button" class="cp-toggle '+(lk?"closed":"open")+'" data-cp-tilelock="'+cpEsc(tk.key)+'"'+(cpBusy?" disabled":"")+'>'+(lk?"🔒 Locked":"🔓 Open")+'</button></div>';
+     }).join("");
+     return '<div class="cp-row"><div></div><div class="cp-name">'+cpEsc(t.name)+' — all 4 tiles<small>One switch for the whole Chumash Cheder tool. Each tile below has its own star and lock.</small></div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>'+tileRows;
+   }
+   return '<div class="cp-row"><button type="button" class="cp-star'+(starred?" on":"")+'" data-cp-newstar="'+cpEsc(t.id)+'" title="'+(starred?"Remove the star: this tool locks with the class":"Keep this tool open for students while the class is locked")+'" aria-label="Star '+cpEsc(t.name)+'"'+(cpBusy?" disabled":"")+'>⭐</button><div class="cp-name">'+cpEsc(t.name)+(starred?'<small>'+(isOpen?"⭐ will stay open if you lock the class":"⭐ open for students even though the class is locked")+' · until '+new Date(starMs).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+'</small>':'')+'</div><button type="button" class="cp-toggle '+(on?"open":"closed")+'" data-cp-grant="'+cpEsc(t.id)+'"'+(cpBusy?" disabled":"")+'>'+(on?"✅ Enabled":"⛔ Disabled")+'</button></div>';
  }).join("");
  panel.innerHTML='<div class="cp-wrap"><div class="cp-switch">'+cpClassTabs()+'</div>'
   +(cpSettings?.siteEnabled===false&&!teacherMode?'<div class="cp-emergency">🚨 The global emergency lock is on for all classes. <button type="button" id="cpEmergencyOffNew">Turn emergency lock off</button></div>':"")
-  +'<div class="cp-status '+(isOpen?"open":"locked")+'"><div>'+(isOpen?"✅ ":"🔒 ")+cpEsc(name)+(isOpen?" is OPEN":" is LOCKED")+'<small>Only this class is affected by the controls below.</small></div></div>'
-  +'<div class="cp-modes"><button type="button" data-cp-new-mode="open" class="'+(mode==="open"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 Open this class</button><button type="button" data-cp-new-mode="locked" class="'+(mode==="locked"?"on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 Lock this class</button></div>'
+  +'<div class="cp-status '+(bigState==="open"?"open":"locked")+'"><div>'+(bigState==="open"?"✅ ":bigState==="mixed"?"⚠️ ":"🔒 ")+cpEsc(name)+(bigState==="open"?" is OPEN":bigState==="mixed"?" is PARTLY LOCKED":" is LOCKED")+'<small>'+(mixed?'Class is open but '+(lockedFeatures?lockedFeatures+' feature'+(lockedFeatures===1?' is':'s are')+' still locked':'a timed feature lock is active')+' — press OPEN to clear it. ':'Only this class is affected by the controls below. ')+(starCount&&!isOpen?'⭐ '+starCount+' starred tool'+(starCount===1?' is':'s are')+' open while locked. ':'')+(lockSchedules?lockSchedules+' weekly lock schedule(s) from a teacher still apply (that teacher clears it). ':'')+'</small></div></div>'
+  +'<div class="cp-bigswitch"><button type="button" data-cp-big="open" class="open'+(bigState==="open"?" on":"")+'"'+(cpBusy?" disabled":"")+'>🔓 OPEN</button><button type="button" data-cp-big="locked" class="lock'+(bigState==="locked"?" on":"")+'"'+(cpBusy?" disabled":"")+'>🔒 LOCK</button></div>'
+  +'<div class="cp-modes cp-timed"><span class="cp-timed-label">⏱ Unlock this class for'+(openUntil>Date.now()?' · open until '+new Date(openUntil).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}):'')+'</span>'+[15,30,45].map(m=>'<button type="button" data-cp-new-timed="'+m+'"'+(cpBusy?" disabled":"")+'>'+m+' min</button>').join("")+(openUntil>Date.now()?'<button type="button" data-cp-new-timed="0"'+(cpBusy?" disabled":"")+'>End now</button>':"")+'</div>'
   +'<div class="cp-games"><div class="cp-games-head">Tools for '+cpEsc(name)+'<span>Each tool is enabled or disabled for this class independently. Only enabled tools are available to students and teachers.</span></div>'
-  +(distinct.length?'<div class="cp-bulk"><button type="button" class="all-open" data-cp-grant-all="1"'+(cpBusy?" disabled":"")+'>✅ Enable ALL</button><button type="button" class="all-closed" data-cp-grant-all="0"'+(cpBusy?" disabled":"")+'>⛔ Disable ALL</button></div>':"")
   +(rows||'<div class="cp-row">No class activities found.</div>')+'</div>'
   +'<div class="cp-msg">'+cpEsc(cpMsg)+'</div></div>';
- cpBindClassTabs(panel);
+ cpBindClassTabs(panel);if(typeof cpMountSubmissionOpen==="function")cpMountSubmissionOpen(panel,id,name);
  const db=w?.firebase?.database?.(),ws=w?.B3SiteSettings?.workspaceId||"b3-2026",base="b3Games/workspaces/"+ws+"/classes/"+id;
- panel.querySelectorAll("[data-cp-new-mode]").forEach(b=>b.onclick=()=>cpSave(()=>{
-   const mode=b.dataset.cpNewMode;
-   if(teacherMode)return cpApi().manageClassAccessAction(id,"platform",{mode});
-   if(mode==="open")return db.ref().update({[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true});
-   return db.ref(base+"/access/mode").set("locked");
- },name+(b.dataset.cpNewMode==="locked"?" locked ✓":" opened ✓")));
+ // ONE switch sets every layer, so they cannot disagree: class access (access/mode, siteEnabled, openUntil),
+ // per-feature locks (locks/features, timed locks) and, on OPEN, every tool grant.
+ panel.querySelectorAll("[data-cp-big]").forEach(b=>b.onclick=()=>{
+   const open=b.dataset.cpBig==="open",api=cpApi();
+   return cpSave(async()=>{
+     if(open){
+       if(teacherMode){
+         await api.manageClassAccessAction(id,"platform",{mode:"open"});
+         await Promise.all(distinct.map(t=>api.manageClassAccessAction(id,"grant",{toolId:t.id,enabled:true})));
+       }else{
+         const u={[base+"/access/mode"]:"open",[base+"/siteEnabled"]:true,[base+"/access/openUntil"]:null,[base+"/access/stars"]:null};
+         distinct.forEach(t=>{u[base+"/toolGrants/"+t.id]=true});
+         await db.ref().update(u);
+       }
+       await api.manageStudentLocks(id,{action:"setAll",locked:false});
+       if(lockOverrides.length){try{await api.manageStudentLocks(id,{action:"clearOverride",targets:lockOverrides})}catch(e){console.warn("Could not end timed feature settings",e)}}
+     }else{
+       if(teacherMode)await api.manageClassAccessAction(id,"platform",{mode:"locked"});
+       else await db.ref().update({[base+"/access/mode"]:"locked",[base+"/access/openUntil"]:null});
+       await api.manageStudentLocks(id,{action:"setAll",locked:true});
+       // Starred tools stay open: put their feature lock back to open after locking everything.
+       for(const [k,v] of Object.entries(row.access?.stars||{})){if(Number(v)>Date.now()){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:cpFeatureOf(k),locked:false})}catch(e){console.warn("Could not keep starred tool open",k,e)}}}
+     }
+   },open?name+" is OPEN: class, features and all tools ✓":name+" is LOCKED ✓");
+ });
+ panel.querySelectorAll("[data-cp-new-timed]").forEach(b=>b.onclick=()=>{const m=Number(b.dataset.cpNewTimed);
+   return cpSave(async()=>{
+     const api=cpApi();
+     if(m){
+       // A timed unlock must open the per-feature locks too (LOCK sets them, and nothing else clears them), or students
+       // stay out behind the padlock. Always done, never decided from the panel's last picture of the class, which can be
+       // a moment behind right after LOCK. Done first, so a failure shows before the class claims to be unlocked.
+       await api.manageStudentLocks(id,{action:"setAll",locked:false});
+       let ov=lockOverrides;
+       try{ov=Object.keys((await db.ref(base+"/locks/overrides").once("value")).val()||{})}catch(e){}
+       if(ov.length){try{await api.manageStudentLocks(id,{action:"clearOverride",targets:ov})}catch(e){console.warn("Could not end timed feature settings",e)}}
+     }
+     await (teacherMode?api.manageClassAccessAction(id,"platformTimedOpen",{minutes:m}):db.ref(base+"/access/openUntil").set(m?Date.now()+m*60000:null));
+   },m?name+" unlocked for "+m+" minutes ✓":"Timed unlock ended ✓")});
  const emergency=document.getElementById("cpEmergencyOffNew");
  if(emergency)emergency.onclick=()=>{
    if(confirm("Turn off the emergency lock for every class?"))
      cpSave(()=>cpApi().updateSiteEnabled(true),"Emergency lock off ✓");
  };
- panel.querySelectorAll("[data-cp-grant-all]").forEach(b=>b.onclick=()=>{
-   const on=b.dataset.cpGrantAll==="1";
-   if(!confirm((on?"Enable":"Disable")+" ALL tools for "+name+"?"))return;
-   const updates={};distinct.forEach(t=>{updates[base+"/toolGrants/"+t.id]=on;});
-   cpSave(()=>teacherMode
-     ?Promise.all(distinct.map(t=>cpApi().manageClassAccessAction(id,"grant",{toolId:t.id,enabled:on})))
-     :db.ref().update(updates),"All tools "+(on?"enabled":"disabled")+" for "+name+" ✓");
+ // Star = the tool stays open while the class is LOCKED (same idea as the ET/WT star). Saved as access/stars/<tool> = the time
+ // it switches itself off (next New York midnight). The tool's feature lock is opened with it, so no layer can disagree.
+ panel.querySelectorAll("[data-cp-newstar]").forEach(b=>b.onclick=()=>{
+   const tool=b.dataset.cpNewstar,api=cpApi(),starred=Number(row.access?.stars?.[tool])>Date.now(),fid=cpFeatureOf(tool);
+   return cpSave(async()=>{
+     const write=keep=>teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:tool,keepOpen:keep,expiresAt:api.newYorkMidnightMs()}):db.ref(base+"/access/stars/"+tool).set(keep?api.newYorkMidnightMs():null);
+     if(starred){
+       await write(false);
+       if(!isOpen){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:true})}catch(e){console.warn("Could not relock the tool",e)}}
+       return;
+     }
+     // Like ET/WT: starring a switched-off tool switches it on first.
+     const grantKey=cpGrantOf(tool);
+     if(row.toolGrants?.[grantKey]!==true)await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:grantKey,enabled:true}):db.ref(base+"/toolGrants/"+grantKey).set(true));
+     await write(true);
+     try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not open the tool's feature lock",e)}
+   },starred?tool+" will lock with the class ✓":tool+" will stay open while the class is locked ✓");
+ });
+ // Each Chumash Cheder tile has its own lock: the same per-feature lock the big switch sets, but for one tile.
+ panel.querySelectorAll("[data-cp-tilelock]").forEach(b=>b.onclick=()=>{
+   const key=b.dataset.cpTilelock,api=cpApi(),locked=row.locks?.features?.[key]?.locked===true,starred=Number(row.access?.stars?.[key])>Date.now();
+   return cpSave(async()=>{
+     await api.manageStudentLocks(id,{action:"setFeature",featureId:key,locked:!locked});
+     // Like ET/WT: closing a tile also removes its star.
+     if(!locked&&starred)await (teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:key,keepOpen:false}):db.ref(base+"/access/stars/"+key).set(null));
+   },(CP_TILES.find(t=>t.key===key)?.name||key)+(locked?" unlocked ✓":" locked ✓"));
  });
  panel.querySelectorAll("[data-cp-grant]").forEach(b=>b.onclick=()=>{
-   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true;
-   cpSave(()=>teacherMode
-     ?cpApi().manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on})
-     :db.ref(base+"/toolGrants/"+tool).set(!on),
-     tool+(on?" disabled":" enabled")+" for "+name+" ✓");
+   const tool=b.dataset.cpGrant,on=row.toolGrants?.[tool]===true,api=cpApi(),fid=cpFeatureOf(tool);
+   cpSave(async()=>{
+     await (teacherMode?api.manageClassAccessAction(id,"grant",{toolId:tool,enabled:!on}):db.ref(base+"/toolGrants/"+tool).set(!on));
+     // Like ET/WT: switching a tool off also removes its star.
+     if(on)for(const k of (tool==="posuk-practice-scroll"?CP_TILE_KEYS:[tool])){if(Number(row.access?.stars?.[k])>Date.now())await (teacherMode?api.manageClassAccessAction(id,"platformStar",{toolId:k,keepOpen:false}):db.ref(base+"/access/stars/"+k).set(null));}
+     // Turning a tool ON also clears an old per-feature lock on that same tool, so the two cannot disagree.
+     if(!on&&row.locks?.features?.[fid]?.locked===true){try{await api.manageStudentLocks(id,{action:"setFeature",featureId:fid,locked:false})}catch(e){console.warn("Could not clear the feature lock",e)}}
+   },tool+(on?" disabled":" enabled")+" for "+name+" ✓");
  });
 }
 async function cpSave(fn,okMsg){
   if(cpBusy)return;cpBusy=true;cpMsg="Saving…";renderOwnerControl();
-  try{await fn();cpMsg=okMsg;}catch(e){console.error(e);cpMsg="Could not save. Please try again.";}
+  try{await fn();cpMsg=okMsg;}catch(e){console.error(e);cpMsg="Could not save"+(e&&e.message?": "+e.message:"")+". Please try again.";}
   cpBusy=false;renderOwnerControl();
 }
 function applyRoleView(){

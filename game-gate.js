@@ -425,6 +425,32 @@
     }).catch(error=>console.warn("Follow Teacher not available",error));
   }
 
+  // Live push for the student's own class record (new classes keep their lock in classes/<id>/access and siteEnabled, which
+  // need a signed-in read). Re-opened with a fresh sign-in token when Firebase ends the stream (tokens last an hour).
+  var classWatch = { id: "", sources: [], timer: null };
+  function watchClassLive(classId, classPath) {
+    if (typeof EventSource !== "function" || isGuestPreview() || classId === "et" || classId === "wt") return;
+    if (classWatch.id === classId && classWatch.sources.length) return;
+    classWatch.id = classId;
+    classWatch.sources.forEach(function (s) { try { s.close(); } catch (e) {} });
+    classWatch.sources = [];
+    var auth = window.firebase && window.firebase.auth && window.firebase.auth();
+    var user = auth && auth.currentUser;
+    if (!user || typeof user.getIdToken !== "function") return;
+    user.getIdToken().then(function (token) {
+      if (classWatch.id !== classId) return;
+      ["access", "siteEnabled"].forEach(function (leaf) {
+        var first = true, url = classPath + "/" + leaf + ".json?auth=" + encodeURIComponent(token) + (databaseNamespace ? "&ns=" + encodeURIComponent(databaseNamespace) : "");
+        var src = new EventSource(url);
+        var changed = function () { if (first) { first = false; return; } clearTimeout(classWatch.timer); classWatch.timer = setTimeout(checkNow, 250); };
+        src.addEventListener("put", changed); src.addEventListener("patch", changed);
+        src.addEventListener("auth_revoked", function () { try { src.close(); } catch (e) {} classWatch.id = ""; });
+        src.addEventListener("cancel", function () { try { src.close(); } catch (e) {} classWatch.id = ""; });
+        classWatch.sources.push(src);
+      });
+    }).catch(function () { classWatch.id = ""; });
+  }
+
   async function resolveStudentClass() {
     var studentId=getStoredStudentId(), storedClass=getStoredClass();
     studentActive=false;assignedClass=null;studentClassId="";
@@ -454,6 +480,7 @@
       fetchJson(classPath+"/toolGrants.json"),
       fetchJson(classPath+"/members/"+encodeURIComponent(studentId)+".json")
     ]);
+    watchClassLive(studentClassId, classPath);
     var member=classFields[4];
     assignedClass={active:classFields[0],siteEnabled:classFields[1],access:classFields[2],toolGrants:classFields[3],members:{}};
     assignedClass.members[studentId]=member;
@@ -495,6 +522,7 @@
     var access = settings && settings.classAccess && settings.classAccess[classId] ? settings.classAccess[classId] : null;
     var mode = access && (access.mode === "open" || access.mode === "locked" || access.mode === "auto") ? access.mode : "auto";
 
+    if (access && Number(access.openUntil) > Date.now()) return { open:true, reason:"Timed unlock" };
     if (mode === "open") return { open:true, reason:"Manual override: OPEN" };
     if (mode === "locked") return { open:false, reason:"Manual override: LOCKED" };
 
@@ -607,7 +635,16 @@
       }
       var grantId=gameId==="class-gallery"?"gallery":gameId;
       if(!assignedClass||!window.B3StudentTools.granted(assignedClass,grantId)){showClosed("This activity is turned off", "Your teacher has not enabled this tool for your class.");return;}
-      if(!followActivityOpen&&!teacherOverrideOpen()&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
+      // A starred tool stays open while the class is locked (same idea as the ET/WT star; saved in access/stars/<tool> as the
+      // time it switches itself off). The emergency lock above and the tool switch just before still win.
+      // The Chumash Cheder tool serves four tiles from two pages (practice and ?mode=quiz); each tile has its own star.
+      var starKey=grantId;
+      if(grantId==="posuk-practice-scroll"){
+        var sp=new URLSearchParams(location.search),quizTile=sp.get("mode")==="quiz"||sp.get("tool")==="test-me",mishTile=location.pathname.indexOf("record-mishnayos")!==-1;
+        starKey=mishTile?(quizTile?"record-mishnayos-quiz":"record-mishnayos"):(quizTile?"chumash-quiz":"posuk-practice-scroll");
+      }
+      var starOpen=Number(assignedClass.access&&assignedClass.access.stars&&assignedClass.access.stars[starKey])>Date.now();
+      if(!starOpen&&!followActivityOpen&&!teacherOverrideOpen()&&!(Number(assignedClass.access&&assignedClass.access.openUntil)>Date.now())&&(assignedClass.siteEnabled===false||assignedClass.access?.mode==="locked")){showClosed("Your class is locked", "Your teacher can reopen your class.");return;}
       showOpen();return;
     }
 
@@ -740,6 +777,21 @@
   if (!isGuestPreview()) watchTeacherAccess();
   checkNow();
   setInterval(checkNow, POLL_INTERVAL_MS);
+  // Live push: the settings are watched with a Firebase streaming read, so a lock or unlock a teacher presses reaches a
+  // student who is already inside a tool within seconds (the 30 second poll above stays as the backup).
+  (function watchSettingsLive(){
+    if (typeof EventSource !== "function" || isGuestPreview()) return;
+    var first = true, timer = null, source = null;
+    try {
+      source = new EventSource(databaseUrl() + "/" + SETTINGS_PATH + ".json");
+      var onChange = function(){
+        if (first) { first = false; return; }          // the first message is just the current state
+        clearTimeout(timer); timer = setTimeout(checkNow, 250);
+      };
+      source.addEventListener("put", onChange);
+      source.addEventListener("patch", onChange);
+    } catch (e) { /* the poll still covers it */ }
+  })();
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") checkNow();
   });

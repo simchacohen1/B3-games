@@ -13,9 +13,9 @@
   var groups=[
     {id:"learn",icon:REBBE,title:"Chumash Cheder",subtitle:"Learn your posuk, then review it",extra:" island-main",tiles:[
       {id:"posuk-practice-scroll",title:"Posuk Practice Scroll",icon:"📜",href:"record_pesukim/student.html",teacherHref:"record_pesukim/teacher.html"},
-      {id:"posuk-practice-scroll",companion:true,title:"Chumash חידון",icon:"🧠",href:"record_pesukim/student.html?mode=quiz"},
-      {id:"posuk-practice-scroll",companion:true,title:"Mishnayos Practice",icon:"📖",href:"record-mishnayos/student.html",teacherHref:"record-mishnayos/teacher.html"},
-      {id:"posuk-practice-scroll",companion:true,title:"Mishnayos חידון",icon:"🧠",href:"record-mishnayos/student.html?mode=quiz"},
+      {id:"posuk-practice-scroll",key:"chumash-quiz",companion:true,title:"Chumash חידון",icon:"🧠",href:"record_pesukim/student.html?mode=quiz"},
+      {id:"posuk-practice-scroll",key:"record-mishnayos",companion:true,title:"Mishnayos Practice",icon:"📖",href:"record-mishnayos/student.html",teacherHref:"record-mishnayos/teacher.html"},
+      {id:"posuk-practice-scroll",key:"record-mishnayos-quiz",companion:true,title:"Mishnayos חידון",icon:"🧠",href:"record-mishnayos/student.html?mode=quiz"},
       {id:"chazara",title:"Chazara Chart",icon:"🔁",href:"chazara/index.html",teacherHref:"chazara/teacher.html"}]},
     {id:"roots",icon:"🌳",title:"Shorashim Grove",subtitle:"Grow your Hebrew word skills",extra:" island-main island-roots",tiles:[
       {id:"shorashim",title:"Shorashim",icon:"🌳",href:"shorashim/index.html",teacherHref:"shorashim/teacher.html"}]},
@@ -91,7 +91,7 @@
       if(!tiles.length)return;
       var cards=tiles.map(function(t){
         var href=opts.hrefFor?opts.hrefFor(t):t.href;
-        return '<a class="game-card" data-game-id="'+esc(t.id)+'"'+(t.companion?' data-companion-of="'+esc(t.id)+'"':'')+' href="'+esc(href)+'">'+iconHtml(t,teacher?"teacher":"student")+'<span class="card-title">'+esc(t.title)+'</span></a>';
+        return '<a class="game-card" data-game-id="'+esc(t.id)+'"'+(t.key?' data-tile-key="'+esc(t.key)+'"':'')+(t.companion?' data-companion-of="'+esc(t.id)+'"':'')+' href="'+esc(href)+'">'+iconHtml(t,teacher?"teacher":"student")+'<span class="card-title">'+esc(t.title)+'</span></a>';
       }).join("\n");
       html+='<section class="game-group island-place'+g.extra+'" data-game-group="'+g.id+'"><div class="game-group-head"><span class="game-group-icon" aria-hidden="true">'+g.icon+'</span><div><div class="game-group-title">'+esc(g.title)+'</div><div class="game-group-subtitle">'+esc((teacher&&g.teacherSubtitle)||g.subtitle)+'</div></div></div><div class="game-group-grid">'+cards+'</div></section>';
     });

@@ -36,6 +36,30 @@
   // Same rule the server and sign-in use: case, spaces and punctuation ignored.
   function nameKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
   function classKey(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/[·�]/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+  // Case, spaces and punctuation all ignored: "B6WT", "b6 wt" and "B6  W.T." are the same class name.
+  function squash(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+  function lev(a, b) {
+    var prev = [], i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      var cur = [i];
+      for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+  // Existing class names that look like a name from the file but are not the same ("B6 WT" -> "B6 WT Boys").
+  function nearClasses(name, names) {
+    var k = squash(name), seen = {};
+    if (!k) return [];
+    return (names || []).filter(function (n) {
+      var c = squash(n);
+      if (!c || c === k || seen[c]) return false;
+      var near = (k.length >= 2 && (c.indexOf(k) === 0 || k.indexOf(c) === 0)) || (k.length >= 4 && lev(k, c) <= (k.length >= 8 ? 2 : 1));
+      if (near) seen[c] = true;
+      return near;
+    }).sort(function (a, b) { return Math.abs(squash(a).length - k.length) - Math.abs(squash(b).length - k.length); }).slice(0, 4);
+  }
   function cleanName(s) { return String(s || '').replace(/[\t\r\n]+/g, ' ').replace(/ {2,}/g, ' ').trim(); }
 
   function splitLine(line) {
@@ -55,6 +79,7 @@
     if (k === 'password') return 'passcode';
     if (k === 'class') return 'class';
     if (k === 'classes') return 'classes';
+    if (k === 'studentname' || k === 'fullname') return 'name';
     if (k === 'studentid' || k === 'id' || k === 'rosterid' || k === 'externalid') return 'rosterId';
     return k;
   }
@@ -76,7 +101,9 @@
     var header = splitLine(lines[0]).map(headerKey);
     var col = function (k) { return header.indexOf(k); };
     var errors = [];
-    if (col('type') < 0 || col('name') < 0) errors.push('The first row must be the header: Type, Name, Email, Passcode, Classes.');
+    // No Type column: every row is a student (the usual case for a list copied from a sheet). Not an error.
+    var typeAssumed = col('type') < 0 && col('name') >= 0;
+    if (col('name') < 0) errors.push('The first row must be the header, with at least a Name column: Name, Passcode, Classes.');
     var hasClasses = col('classes') >= 0, hasClass = col('class') >= 0;
     var rows = lines.slice(1).map(function (line, i) {
       var f = splitLine(line);
@@ -85,7 +112,7 @@
       if (hasClasses && hasClass && get('class')) classes = classes.concat(splitClasses(get('class')));
       return {
         row: i + 2,
-        type: typeKey(get('type')),
+        type: typeAssumed ? 'student' : typeKey(get('type')),
         name: cleanName(get('name')),
         email: get('email').toLowerCase(),
         passcode: get('passcode'),
@@ -93,16 +120,19 @@
         rosterId: get('rosterId')
       };
     }).filter(function (r) { return r.type || r.name; });
-    return { rows: rows, legacyFormat: !hasClasses && hasClass, errors: errors };
+    return { rows: rows, legacyFormat: !hasClasses && hasClass, errors: errors, typeAssumed: typeAssumed };
   }
 
   // Groups rows into one entry per class, person and student, and validates.
   // existingClassNames: names of classes that already exist on the site.
-  function plan(parsed, existingClassNames) {
+  // opts.classDecisions: { squash(name): {type:'create'} | {type:'use', name:'Existing class'} } for names not on the site yet.
+  function plan(parsed, existingClassNames, opts) {
+    opts = opts || {};
     var rows = parsed.rows || [];
-    var errors = (parsed.errors || []).slice(), warnings = [];
-    var known = {}, ambiguous = {};
-    (existingClassNames || []).forEach(function (n) { var k = classKey(n); if (!k) return; if (known[k]) ambiguous[k] = true; known[k] = n; });
+    var errors = (parsed.errors || []).slice(), warnings = [], autoFixes = [], fixSeen = {};
+    if (parsed.typeAssumed) autoFixes.push('No Type column, so every row is treated as a student.');
+    var known = {}, ambiguous = {}, knownNames = [];
+    (existingClassNames || []).forEach(function (n) { var k = squash(n); if (!k) return; if (known[k]) ambiguous[k] = true; known[k] = n; knownNames.push(n); });
     var fileClasses = {}, lastOrder = 0, orderWarned = false;
     rows.forEach(function (r) {
       var at = 'Row ' + r.row + ': ';
@@ -112,18 +142,29 @@
       if (ORDER[r.type] < lastOrder && !orderWarned) { warnings.push(at + 'put Classes first, then Teachers and Principals, then Students. The file is still processed in that order.'); orderWarned = true; }
       lastOrder = Math.max(lastOrder, ORDER[r.type]);
       if (r.type === 'class') {
-        var k = classKey(r.name);
+        var k = squash(r.name);
         if (!k) errors.push(at + 'class name needs letters or numbers.');
         else if (fileClasses[k]) warnings.push(at + 'class "' + r.name + '" is listed twice (kept once).');
         else fileClasses[k] = r.name;
       }
     });
-    Object.keys(ambiguous).forEach(function (k) {
-      var used = rows.some(function (r) { return (r.type === 'class' && classKey(r.name) === k) || r.classes.some(function (c) { return classKey(c) === k; }); });
-      if (used) errors.push('Class "' + known[k] + '" matches more than one class on the site. Rename or remove the extra class in Owner Admin first, so students are not put in the wrong one.');
-    });
-    var classOk = function (n) { var k = classKey(n); return !!(k && !ambiguous[k] && (known[k] || fileClasses[k])); };
-    var canonical = function (n) { var k = classKey(n); return fileClasses[k] || known[k] || n; };
+    // Several site classes with one name are not an error here: the server lists them and the owner picks one.
+    var missing = {}, usedCreate = {};
+    var decision = function (k) { return opts.classDecisions && opts.classDecisions[k]; };
+    var fixed = function (typed, name) { if (typed !== name && !fixSeen[typed + '>' + name]) { fixSeen[typed + '>' + name] = 1; autoFixes.push('Class "' + typed + '" matched "' + name + '".'); } return name; };
+    // The class name to send to the server, or '' while the owner still has to decide about a class that is not on the site.
+    var resolveName = function (n) {
+      var k = squash(n);
+      if (!k) return '';
+      if (ambiguous[k]) return n;
+      if (fileClasses[k]) return fixed(n, fileClasses[k]);
+      if (known[k]) return fixed(n, known[k]);
+      var d = decision(k);
+      if (d && d.type === 'use' && d.name && known[squash(d.name)]) return known[squash(d.name)];
+      if (d && d.type === 'create') { usedCreate[k] = usedCreate[k] || n; return usedCreate[k]; }
+      (missing[k] = missing[k] || { key: k, name: n, count: 0, suggestions: nearClasses(n, knownNames) }).count++;
+      return '';
+    };
 
     var classesToCreate = Object.keys(fileClasses).filter(function (k) { return !known[k]; }).map(function (k) { return fileClasses[k]; });
     var existingClassesInFile = Object.keys(fileClasses).filter(function (k) { return known[k]; }).map(function (k) { return known[k]; });
@@ -134,7 +175,7 @@
       var at = 'Row ' + r.row + ': ';
       if (!EMAIL.test(r.email)) { errors.push(at + r.type + ' needs a valid email.'); return; }
       var cls = [];
-      r.classes.forEach(function (c) { if (!classOk(c)) { if (!ambiguous[classKey(c)]) errors.push(at + 'class "' + c + '" does not exist and is not in this file.'); } else cls.push(canonical(c)); });
+      r.classes.forEach(function (c) { var n = resolveName(c); if (n) cls.push(n); });
       var s = staff[r.email];
       if (s) {
         if (s.role !== r.type) errors.push(at + r.email + ' is listed as both ' + s.role + ' and ' + r.type + '.');
@@ -157,8 +198,9 @@
       if (!r.classes.length) { errors.push(at + 'student needs at least one class.'); bad = true; }
       if (r.rosterId && !ID.test(r.rosterId)) { errors.push(at + 'Student ID may only use letters, numbers, - and _.'); bad = true; }
       var cls = [];
-      r.classes.forEach(function (c) { if (!classOk(c)) { if (!ambiguous[classKey(c)]) errors.push(at + 'class "' + c + '" does not exist and is not in this file.'); bad = true; } else cls.push(canonical(c)); });
-      if (bad) return;
+      var pending = false;
+      r.classes.forEach(function (c) { var n = resolveName(c); if (n) cls.push(n); else pending = true; });
+      if (bad || pending) return;
       var k = r.rosterId ? 'id:' + r.rosterId : 'np:' + nameKey(r.name) + '|' + r.passcode;
       var s = byKey[k];
       if (s) {
@@ -186,7 +228,10 @@
     return {
       legacyFormat: !!parsed.legacyFormat,
       errors: errors, warnings: warnings,
-      classesToCreate: classesToCreate, existingClassesInFile: existingClassesInFile,
+      classesToCreate: classesToCreate.concat(Object.keys(usedCreate).filter(function (k) { return !known[k] && !fileClasses[k]; }).map(function (k) { return usedCreate[k]; })),
+      existingClassesInFile: existingClassesInFile,
+      autoFixes: autoFixes,
+      missingClasses: Object.keys(missing).map(function (k) { return missing[k]; }),
       staff: staffList, students: students
     };
   }
@@ -206,7 +251,7 @@
     return 'imp_' + ('00000000' + h1.toString(16)).slice(-8) + ('00000000' + h2.toString(16)).slice(-8);
   }
 
-  var api = { TEMPLATE_ROWS: TEMPLATE_ROWS, parse: parse, plan: plan, nameKey: nameKey, classKey: classKey, cleanName: cleanName, splitClasses: splitClasses, toCsv: toCsv, batchIdFor: batchIdFor, PASSCODE: PASSCODE };
+  var api = { squash: squash, nearClasses: nearClasses, TEMPLATE_ROWS: TEMPLATE_ROWS, parse: parse, plan: plan, nameKey: nameKey, classKey: classKey, cleanName: cleanName, splitClasses: splitClasses, toCsv: toCsv, batchIdFor: batchIdFor, PASSCODE: PASSCODE };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.FTTBulkRoster = api;
 })(typeof window !== 'undefined' ? window : this);

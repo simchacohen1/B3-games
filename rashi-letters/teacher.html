@@ -164,6 +164,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="../teacher-class-scope.js"></script>
+<script src="../shared/one-audio-at-a-time.js?v=20261124"></script>
 <script src="./rashi-letter-marks-core.js?v=20261122"></script>
 <script>
 if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
@@ -304,9 +305,16 @@ function rashiCardHtml(r,graded){
       '<button type="button" class="btn-delete-rec" data-delete="1" title="Remove this bad recording and refund the 2 points">Delete</button></div>'+
     '<div class="rec-msg" data-field="msg"></div></div>';
 }
-function renderRecordings(rows,recent){
+/* "Only items I've opened": a reading a boy already sent stays on the list by default (he sent it while it was open).
+   Tick the box to see only readings for items that are open for sending right now (for the class or for that boy). */
+const OPEN_ONLY_KEY='b3RashiGradeOpenOnly';
+function openOnlyPref(){ try{ return localStorage.getItem(OPEN_ONLY_KEY)==='1'; }catch(_e){ return false; } }
+function setOpenOnlyPref(on){ try{ localStorage.setItem(OPEN_ONLY_KEY,on?'1':'0'); }catch(_e){} }
+function renderRecordings(allRows,recent){
   const list=document.getElementById('recList');
   recent=recent||[];
+  const onlyOpen=openOnlyPref();
+  const rows=onlyOpen?allRows.filter(r=>r.sendOpen!==false):allRows;
   recRows={};rows.concat(recent).forEach(r=>{recRows[r.id]=r;});
   document.getElementById('recCount').textContent=rows.length?'('+rows.length+')':'';
   // Older recordings (sent before letter marking) can be approved all at once: +2 points, no letter data.
@@ -314,9 +322,13 @@ function renderRecordings(rows,recent){
   const bulk=document.getElementById('approveLegacyAllBtn');
   bulk.classList.toggle('hidden',!pendingLegacyIds.length);
   bulk.textContent='✅ Approve All Legacy Readings ('+pendingLegacyIds.length+')';
-  let html=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="empty">✅ No Rashi recordings are waiting.</div>';
+  let html='<label style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:700;"><input type="checkbox" id="recOpenOnly"'+(onlyOpen?' checked':'')+'> Only show items I have opened for sending</label>'+
+    '<div class="rec-sub">Readings a boy already sent stay on this list unless you tick the box.'+(onlyOpen?' Showing '+rows.length+' of '+allRows.length+' waiting readings.':'')+'</div>';
+  html+=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="empty">'+(allRows.length?'No waiting readings are for items you have opened.':'✅ No Rashi recordings are waiting.')+'</div>';
   if(recent.length) html+='<h3 class="rec-section-title">✔️ Recently graded</h3><p class="rec-sub">Tap letters to change the marks. The points are adjusted for you (a student is never paid twice).</p>'+recent.map(r=>rashiCardHtml(r,true)).join('');
   list.innerHTML=html;
+  const openOnlyBox=document.getElementById('recOpenOnly');
+  if(openOnlyBox)openOnlyBox.onchange=()=>{setOpenOnlyPref(openOnlyBox.checked);loadRecordings();};
   list.querySelectorAll('.rec-item').forEach(card=>wireRashiCard(card,recRows[card.dataset.id]));
 }
 async function flushGradeSaves(){ await Promise.all([...gradeSavers].map(fn=>fn())); }

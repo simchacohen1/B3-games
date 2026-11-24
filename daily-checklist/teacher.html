@@ -41,6 +41,15 @@ td.edit:focus{outline:2px solid #2d6ea3;outline-offset:-2px}
 .stars{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap}
 #status{padding:12px;color:#5d6b7a}
 .sum{margin:0 0 8px;font-weight:700}
+#picRows{display:grid;gap:6px}
+.prow{display:flex;align-items:center;gap:10px;padding:6px 8px;border:1px solid #e3ebf2;border-radius:10px}
+.prow .pv{flex:none;width:40px;height:40px;border-radius:10px;background:#eef5fb;display:flex;align-items:center;justify-content:center;font-size:26px}
+.prow .pn{flex:1;font-weight:700;overflow-wrap:anywhere}
+.picker{margin:4px 0 8px;padding:10px;border:2px solid #2d6ea3;border-radius:12px;background:#f7fbff}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:4px;margin-bottom:8px}
+.egrid button{font-size:24px;padding:4px;background:#fff;border:1px solid #d5e0ea;border-radius:8px}
+.picker .prow2{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.picker input{width:90px;font-size:22px;text-align:center}
 @media(max-width:600px){.erow{grid-template-columns:1fr auto}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
@@ -83,6 +92,12 @@ td.edit:focus{outline:2px solid #2d6ea3;outline-offset:-2px}
       <div class="scroll"><table id="grid"></table></div>
       <p class="muted">✓ = Yes &nbsp; ✗ = No &nbsp; blank = not answered. Click a cell to mark it for a student: blank → ✓ → ✗ → blank. It saves the way the student's own answer does. Column names are shown as they were on that day.</p>
     </div>
+
+    <details class="panel" id="picPanel">
+      <summary><b>Pictures on the boys' page</b> <span class="muted">(change or remove the picture next to each item)</span></summary>
+      <div id="picRows" style="margin-top:10px"></div>
+      <p class="muted" id="picMsg" role="status" aria-live="polite"></p>
+    </details>
 
     <div class="panel">
       <h2>Export CSV</h2>
@@ -170,7 +185,47 @@ function showSummary(d){
   var answered=people.filter(function(p){return day[p.id]&&day[p.id].items&&Object.keys(day[p.id].items).length}).length;
   $("summary").textContent=answered+" of "+people.length+" students have answered on "+d;
 }
+/* ---------- pictures: the teacher's choice is stored on each item (config/items/{id}/icon) ---------- */
+var EMOJIS=["🪙","💰","🌅","☀️","🌙","⭐","🙏","📖","📚","📜","✏️","📝","🎒","🏫","🕍","🕎","✡️","🍎","🍞","🥛","💧","🫗","🧼","🚿","🪥","🛏️","👕","🧦","🚌","🏃","⚽","🎵","❤️","👍","✅","🔔","🕯️","📿","🍷","🌳"];
+var pickFor=null;
+function picMsg(t,bad){var m=$("picMsg");m.textContent=t||"";m.style.color=bad?"#b42318":""}
+function renderPics(){
+  var box=$("picRows");if(!box)return;
+  var list=C.itemsFromConfig(configRaw,false);
+  box.innerHTML=list.map(function(it){
+    var ic=C.iconFor(it),mode=it.icon===C.NO_ICON?"no picture":(it.icon?"your choice":"automatic");
+    var h='<div class="prow"><div class="pv">'+esc(ic||"–")+'</div><div class="pn" dir="auto">'+esc(it.name)+' <span class="muted">('+mode+')</span></div>'+
+      '<button type="button" class="alt" data-pick="'+esc(it.id)+'">Change</button></div>';
+    if(pickFor===it.id)h+='<div class="picker"><div class="egrid">'+EMOJIS.map(function(e){return '<button type="button" data-set="'+e+'" aria-label="'+e+'">'+e+'</button>'}).join("")+'</div>'+
+      '<div class="prow2"><label>Or paste any emoji: <input type="text" id="picCustom" maxlength="16" dir="auto"></label><button type="button" data-use="1">Use it</button>'+
+      '<button type="button" class="alt" data-none="1">No picture</button><button type="button" class="alt" data-auto="1">Automatic</button><button type="button" class="alt" data-close="1">Close</button></div></div>';
+    return h}).join("");
+}
+async function setIcon(id,value){   // value: emoji | C.NO_ICON | "" (= automatic, removes the field)
+  picMsg("Saving…");
+  try{
+    if(!configRaw){   // the class still uses the standard list: save it once so the picture has somewhere to live
+      var o={};C.DEFAULT_ITEMS.forEach(function(d,i){o[d.id]={name:d.name,star:!!d.star,order:i,removed:false}});
+      await db.ref(base()+"/config/items").set(o);configRaw=o;
+    }
+    if(!configRaw[id])throw new Error("That item is no longer in the list. Press Refresh.");
+    await db.ref(base()+"/config/items/"+id).update({icon:value||null});
+    if(value)configRaw[id].icon=value;else delete configRaw[id].icon;
+    pickFor=null;renderPics();picMsg("✓ Saved. The boys see it the next time they open the checklist.");
+  }catch(e){console.error(e);picMsg("Could not save the picture: "+(e.message||e),true)}
+}
+$("picRows").onclick=function(e){
+  var t=e.target.closest("button");if(!t)return;
+  if(t.dataset.pick){pickFor=pickFor===t.dataset.pick?null:t.dataset.pick;picMsg("");renderPics();return}
+  if(!pickFor)return;
+  if(t.dataset.set)return void setIcon(pickFor,t.dataset.set);
+  if(t.dataset.use){var v=C.cleanIcon($("picCustom").value);if(!v){picMsg("That is not an emoji. Paste one emoji, such as 🍎.",true);return}return void setIcon(pickFor,v)}
+  if(t.dataset.none)return void setIcon(pickFor,C.NO_ICON);
+  if(t.dataset.auto)return void setIcon(pickFor,"");
+  if(t.dataset.close){pickFor=null;renderPics()}
+};
 async function drawGrid(force){
+  renderPics();
   var d=$("day").value;if(!C.isDateKey(d))return;
   $("summary").textContent="Loading…";
   var day;

@@ -275,7 +275,10 @@
       lockWindows = deepClone(fallback.lockWindows);
     }
 
-    return { mode: mode, lockWindows: lockWindows };
+    const result = { mode: mode, lockWindows: lockWindows };
+    const openUntil = Number(source.openUntil);
+    if (openUntil > 0) result.openUntil = openUntil;
+    return result;
   }
 
   function normalizeStudentGameOverrides(value) {
@@ -689,6 +692,7 @@
     if (!["et", "wt"].includes(classId)) return false;
 
     const access = normalized.classAccess[classId];
+    if (access.openUntil && access.openUntil > (date instanceof Date ? date : new Date()).getTime()) return true;
     if (access.mode === "open") return true;
     if (access.mode === "locked") return false;
     return !isInLockedPeriod(access.lockWindows, date);
@@ -700,6 +704,7 @@
     if (!["et", "wt"].includes(classId)) return { open: false, reason: "Class not assigned" };
 
     const access = normalized.classAccess[classId];
+    if (access.openUntil && access.openUntil > (date instanceof Date ? date : new Date()).getTime()) return { open: true, reason: "Timed unlock" };
     if (access.mode === "open") return { open: true, reason: "Manual override: OPEN" };
     if (access.mode === "locked") return { open: false, reason: "Manual override: LOCKED" };
     const locked = isInLockedPeriod(access.lockWindows, date);

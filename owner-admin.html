@@ -14,7 +14,8 @@
 <script src="owner-teacher-view.js?v=20261109-726"></script>
 <script src="student-scope.js?v=20261108"></script>
 <script src="owner-classes.js?v=20261118"></script>
-<script src="bulk-roster.js?v=20261109-706"></script>
+<script src="bulk-roster.js?v=20261123-706b"></script>
+<script src="class-roster-tools.js?v=20261123-roster"></script>
 <script src="owner-export.js?v=20261109-724"></script>
 <style>
 *{box-sizing:border-box}
@@ -109,6 +110,36 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 .access-overview-undo{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #86efac;color:#14532d;font-weight:700}
 .access-overview-undo[hidden],.access-overview-bulk[hidden]{display:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+main:has([data-view="roster"]:not(.hidden)){max-width:1180px}
+.rbar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin:10px 0;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc}
+.rbar select{flex:0 1 240px;width:auto}
+.rbar button{padding:9px 14px;font-size:15px}
+.card button.light{background:#fff;color:#172033;border:1px solid #cbd5e1}.card button.light:hover{background:#f1f5f9}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start}
+.rcard{border:1px solid #cbd5e1;border-radius:14px;padding:14px;background:#fff}
+.rcard.unassigned{border-color:#f59e0b;background:#fffbeb;grid-column:1/-1}
+.rcard.off{background:#f1f5f9}
+.rhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.rhead b{font-size:20px}
+.rtool button{padding:6px 10px;font-size:14px}
+.rteach{margin:8px 0;padding:8px 10px;background:#eef2ff;border-radius:10px;font-size:15px}
+.rstu{display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f1f5f9}
+.rstu[hidden]{display:none}
+.rstu label{flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:16px}
+.rstu input[type=checkbox]{width:20px;height:20px;flex:none;padding:0}
+.card .rstu button.x{background:transparent;color:#b91c1c;padding:2px 10px;font-size:22px;line-height:1}
+.card .rstu button.x:hover{background:#fee2e2}
+.radd{position:relative;margin-top:10px}
+.rsuggest{position:absolute;left:0;right:0;top:100%;z-index:6;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 20px rgba(15,23,42,.15);max-height:260px;overflow:auto}
+.rsuggest[hidden]{display:none}
+.card .rsuggest button{display:block;width:100%;text-align:left;background:#fff;color:#1f2937;border-radius:0;font-weight:600;font-size:16px;padding:10px 12px;border-bottom:1px solid #f1f5f9}
+.card .rsuggest button:hover{background:#eef2ff}
+.card .rsuggest button.new{color:#15803d}
+.rpaste textarea{width:100%;min-height:140px;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}
+.rmatch{padding:8px 0;border-bottom:1px solid #e2e8f0}
+.rnotice{background:#ecfdf5;border:1px solid #86efac;border-radius:12px;padding:10px 14px;margin:10px 0}
+.rmatch label,.entry label{cursor:pointer}
+.rmatch input[type=radio],#bulkSummary input[type=radio]{width:auto;padding:0;margin-right:6px}
 </style>
 </head><body>
 <header><div><h1>Fun Torah Tools — Owner Admin</h1><div class="sub">Platform-wide management</div></div><a class="back" href="index.html">← Back to B3</a></header>
@@ -146,6 +177,19 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 <select id="libraryTeacherSelect"><option value="">Choose teacher</option></select>
 <div id="libraryGrant"></div></section>
 
+<section class="card hidden" id="rosterCard" data-view="roster"><div class="card-head"><h2>&#x1F5C2;&#xFE0F; Classes &amp; Students</h2></div>
+<p class="hint">Every class in this school is a card: its teachers on top, its students underneath. Tick students, choose a class, then press <b>Move to&hellip;</b>, <b>Add to&hellip;</b> or <b>Remove from class</b>. Taking a student out of a class keeps their work, name and passcode.</p>
+<div id="rosterNotices"></div>
+<div class="rbar" id="rosterBar"><b id="rosterCount">0 selected</b><select id="rosterTarget" aria-label="Class"><option value="">Choose a class&hellip;</option></select><button id="rosterMove" type="button" disabled>Move to&hellip;</button><button id="rosterAddTo" type="button" disabled>Add to&hellip;</button><button id="rosterRemove" type="button" class="light" disabled>Remove from class</button><button id="rosterClearSel" type="button" class="light" disabled>Clear</button></div>
+<details class="rpaste" id="rosterPaste" style="margin:8px 0 12px"><summary style="font-weight:800;font-size:17px;cursor:pointer;padding:6px 0">&#x1F4CB; Paste a list of names</summary>
+<p class="hint">Copy a column of names from a Google Sheet and paste it here, one name per line. Boys who already have an account are matched automatically. You are asked only when a name could be a different boy. No CSV and no Type column needed.</p>
+<div class="formrow"><select id="pasteClass" aria-label="Class to add them to"><option value="">Choose a class&hellip;</option></select></div>
+<textarea id="pasteText" aria-label="Names, one per line" placeholder="Moshe Birk&#10;Dovid Levi&#10;&hellip;" style="width:100%;min-height:130px;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit"></textarea>
+<div class="formrow" style="margin-top:8px"><button id="pasteCheck" type="button">Check names</button></div>
+<div id="pasteResult"></div></details>
+<div class="formrow" style="margin-top:6px"><input id="rosterNewClass" placeholder="New class name" maxlength="80"><button id="rosterAddClass" type="button">Add class</button><input id="rosterFilter" type="search" placeholder="Find a student on these cards" aria-label="Find a student on these cards"></div>
+<div id="rosterCards" class="rgrid"></div></section>
+
 <section class="card hidden" data-view="classes"><div class="card-head"><h2>Classes</h2></div>
 <p class="hint">Create a class for each group of students. Click a class to see its teachers, students and tools.</p>
 <div class="formrow"><input id="className" placeholder="New class name"><button id="addClass">Add class</button></div>
@@ -178,7 +222,7 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 
 <section class="card hidden" id="bulkUploadCard" data-view="bulk"><div class="card-head"><h2>&#x1F4CB; Bulk Upload</h2></div>
 <p class="hint">Everything you upload here goes into <b>this school</b>: new classes, teachers and students are added to it, and anything that already belongs to another school is refused. Upload a CSV to add classes, teachers, principals and students. <b>Each person is on one row.</b> Put every class a student or teacher is in into the <code>Classes</code> column, separated by semicolons, for example <code>B2 ET Morning; B2 ET Afternoon</code>. A student with five classes is still one row, one passcode and one account. <a id="bulkDownloadTemplate" href="#" style="font-weight:800">Download template CSV</a></p>
-<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>Type</code> (Class, Principal, Teacher, Student), <code>Name</code>, <code>Email</code> (teachers and principals), <code>Passcode</code> (students, exactly 6 digits), <code>Classes</code>, and optional <code>Student ID</code> (your own roster number, used to recognise the student next time). Classes first, then teachers and principals, then students. Older files with one row per class still work: rows with the same name and passcode become one student.</p>
+<p class="hint" style="margin-top:-8px;font-size:14px">Columns: <code>Type</code> (Class, Principal, Teacher, Student), <code>Name</code>, <code>Email</code> (teachers and principals), <code>Passcode</code> (students, exactly 6 digits), <code>Classes</code>, and optional <code>Student ID</code> (your own roster number, used to recognise the student next time). Classes first, then teachers and principals, then students. Older files with one row per class still work: rows with the same name and passcode become one student. <b>Type is optional</b> (no Type column means every row is a student). The importer fixes small class-name differences (spaces, capitals) by itself, offers to create classes that are missing, and asks you only about real decisions.</p>
 <div class="formrow" style="margin-top:8px"><input type="file" id="bulkFile" accept=".csv" style="flex:1 1 auto"><button id="bulkPreview" type="button">Check file</button></div>
 <div id="bulkPreviewArea" style="display:none;margin-top:12px">
   <div id="bulkSummary" style="margin-bottom:10px;font-size:16px"></div>
@@ -624,16 +668,49 @@ q("bulkDownloadTemplate").onclick=function(e){e.preventDefault();downloadFile("b
 function bulkReset(){q("bulkPreviewArea").style.display="none";q("bulkFile").value="";bulkState=null;}
 function bulkBody(){
   const p=bulkState.plan;
-  return {batchId:bulkState.batchId,label:bulkState.fileName,
+  return {batchId:bulkState.batchId,label:bulkState.fileName,classPicks:bulkState.classPicks||{},
     classes:p.classesToCreate.concat(p.existingClassesInFile),
     staff:p.staff.map(s=>({role:s.role,name:s.name,email:s.email,classes:s.classes})),
     students:p.students.map(s=>({key:s.key,name:s.name,passcode:s.passcode,rosterId:s.rosterId,classes:s.classes,decision:bulkState.decisions[s.key]||null}))};
 }
+// Re-plans the file with the owner's answers about classes that are not on the site. Returns the plan.
+function bulkReplan(st){
+  const existing=Object.values(classData||{}).map(c=>c&&c.name).filter(Boolean),run=()=>FTTBulkRoster.plan(st.parsed,existing,{classDecisions:st.classDecisions});
+  let plan=run();
+  plan.missingClasses.forEach(m=>{if(!st.missingAll[m.key])st.missingAll[m.key]=m;});
+  // A missing class with nothing like it on the site is simply offered for creation (the owner can still change it).
+  let changed=false;
+  plan.missingClasses.forEach(m=>{if(!m.suggestions.length&&!st.classDecisions[m.key]){st.classDecisions[m.key]={type:"create"};changed=true;}});
+  if(changed)plan=run();
+  st.plan=plan;return plan;
+}
+// What was fixed by itself, and the few real decisions: classes not on the site, and two classes with one name.
+function bulkAskHtml(){
+  const st=bulkState,p=st.plan,sv=st.server,parts=[];
+  if(p.autoFixes.length)parts.push('<details open style="margin:6px 0;padding:8px 12px;background:#ecfdf5;border-radius:10px"><summary style="font-weight:800">&#x2728; Fixed automatically ('+p.autoFixes.length+')</summary>'+bulkList(p.autoFixes,f=>'<li>'+safe(f)+'</li>')+'</details>');
+  const miss=Object.values(st.missingAll);
+  if(miss.length)parts.push('<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>Classes that are not on the site yet</b><div class="hint" style="margin:2px 0 8px">Choose for each one. Nothing is created until you press Import.</div>'+miss.map(m=>{
+    const d=st.classDecisions[m.key],id="mc_"+safe(m.key);
+    return '<div class="entry"><b>&ldquo;'+safe(m.name)+'&rdquo;</b>'+(d?'':' <small style="display:inline;color:#b45309">needs your decision</small>')+
+      m.suggestions.map(s=>'<label style="display:block"><input type="radio" name="'+id+'" data-mclass="'+safe(m.key)+'" value="use:'+safe(s)+'"'+(d&&d.type==="use"&&d.name===s?' checked':'')+'> It is the existing class <b>'+safe(s)+'</b></label>').join("")+
+      '<label style="display:block"><input type="radio" name="'+id+'" data-mclass="'+safe(m.key)+'" value="create"'+(d&&d.type==="create"?' checked':'')+'> Create a new class called <b>'+safe(m.name)+'</b></label></div>';
+  }).join("")+'</div>');
+  const choices=(sv&&sv.classChoices)||[];
+  if(choices.length)parts.push('<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>Two classes have the same name. Which one is meant?</b>'+choices.map(c=>'<div class="entry"><b>&ldquo;'+safe(c.name)+'&rdquo;</b>'+c.options.map(o=>'<label style="display:block"><input type="radio" name="cc_'+safe(c.key)+'" data-cpick="'+safe(c.key)+'" value="'+safe(o.classId)+'"'+(st.classPicks[c.key]===o.classId?' checked':'')+'> <b>'+safe(o.name)+'</b> <small style="display:inline;color:#64748b">'+[o.students+" "+(o.students===1?"student":"students"),o.teachers+" "+(o.teachers===1?"teacher":"teachers"),(schoolData[o.schoolId]&&schoolData[o.schoolId].name)||"no school",o.active?"":"turned off",o.createdAt?"created "+new Date(o.createdAt).toLocaleDateString():"",o.classId].filter(Boolean).join(" &middot; ")+'</small></label>').join("")+'</div>').join("")+'</div>');
+  return parts.join("");
+}
+q("bulkSummary").addEventListener("change",async e=>{
+  const m=e.target.closest("[data-mclass]"),c=e.target.closest("[data-cpick]");
+  if(!bulkState||(!m&&!c))return;
+  if(m){bulkState.classDecisions[m.dataset.mclass]=m.value==="create"?{type:"create"}:{type:"use",name:m.value.slice(4)};bulkReplan(bulkState);}
+  else bulkState.classPicks[c.dataset.cpick]=c.value;
+  try{await bulkServerPreview();}catch(err){console.error(err);q("bulkSummary").textContent="Could not check the file: "+err.message;}
+});
 function renderBulkPreview(){
   const sv=bulkState.server,p=bulkState.plan,sm=sv.summary;
   const warn=p.warnings.length?'<details style="margin:6px 0"><summary>'+p.warnings.length+' thing(s) to check</summary>'+bulkList(p.warnings,w=>'<li>'+safe(w)+'</li>')+'</details>':"";
   const errs=sv.errors.length?'<div style="color:#b91c1c;font-weight:700">&#x26A0;&#xFE0F; '+sv.errors.length+' problem(s). Nothing can be imported until they are fixed:</div>'+bulkList(sv.errors,e=>'<li>'+safe(e)+'</li>'):"";
-  q("bulkSummary").innerHTML=errs+'<b>Ready to import:</b> '+[sm.classesCreate+" new class(es)",sm.staffCreate+" new teacher/principal(s)",sm.staffUpdate+" teacher(s) getting classes",sm.studentsCreate+" new student(s)",sm.studentsUpdate+" existing student(s) getting classes",sm.membershipsAdd+" class place(s) to add",sm.studentsUnchanged+" already done (skipped)",sm.conflicts+" need your decision"].join(" &middot; ")+warn+(sv.batchStatus!=="new"?'<p class="hint">This file was imported before (status: '+safe(sv.batchStatus)+'). Only what is still missing will be added.</p>':"");
+  q("bulkSummary").innerHTML=errs+bulkAskHtml()+'<b>Ready to import:</b> '+[sm.classesCreate+" new class(es)",sm.staffCreate+" new teacher/principal(s)",sm.staffUpdate+" teacher(s) getting classes",sm.studentsCreate+" new student(s)",sm.studentsUpdate+" existing student(s) getting classes",sm.membershipsAdd+" class place(s) to add",sm.studentsUnchanged+" already done (skipped)",sm.conflicts+" need your decision"].join(" &middot; ")+warn+(sv.batchStatus!=="new"?'<p class="hint">This file was imported before (status: '+safe(sv.batchStatus)+'). Only what is still missing will be added.</p>':"");
   const create=sv.students.filter(s=>s.status==="create"),update=sv.students.filter(s=>s.status==="update"),same=sv.students.filter(s=>s.status==="unchanged");
   const cls=ids=>ids.map(bulkClassName).map(safe).join(", ");
   let html="";
@@ -658,7 +735,7 @@ function renderBulkPreview(){
     bulkState.dirty=true;q("bulkImport").textContent="Check decisions again";
   });
   q("bulkPreviewArea").style.display="";
-  q("bulkImport").disabled=sv.errors.length>0;q("bulkImport").textContent="✅ Import these changes";bulkState.dirty=false;
+  q("bulkImport").disabled=sv.errors.length>0||p.missingClasses.length>0;q("bulkImport").textContent="✅ Import these changes";bulkState.dirty=false;
 }
 // School scope. The page only uploads into the school that is open. The server
 // matches classes, teachers and students across the whole site, so anything it
@@ -686,15 +763,15 @@ q("bulkPreview").onclick=function(){
   if(!file){q("status").textContent="Choose a CSV file first.";return;}
   const reader=new FileReader();
   reader.onload=async function(e){
-    const text=e.target.result,parsed=FTTBulkRoster.parse(text);
-    const plan=FTTBulkRoster.plan(parsed,Object.values(classData||{}).map(c=>c&&c.name).filter(Boolean));
+    const text=e.target.result,parsed=FTTBulkRoster.parse(text),draft={parsed,classDecisions:{},classPicks:{},missingAll:{},decisions:{}};
+    const plan=bulkReplan(draft);
     q("bulkLog").style.display="none";q("bulkProgress").style.display="none";
     if(plan.errors.length){
       q("bulkPreviewArea").style.display="";q("bulkImport").disabled=true;q("bulkTable").innerHTML="";
       q("bulkSummary").innerHTML='<span style="color:#b91c1c;font-weight:700">&#x26A0;&#xFE0F; '+plan.errors.length+' problem(s). Fix the file and check it again:</span>'+bulkList(plan.errors,x=>'<li>'+safe(x)+'</li>');
       return;
     }
-    bulkState={plan,batchId:FTTBulkRoster.batchIdFor(text),fileName:file.name,decisions:{}};
+    bulkState=Object.assign(draft,{plan,batchId:FTTBulkRoster.batchIdFor(text),fileName:file.name});
     try{await bulkServerPreview();}catch(err){console.error(err);q("bulkSummary").textContent="Could not check the file: "+err.message;}
   };
   reader.readAsText(file);
@@ -717,6 +794,7 @@ q("bulkImport").onclick=async function(){
       bulkList(r.failed,f=>'<li>&#x26A0;&#xFE0F; '+safe(f.what+" "+f.name+": "+f.error)+'</li>')+
       bulkList(r.conflicts,f=>'<li>Skipped: '+safe(f.name+" - "+f.reason)+'</li>')+'<button type="button" id="bulkResultsCsv">Download results CSV</button>';
     q("bulkResultsCsv").onclick=()=>downloadFile("import-results-"+r.batchId+".csv",FTTBulkRoster.toCsv([["Name","Result","Student ID","Classes added"],...r.students.map(s=>[s.name,s.status,s.studentId,(s.addedClassIds||[]).map(bulkClassName).join("; ")]),...r.failed.map(f=>[f.name,"FAILED: "+f.error,"",""]),...r.conflicts.map(f=>[f.name,"SKIPPED: "+f.reason,"",""])]));
+    B3OwnerClasses.remember(WS,bulkClassIds(bulkState.server));   // classes the import made are always listed in this browser
     // Everything this import made or touched now belongs to the open school.
     const sc=schoolScope();
     if(sc)await sc.adopt({classIds:bulkClassIds(bulkState.server),inviteIds:bulkState.server.staff.map(s=>s.inviteId).filter(Boolean),studentIds:r.students.map(s=>s.studentId).filter(Boolean)}).catch(err=>{console.error(err);logEl.insertAdjacentHTML("beforeend",'<p>&#x26A0;&#xFE0F; The import worked, but some of it could not be marked as belonging to '+safe(sc.name)+': '+safe(err.message)+' Check the Schools page for anything listed with no school.</p>');});
@@ -964,7 +1042,14 @@ document.addEventListener("change",async e=>{
 // the class rosters already loaded above. Class changes go through the trusted
 // funTorahManageStudents add/remove actions, exactly as teachers' changes do.
 let studentRecords={},rosterData={};
-async function loadStudentData(){studentRecords=await B3StudentScope.loadRecords(db,WS);rosterData=B3StudentScope.rosterStudents(classData);}
+async function loadStudentData(){
+ studentRecords=await B3StudentScope.loadRecords(db,WS);
+ // A class with no teacher cannot be listed (the database does not allow it), but every student record names the classes the student is in.
+ // Read those too, so a class made by an import is never invisible.
+ const extra=[...new Set(Object.values(studentRecords).flatMap(r=>Object.keys(r.classIds||{})))].filter(id=>!classData[id]);
+ if(extra.length){Object.assign(classData,await readClasses(extra));B3OwnerClasses.remember(WS,Object.keys(classData));}
+ rosterData=B3StudentScope.rosterStudents(classData);
+}
 const studentName=id=>rosterData[id]&&rosterData[id].name||id;
 async function manageStudent(action,classId,studentId){
  // Same Firebase project as this page (staging tests never touch the live site).
@@ -1052,6 +1137,242 @@ async function onStudentChange(e){
 }
 q("studentList").addEventListener("change",onStudentChange);
 q("studentOrphans").addEventListener("change",onStudentChange);
+
+// ---- Classes & Students (one page per school) ------------------------------
+// Each class is a card: its teachers on top, its students below. Single actions (add, remove, rename, turn off, teachers) and
+// bulk actions (tick students, then Move / Add / Remove) all use the same trusted funTorahManageStudents add/remove actions
+// as the rest of this page. Taking a student out of a class never deletes the student, their work or their passcode.
+const rosterSel=new Set(),profileNames={},profileTried=new Set(),rosterCreated=[];
+let pasteState=null,rNames={};
+const ro=B3ClassRoster;
+const say=t=>{q("status").textContent=t};
+const rosterRun=p=>p.catch(err=>{console.error(err);say(err&&err.message?err.message:"Could not save. Please try again.")});
+const classOn=c=>!!c&&c.active!==false;
+function rosterMembers(cid){return Object.entries(classData[cid]&&classData[cid].members||{}).filter(([id,m])=>m&&m.demo!==true&&!/^demo_/.test(id)).map(([id,m])=>({id,blocked:m.active===false})).sort((a,b)=>byName(rosterNameOf(a.id),rosterNameOf(b.id)))}
+function memberNameMap(){const m={};Object.values(classData).forEach(c=>Object.entries(c&&c.members||{}).forEach(([id,x])=>{if(x&&x.name&&!m[id])m[id]=String(x.name)}));return m}
+const rosterNameOf=id=>rNames[id]||profileNames[id]||id;
+// Students of this school who are in no class (any class, turned off ones too). Their names are read from their profiles.
+function unassignedIds(){
+ const inAny=new Set();Object.values(classData).forEach(c=>Object.keys(c&&c.members||{}).forEach(id=>inAny.add(id)));
+ return Object.keys(studentRecords).filter(id=>studentRecords[id].schoolId===nav.school&&!inAny.has(id)&&!/^demo_/.test(id)).sort((a,b)=>byName(rosterNameOf(a),rosterNameOf(b)));
+}
+async function loadProfileNames(ids){
+ const todo=ids.filter(id=>!rNames[id]&&!(id in profileNames)&&!profileTried.has(id));
+ if(!todo.length)return;
+ todo.forEach(id=>profileTried.add(id));
+ await Promise.all(todo.map(async id=>{try{const n=(await db.ref("b3Games/students/"+id+"/profile/name").once("value")).val();if(n)profileNames[id]=String(n)}catch(e){}}));
+}
+function schoolPeopleIds(){return [...new Set([...schoolStudentIds(),...unassignedIds()])]}
+function classTeacherRows(cid){return Object.entries(teacherData).filter(([,t])=>t&&!B3PrincipalScope.principal(t)&&t.classIds&&t.classIds[cid]===true).sort((a,b)=>byName(a[1].name||a[1].email,b[1].name||b[1].email))}
+function classCardHtml(cid){
+ const c=classData[cid],on=classOn(c),mem=rosterMembers(cid),teachers=classTeacherRows(cid),free=schoolTeachers().filter(([,t])=>t.classIds&&t.classIds[cid]===true?false:true),legacy=B3_CLASSES.includes(cid);
+ const chips=teachers.map(([tid,t])=>'<span class="chip">'+safe(t.name||t.email)+' <button type="button" title="Take this class away from this teacher" data-unassign-teacher="'+safe(tid)+'" data-unassign-class="'+safe(cid)+'">&#x2715;</button></span>').join("")||'<small style="display:inline">No teacher yet</small>';
+ const addT=free.length?'<span class="rtadd"><select data-rtsel="'+safe(cid)+'" aria-label="Add a teacher to '+safe(c.name||cid)+'" style="width:auto;padding:6px 8px;font-size:15px"><option value="">Add teacher…</option>'+free.map(([tid,t])=>'<option value="'+safe(tid)+'">'+safe(t.name||t.email)+'</option>').join("")+'</select> <button type="button" data-rtadd="'+safe(cid)+'" style="padding:6px 10px;font-size:14px">Add</button></span>':"";
+ const rows=mem.map(m=>{const k=cid+"|"+m.id,nm=rosterNameOf(m.id);rosterKeys.add(k);return '<div class="rstu" data-name="'+safe(nm.toLowerCase())+'"><label><input type="checkbox" data-rsel="'+safe(k)+'"'+(rosterSel.has(k)?' checked':'')+'> '+safe(nm)+(m.blocked?' <small style="display:inline;color:#b45309">(blocked)</small>':'')+'</label>'+(on?'<button type="button" class="x" title="Remove '+safe(nm)+' from this class" aria-label="Remove '+safe(nm)+' from this class" data-rremove="'+safe(k)+'">&times;</button>':'')+'</div>'}).join("")||'<small>No students in this class yet.</small>';
+ return '<div class="rcard'+(on?'':' off')+'" data-rcard="'+safe(cid)+'"><div class="rhead"><span><b>'+safe(c.name||cid)+'</b>'+(on?'':' <small style="display:inline;color:#b45309">Turned off</small>')+'<small>'+mem.length+' '+(mem.length===1?'student':'students')+'</small></span><span class="rtool rowbtns">'+
+  (legacy?'':'<button type="button" class="light" data-rrename="'+safe(cid)+'">Rename</button><button type="button" class="light" data-rtoggle="'+safe(cid)+'">'+(on?'Turn off':'Turn on')+'</button>'+(mem.length?'':'<button type="button" class="danger" data-delete-class="'+safe(cid)+'">Delete</button>'))+'</span></div>'+
+  '<div class="rteach"><b style="font-size:15px">Teachers:</b> <span class="chips" style="display:inline-flex;margin:0 6px">'+chips+'</span>'+addT+'</div>'+
+  (mem.length?'<div class="rtool"><button type="button" class="light" data-rall="'+safe(cid)+'">Tick all</button></div>':'')+rows+
+  (on?'<div class="radd"><input data-radd="'+safe(cid)+'" placeholder="Add student: type a name" autocomplete="off" aria-label="Add a student to '+safe(c.name||cid)+'"><div class="rsuggest" data-rsug="'+safe(cid)+'" hidden></div></div>':'<small>Turned off: students and teachers do not see this class. Turn it on to change its students.</small>')+'</div>';
+}
+function unassignedCardHtml(ids){
+ return '<div class="rcard unassigned"><div class="rhead"><span><b>Not in any class</b><small>'+ids.length+' '+(ids.length===1?'student':'students')+' of this school. Tick them and use <b>Add to&hellip;</b> in the bar above.</small></span></div>'+
+  ids.map(id=>{const k="|"+id;rosterKeys.add(k);const nm=rosterNameOf(id);return '<div class="rstu" data-name="'+safe(nm.toLowerCase())+'"><label><input type="checkbox" data-rsel="'+safe(k)+'"'+(rosterSel.has(k)?' checked':'')+'> '+safe(nm)+'</label></div>'}).join("")+'</div>';
+}
+let rosterKeys=new Set();
+function renderRoster(){
+ rNames=memberNameMap();rosterKeys=new Set();
+ const ids=schoolClassIds(),un=unassignedIds();
+ if(un.some(id=>!rNames[id]&&!(id in profileNames)&&!profileTried.has(id)))loadProfileNames(un).then(()=>{if(currentView()==="roster")renderRoster()});
+ const on=ids.filter(id=>classOn(classData[id])),opts='<option value="">Choose a class…</option>'+on.map(id=>'<option value="'+safe(id)+'">'+safe(classData[id].name||id)+'</option>').join("");
+ [["rosterTarget"],["pasteClass"]].forEach(([e])=>{const el=q(e),cur=el.value;el.innerHTML=opts;if(on.includes(cur))el.value=cur});
+ q("rosterCards").innerHTML=(un.length?unassignedCardHtml(un):"")+(ids.map(classCardHtml).join("")||'<small>No classes in this school yet. Add one with the box above.</small>');
+ [...rosterSel].forEach(k=>{if(!rosterKeys.has(k))rosterSel.delete(k)});
+ renderRosterNotices();updateRosterBar();applyRosterFilter();
+}
+function renderRosterNotices(){
+ q("rosterNotices").innerHTML=rosterCreated.length?'<div class="rnotice"><b>New students created. Write these passcodes down now:</b><ul style="margin:6px 0">'+rosterCreated.map(c=>'<li>'+safe(c.name)+' &mdash; passcode <b>'+safe(c.passcode)+'</b> <small style="display:inline">('+safe(c.cls)+')</small></li>').join("")+'</ul><button type="button" id="rosterCopyCodes" class="light">Copy list</button> <button type="button" id="rosterClearCodes" class="light">Done</button></div>':"";
+}
+q("rosterNotices").addEventListener("click",e=>{
+ if(e.target.id==="rosterCopyCodes")navigator.clipboard&&navigator.clipboard.writeText(rosterCreated.map(c=>c.name+"\t"+c.passcode+"\t"+c.cls).join("\n")).then(()=>say("Copied."),()=>say("Could not copy."));
+ if(e.target.id==="rosterClearCodes"){rosterCreated.length=0;renderRosterNotices()}
+});
+function updateRosterBar(){q("rosterCount").textContent=rosterSel.size+" selected";["rosterMove","rosterAddTo","rosterRemove","rosterClearSel"].forEach(i=>q(i).disabled=!rosterSel.size)}
+function applyRosterFilter(){const t=q("rosterFilter").value.trim().toLowerCase();q("rosterCards").querySelectorAll(".rstu").forEach(r=>{r.hidden=!!t&&!r.dataset.name.includes(t)})}
+q("rosterFilter").addEventListener("input",applyRosterFilter);
+// One student into or out of one class, then keep the owner copy of their classes in step.
+async function rosterEnroll(sid,cid,on){
+ const rec=studentRecords[sid],cls=classData[cid],name=rosterNameOf(sid);
+ if(on&&rec&&schoolData[rec.schoolId]&&cls&&cls.schoolId&&rec.schoolId!==cls.schoolId)throw new Error(name+" belongs to another school.");
+ await manageStudent(on?"add":"remove",cid,sid);
+ const ts=firebase.database.ServerValue.TIMESTAMP;
+ if(rec)await B3StudentScope.setStudentClass(db,WS,sid,cid,on,ts);
+ else if(!on)await B3StudentScope.saveSchool(db,WS,sid,nav.school,{},ts);   // so a boy taken out of his last class still shows under "Not in any class"
+}
+async function rosterCreate(cid,name){
+ const passcode=ro.randomPasscode();
+ const r=await manageCall({action:"create",classId:cid,name,passcode,confirmNew:true},30000);
+ await B3StudentScope.saveSchool(db,WS,r.studentId,nav.school,{[cid]:true},firebase.database.ServerValue.TIMESTAMP);
+ rosterCreated.push({name,passcode,cls:classData[cid]&&classData[cid].name||cid});
+ return r.studentId;
+}
+async function rosterPool(jobs,limit,progress){
+ const failures=[];let next=0,done=0;
+ await Promise.all(Array.from({length:Math.min(limit,jobs.length)},async()=>{while(next<jobs.length){const j=jobs[next++];try{await j.run()}catch(err){failures.push(j.label+": "+(err&&err.message||"failed"))}done++;if(progress)progress(done,jobs.length)}}));
+ return failures;
+}
+function rosterFailures(list){if(list.length)q("rosterNotices").insertAdjacentHTML("beforeend",'<div class="notice" style="background:#fef2f2;border-color:#fecaca"><b>'+list.length+' could not be done:</b><ul style="margin:6px 0">'+list.map(f=>'<li>'+safe(f)+'</li>').join("")+'</ul></div>')}
+async function rosterBulk(kind){
+ const items=[...rosterSel].map(s=>{const i=s.indexOf("|");return {cid:s.slice(0,i),sid:s.slice(i+1)}}),target=q("rosterTarget").value;
+ if(!items.length){say("Tick some students first.");return}
+ if(kind!=="remove"&&!classOn(classData[target])){say("Choose a class in the box first.");return}
+ const tname=classData[target]&&classData[target].name,jobs=[],addedFor=new Set(),n=new Set(items.map(i=>i.sid)).size;
+ const isMember=(cid,sid)=>!!(classData[cid]&&classData[cid].members&&classData[cid].members[sid]);
+ items.forEach(i=>{
+  const nm=rosterNameOf(i.sid);
+  if(kind==="remove"){if(i.cid)jobs.push({label:nm,run:()=>rosterEnroll(i.sid,i.cid,false)});return}
+  if(i.cid===target)return;
+  if(!isMember(target,i.sid)&&!addedFor.has(i.sid)){addedFor.add(i.sid);jobs.push({label:nm,run:()=>rosterEnroll(i.sid,target,true)})}
+  if(kind==="move"&&i.cid)jobs.push({label:nm,after:true,run:()=>rosterEnroll(i.sid,i.cid,false)});
+ });
+ if(!jobs.length){say("Nothing to change.");return}
+ const verb=kind==="remove"?"Take "+n+" "+(n===1?"student":"students")+" out of the class they are ticked in?":kind==="move"?"Move "+n+" "+(n===1?"student":"students")+" to "+tname+"?":"Add "+n+" "+(n===1?"student":"students")+" to "+tname+"?";
+ if(!confirm(verb+" Names, passcodes and saved work are never changed."))return;
+ ["rosterMove","rosterAddTo","rosterRemove"].forEach(i=>q(i).disabled=true);
+ // Additions first (so a boy is never in no class half way), then the removals.
+ const adds=jobs.filter(j=>!j.after),rems=jobs.filter(j=>j.after);
+ const prog=(d,t)=>say("Working… "+d+" of "+t);
+ let fails=await rosterPool(kind==="remove"?[]:adds,4,prog);
+ const failedNames=new Set(fails.map(f=>f.split(": ")[0]));
+ fails=fails.concat(await rosterPool(kind==="remove"?jobs:rems.filter(j=>!failedNames.has(j.label)),4,prog));
+ rosterSel.clear();rosterFailures(fails);
+ say(fails.length?"Finished, with "+fails.length+" problem(s).":"Done ✓");
+ await load();
+}
+q("rosterMove").onclick=()=>rosterRun(rosterBulk("move"));
+q("rosterAddTo").onclick=()=>rosterRun(rosterBulk("add"));
+q("rosterRemove").onclick=()=>rosterRun(rosterBulk("remove"));
+q("rosterClearSel").onclick=()=>{rosterSel.clear();renderRoster()};
+// Single actions.
+async function rosterRemoveOne(k){
+ const i=k.indexOf("|"),cid=k.slice(0,i),sid=k.slice(i+1),nm=rosterNameOf(sid),cn=classData[cid]&&classData[cid].name||cid;
+ if(!confirm("Take "+nm+" out of "+cn+"? Their work, name and passcode are kept."))return;
+ await rosterEnroll(sid,cid,false);rosterSel.delete(k);say(nm+" taken out of "+cn+" ✓");await load();
+}
+async function rosterAddExisting(cid,sid){await rosterEnroll(sid,cid,true);say(rosterNameOf(sid)+" added to "+(classData[cid].name||cid)+" ✓");await load()}
+async function rosterCreateOne(cid,name){await rosterCreate(cid,name);say(name+" created and added ✓");await load()}
+async function rosterRename(cid){
+ const cur=classData[cid].name||cid,name=(prompt("New name for this class:",cur)||"").trim().replace(/\s+/g," ");
+ if(!name||name===cur)return;
+ if(name.length>80){say("That name is too long.");return}
+ const clash=Object.entries(classData).find(([id,c])=>id!==cid&&c&&FTTBulkRoster.squash(c.name)===FTTBulkRoster.squash(name));
+ if(clash){say('Another class is already called "'+clash[1].name+'". Choose a different name.');return}
+ await db.ref("b3Games/workspaces/"+WS+"/classes/"+cid+"/name").set(name);say("Class renamed ✓");await load();
+}
+async function rosterToggle(cid){
+ const c=classData[cid],on=classOn(c);
+ if(on&&!confirm("Turn off "+(c.name||cid)+"? Students and teachers will not see it. Nothing is deleted, and you can turn it on again at any time."))return;
+ await db.ref("b3Games/workspaces/"+WS+"/classes/"+cid+"/active").set(!on);say(on?"Class turned off.":"Class turned on ✓");await load();
+}
+async function rosterAddTeacher(cid,tid){
+ if(!tid||!classData[cid]||!teacherData[tid]){say("Choose a teacher.");return}
+ const root="b3Games/workspaces/"+WS,uid=teacherData[tid].claimedUid,updates={[root+"/teacherInvites/"+tid+"/classIds/"+cid]:true,[root+"/teacherInvites/"+tid+"/active"]:true};
+ if(uid){updates[root+"/teachers/"+uid+"/classIds/"+cid]=true;updates[root+"/teachers/"+uid+"/active"]=true;updates[root+"/classes/"+cid+"/teacherIds/"+uid]=true}
+ await db.ref().update(updates);say("Teacher added ✓");await load();
+}
+q("rosterAddClass").onclick=()=>rosterRun((async()=>{
+ const name=q("rosterNewClass").value.trim().replace(/\s+/g," "),school=nav.school;
+ if(!name)return;
+ if(!schoolData[school]){say("Open a school first.");return}
+ const clash=Object.values(classData).find(c=>c&&FTTBulkRoster.squash(c.name)===FTTBulkRoster.squash(name));
+ if(clash){say('A class called "'+clash.name+'" already exists.');return}
+ let id=key(name)||"class";if((await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value")).exists())id+="_"+Date.now().toString().slice(-4);
+ await db.ref("b3Games/workspaces/"+WS+"/classes/"+id).set({name,active:true,schoolId:school});B3OwnerClasses.remember(WS,id);
+ q("rosterNewClass").value="";say("Class added ✓");await load();
+})());
+// Card events.
+q("rosterCards").addEventListener("change",e=>{
+ const b=e.target.closest("[data-rsel]");
+ if(b){if(b.checked)rosterSel.add(b.dataset.rsel);else rosterSel.delete(b.dataset.rsel);updateRosterBar()}
+});
+q("rosterCards").addEventListener("click",e=>{
+ const t=e.target;let x;
+ if((x=t.closest("[data-rremove]")))return rosterRun(rosterRemoveOne(x.dataset.rremove));
+ if((x=t.closest("[data-rall]"))){const cid=x.dataset.rall,keys=rosterMembers(cid).map(m=>cid+"|"+m.id),all=keys.every(k=>rosterSel.has(k));keys.forEach(k=>all?rosterSel.delete(k):rosterSel.add(k));return renderRoster()}
+ if((x=t.closest("[data-rrename]")))return rosterRun(rosterRename(x.dataset.rrename));
+ if((x=t.closest("[data-rtoggle]")))return rosterRun(rosterToggle(x.dataset.rtoggle));
+ if((x=t.closest("[data-rtadd]"))){const sel=q("rosterCards").querySelector('[data-rtsel="'+x.dataset.rtadd+'"]');return rosterRun(rosterAddTeacher(x.dataset.rtadd,sel&&sel.value))}
+ if((x=t.closest("[data-rpick]")))return rosterRun(rosterAddExisting(x.dataset.rcls,x.dataset.rpick));
+ if((x=t.closest("[data-rcreate]")))return rosterRun(rosterCreateOne(x.dataset.rcls,x.dataset.rcreate));
+});
+q("rosterCards").addEventListener("input",e=>{
+ const inp=e.target.closest("[data-radd]");if(!inp)return;
+ const cid=inp.dataset.radd,box=inp.parentElement.querySelector("[data-rsug]"),typed=inp.value.trim().replace(/\s+/g," ");
+ if(!typed){box.hidden=true;box.innerHTML="";return}
+ const people=schoolPeopleIds().filter(id=>!(classData[cid].members&&classData[cid].members[id])).map(id=>({id,name:rosterNameOf(id)}));
+ const hits=ro.suggest(typed,people,8);
+ box.innerHTML=hits.map(p=>{const where=Object.keys(rosterData[p.id]&&rosterData[p.id].classIds||{}).map(c=>classData[c]&&classData[c].name).filter(Boolean).join(", ");return '<button type="button" data-rpick="'+safe(p.id)+'" data-rcls="'+safe(cid)+'">'+safe(p.name)+(where?' <small style="display:inline;color:#64748b">'+safe(where)+'</small>':' <small style="display:inline;color:#64748b">not in a class</small>')+'</button>'}).join("")+
+  (typed.length>=2?'<button type="button" class="new" data-rcreate="'+safe(typed)+'" data-rcls="'+safe(cid)+'">+ Create a new student &ldquo;'+safe(typed)+'&rdquo;</button>':"");
+ box.hidden=false;
+});
+document.addEventListener("click",e=>{if(!e.target.closest(".radd"))q("rosterCards").querySelectorAll("[data-rsug]").forEach(b=>{b.hidden=true})});
+// Paste a list of names (one per line, straight from a Google Sheet).
+function renderPaste(){
+ const st=pasteState;if(!st){q("pasteResult").innerHTML="";return}
+ const cn=classData[st.cid]&&classData[st.cid].name||st.cid;
+ let todo=0,undecided=0;
+ const rows=st.items.map((it,i)=>{
+  const m=it.m,nm=safe(it.name),radio=(v,label,checked)=>'<label style="display:block"><input type="radio" name="pp'+i+'" data-pitem="'+i+'" value="'+safe(v)+'"'+(checked?' checked':'')+'> '+label+'</label>';
+  if(m.status==="match"){
+   const inClass=!!(classData[st.cid].members&&classData[st.cid].members[m.id]);
+   if(!inClass)todo++;
+   return '<div class="rmatch">'+(inClass?'&#x2713; <b>'+nm+'</b> is already in '+safe(cn):'&#x2713; <b>'+nm+'</b> &mdash; existing student, will be added')+'</div>';
+  }
+  const c=it.choice;
+  if(m.status==="ask"){
+   if(!c)undecided++;else if(c!=="skip")todo++;
+   return '<div class="rmatch"><b>'+nm+'</b> <small style="display:inline;color:#b45309">is this the same boy? ('+safe(m.reason)+')</small>'+
+    m.candidates.map(k=>radio("same:"+k.id,'Yes, same boy: <b>'+safe(k.name)+'</b> <small style="display:inline;color:#64748b">('+safe(k.reason)+(rosterData[k.id]?", in "+Object.keys(rosterData[k.id].classIds).map(x=>classData[x]&&classData[x].name).filter(Boolean).join(", "):"")+')</small>',c==="same:"+k.id)).join("")+
+    radio("new","No, a different boy: create a new student",c==="new")+radio("skip","Skip this name",c==="skip")+'</div>';
+  }
+  if(c!=="skip")todo++;
+  return '<div class="rmatch"><b>'+nm+'</b> &mdash; new student (a passcode is made for them) '+radio("new","Create",c!=="skip")+radio("skip","Skip",c==="skip")+'</div>';
+ }).join("");
+ q("pasteResult").innerHTML='<h3 style="margin:12px 0 4px">'+st.items.length+' name(s) for '+safe(cn)+'</h3>'+rows+
+  '<div class="formrow" style="margin-top:10px"><button type="button" id="pasteApply"'+(undecided||!todo?' disabled':'')+'>Add '+todo+' to '+safe(cn)+'</button><button type="button" id="pasteCancel" class="light">Cancel</button></div>'+(undecided?'<small>Answer the '+undecided+' question(s) above first.</small>':"");
+}
+q("pasteCheck").onclick=()=>rosterRun((async()=>{
+ const cid=q("pasteClass").value;if(!classOn(classData[cid])){say("Choose the class first.");return}
+ const parsed=ro.parsePastedNames(q("pasteText").value);if(!parsed.names.length){say("Paste at least one name.");return}
+ await loadProfileNames(unassignedIds());rNames=memberNameMap();
+ const people=schoolPeopleIds().map(id=>({id,name:rosterNameOf(id)}));
+ pasteState={cid,duplicates:parsed.duplicates,items:parsed.names.map(name=>{const m=ro.matchPerson(name,people);return {name,m,choice:m.status==="none"?"new":null}})};
+ renderPaste();
+ if(parsed.duplicates)say(parsed.duplicates+" repeated name(s) were ignored.");
+})());
+q("pasteResult").addEventListener("change",e=>{const r=e.target.closest("[data-pitem]");if(r&&pasteState){pasteState.items[+r.dataset.pitem].choice=r.value;renderPaste()}});
+q("pasteResult").addEventListener("click",e=>{
+ if(e.target.id==="pasteCancel"){pasteState=null;renderPaste()}
+ if(e.target.id==="pasteApply")rosterRun(pasteApply());
+});
+async function pasteApply(){
+ const st=pasteState,cid=st.cid,jobs=[];
+ st.items.forEach(it=>{
+  if(it.m.status==="match"){if(!(classData[cid].members&&classData[cid].members[it.m.id]))jobs.push({label:it.name,run:()=>rosterEnroll(it.m.id,cid,true)});return}
+  const c=it.choice;if(!c||c==="skip")return;
+  if(c.startsWith("same:")){const id=c.slice(5);jobs.push({label:it.name,run:()=>rosterEnroll(id,cid,true)})}
+  else jobs.push({label:it.name,run:()=>rosterCreate(cid,it.name)});
+ });
+ if(!jobs.length)return;
+ q("pasteApply").disabled=true;
+ const creates=st.items.filter(it=>it.choice==="new"||(it.m.status==="none")).length;
+ // Creating accounts goes one at a time (the server checks for same names); adding existing students runs four at a time.
+ const prog=(d,t)=>say("Working… "+d+" of "+t);
+ const fails=await rosterPool(jobs,creates?1:4,prog);
+ pasteState=null;q("pasteText").value="";renderPaste();rosterFailures(fails);
+ say(fails.length?"Finished, with "+fails.length+" problem(s).":"Done ✓ "+jobs.length+" added.");
+ await load();
+}
 
 // ---- Tool access overview -------------------------------------------------
 const TOOL_ACCESS_PATH="tool-access-overview/";
@@ -1189,7 +1510,7 @@ q("toolAccessDownload").onclick=()=>{
 // browser's Back button and reloading both work. Every card stays in the page;
 // render() shows only the cards of the open view and fills them with the open
 // school's data or the platform-wide tool access overview.
-const SECTIONS=[["principals","🎓","Principals"],["teachers","👤","Teachers"],["classes","📚","Classes"],["students","👥","Students"],["bulk","📋","Bulk Upload"],["undo","↩️","Undo Import"],["manage","🧹","Bulk Manage"]];
+const SECTIONS=[["principals","🎓","Principals"],["teachers","👤","Teachers"],["roster","🗂️","Classes & Students"],["classes","📚","Classes"],["students","👥","Students"],["bulk","📋","Bulk Upload"],["undo","↩️","Undo Import"],["manage","🧹","Bulk Manage"]];
 const navPath=(...parts)=>parts.filter(Boolean).map(encodeURIComponent).join("/");
 const byName=(a,b)=>String(a||"").localeCompare(String(b||""));
 const inSchool=o=>!!o&&!!nav.school&&o.schoolId===nav.school;
@@ -1218,7 +1539,7 @@ function resetSchoolTools(){
  bulkReset();q("bulkProgress").style.display="none";q("bulkLog").style.display="none";
  undoSel.clear();q("undoArea").style.display="none";q("rbArea").innerHTML="";
  bm.students=[];bm.batches=[];bm.selected.clear();q("bmArea").style.display="none";q("bmPreviewArea").innerHTML="";q("bmAuditArea").innerHTML="";
- q("studentSearch").value="";
+ q("studentSearch").value=""; rosterSel.clear();pasteState=null;q("pasteResult").innerHTML="";
 }
 function render(){
  const view=currentView();
@@ -1230,6 +1551,7 @@ function render(){
  if(!nav.school)return;
  renderSchoolHome();renderPrincipalAssignments();renderTeachers();renderClasses();renderStudentSection();
  if(view==="class")renderClassPage();
+ if(view==="roster")renderRoster();
 }
 function renderNav(view){
  const sc=schoolData[nav.school],section=SECTIONS.find(s=>s[0]===nav.section),cls=classData[nav.classId];

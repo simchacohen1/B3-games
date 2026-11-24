@@ -47,7 +47,7 @@ test('owner class controls discover the registry and change only a selected clas
  const src=fs.readFileSync('admin.html','utf8');
  assert.match(src,/cpWatchClasses\(\)/);
  assert.match(src,/cpRecords=snapshot\.val\(\)/);
- assert.match(src,/data-cp-new-mode/);
+ assert.match(src,/data-cp-big/);
  assert.match(src,/base\+"\/toolGrants\/"\+tool/);
  assert.match(src,/base\+"\/access\/mode"/);
 });

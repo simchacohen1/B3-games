@@ -21,6 +21,7 @@
   h1{font-size:46px;margin:8px 0 8px;color:#26364a}
   .subtitle{color:#64748b;margin-bottom:24px}
   .hidden{display:none!important}
+  .tile-locked-out{display:none!important}
   /* Keep the login form hidden until saved student and teacher sessions are checked. */
   #homeAuthLoading{display:none;max-width:520px;margin:24px auto;padding:30px;color:#475569;background:#fff;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
   html.b3-home-auth-pending #homeAuthLoading{display:block!important}
@@ -524,6 +525,7 @@ document.addEventListener("DOMContentLoaded",function(){
         <div><h2 id="approvalCenterTitle">🔔 Teacher Approval Center</h2><p id="approvalCenterSummary">Checking what needs your attention…</p></div>
         <button id="approvalCenterClose" class="approval-center-x" type="button" aria-label="Close">×</button>
       </div>
+      <div class="approval-center-scope" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px;color:#475569;font-size:15px"><label style="display:flex;gap:6px;align-items:center;font-weight:800;color:#26364a"><input type="checkbox" id="approvalAllClassesBox"> All classes</label><span id="approvalScopeNote"></span></div>
       <div id="approvalCenterList" class="approval-center-list"><div class="approval-center-empty">Checking approvals…</div></div>
       <div id="approvalCenterWarning" class="approval-center-warning hidden"></div>
       <div class="approval-center-footer"><button id="approvalCenterRefresh" class="approval-center-refresh" type="button">Refresh</button><button id="approvalCenterDone" class="approval-center-done" type="button">Close</button></div>
@@ -1099,6 +1101,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const total=active.reduce(function(n,item){return n+Number(approvalCounts[item.key]||0);},0);
     el("approvalCenterBadge").textContent=String(total);
     el("approvalCenterBadge").classList.toggle("hidden",total===0);
+    renderApprovalScope();
     if(approvalCenterLoading){
       el("approvalCenterSummary").textContent="Checking what needs your attention…";
     }else if(total){
@@ -1150,13 +1153,50 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   function openApprovalCenter(){if(isAuthorizedAdmin)el("approvalCenterModal").classList.remove("hidden");}
   function closeApprovalCenter(){el("approvalCenterModal").classList.add("hidden");}
+  // Which classes the Approval Center covers. The owner is also an admin, but as a teacher should only see the classes
+  // they teach: their teacher assignment, or ET and WT when there is none. "All classes" is a saved switch (this browser only).
+  const APPROVAL_ALL_CLASSES_KEY="b3ApprovalAllClasses";
+  function approvalAllClasses(){try{return localStorage.getItem(APPROVAL_ALL_CLASSES_KEY)==="1";}catch(e){return false;}}
+  function setApprovalAllClasses(on){try{localStorage.setItem(APPROVAL_ALL_CLASSES_KEY,on?"1":"0");}catch(e){}}
+  let approvalMyClassesPromise=null,approvalMyClassesUid="";
+  function approvalMyClassIds(){
+    const user=firebase.auth().currentUser;
+    if(!user)return Promise.resolve(["et","wt"]);
+    if(!approvalMyClassesPromise||approvalMyClassesUid!==user.uid){
+      approvalMyClassesUid=user.uid;
+      approvalMyClassesPromise=db.ref("b3Games/workspaces/"+workspaceId+"/teachers/"+user.uid+"/classIds").once("value").then(function(snap){
+        const row=snap.val()||{};
+        const ids=Object.keys(row).filter(function(id){return id!=="*"&&row[id]===true&&/^[A-Za-z0-9_-]{1,100}$/.test(id);});
+        return ids.length?ids:["et","wt"];
+      }).catch(function(){return ["et","wt"];});
+    }
+    return approvalMyClassesPromise;
+  }
+  function renderApprovalScope(){
+    const box=el("approvalAllClassesBox"),note=el("approvalScopeNote");
+    if(!box||!note)return;
+    box.checked=approvalAllClasses();
+    if(approvalAllClasses()){note.textContent="Showing every class.";return;}
+    approvalMyClassIds().then(function(ids){
+      if(approvalAllClasses())return;
+      note.textContent="Posuk recordings: only my classes ("+ids.map(function(id){return approvalClassNames[id]||id.toUpperCase();}).join(", ")+").";
+    });
+  }
   // Approval sources are watched with live listeners instead of being
   // re-downloaded with once() every minute: Realtime Database charges for data
   // downloaded, and a listener downloads each tree once and then receives only
   // the changes. (posukPractice/attempts alone is large.)
   const APPROVAL_SOURCES=[
     ["attempts","posukPractice/attempts"],
-    ["posukRecordings",(onValue,onError)=>window.B3PosukGradingQueue.watchClassCounts(db,workspaceId,onValue,onError)],
+    ["posukRecordings",(onValue,onError)=>{
+      // Default: only the classes this teacher teaches. The owner can switch to "All classes" in the Approval Center.
+      let stop=null,stopped=false;
+      (approvalAllClasses()?Promise.resolve(null):approvalMyClassIds()).then(function(ids){
+        if(stopped)return;
+        stop=window.B3PosukGradingQueue.watchClassCounts(db,workspaceId,onValue,onError,ids?{classIds:ids}:undefined);
+      }).catch(onError);
+      return function(){stopped=true;if(stop)stop();};
+    }],
     ["pointRequests","studentRewards/pointRequests"],
     ["shorashimRecordings","posukPractice/shorashimLearning/recordingEvents"],
     ["shorashimWords","posukPractice/shorashimLearning/catalog/shorashim"],
@@ -1618,18 +1658,30 @@ document.addEventListener("DOMContentLoaded",function(){
 
     const legacyB3Class=["et","wt"].includes(myClassId);
     if(!legacyB3Class){
-      if(myClassRecord?.active===false||myClassRecord?.siteEnabled===false||myClassRecord?.access?.mode==="locked"){
+      // A timed unlock (access/openUntil) opens a locked class until it runs out; a starred tool (access/stars/<tool> = the time the
+      // star ends) stays open while the class is locked. Same rules as the shared page gate.
+      const accessNow=myClassRecord?.access||{},nowMs=Date.now();
+      const timedOpen=Number(accessNow.openUntil)>nowMs;
+      const classLocked=!timedOpen&&(myClassRecord?.siteEnabled===false||accessNow.mode==="locked");
+      const starOpen=id=>Number((accessNow.stars||{})[id==="class-gallery"?"gallery":id])>nowMs;
+      // Tiles that share one tool (Chumash Cheder has four) each keep their own star, under their own tile key.
+      const tileKeyOf=card=>card.dataset.tileKey||card.dataset.gameId;
+      const familyStar=gameId=>gameCards.some(card=>card.dataset.gameId===gameId&&starOpen(tileKeyOf(card)));
+      const anyStar=classLocked&&gameDefinitions.some(game=>familyStar(game.id)&&window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id));
+      if(myClassRecord?.active===false||(classLocked&&!anyStar)){
         el("gamesArea").classList.add("hidden");el("lockedCard").classList.remove("hidden");el("lockedTitle").textContent="Your class is locked";el("lockedMessage").textContent="Your teacher can reopen your class.";return;
       }
       const grants=myClassRecord?.toolGrants||{};
       let visible=0;
       gameDefinitions.forEach(game=>{
-        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id);
+        const show=window.B3StudentTools.allowed(myClassRecord,myStudentId,game.id)&&window.B3StudentTools.granted(myClassRecord,game.id)&&(!classLocked||familyStar(game.id));
         game.element.classList.toggle("hidden",!show);
         game.element.classList.remove("activity-closed");
         game.element.querySelector(".activity-closed-badge")?.remove();
         if(show)visible++;
       });
+      // While locked, only the tiles with their own star stay (the other tiles of the same tool are hidden individually).
+      gameCards.forEach(card=>card.classList.toggle("tile-locked-out",classLocked&&!starOpen(tileKeyOf(card))));
       updateGameGroupVisibility();
       const className=String(myClassRecord?.name||myClassId||"Class");
       el("studentClassLabel").textContent=className;
@@ -2451,6 +2503,7 @@ document.addEventListener("DOMContentLoaded",function(){
   el("approvalCenterClose")?.addEventListener("click",closeApprovalCenter);
   el("approvalCenterDone")?.addEventListener("click",closeApprovalCenter);
   el("approvalCenterRefresh")?.addEventListener("click",()=>{unwatchApprovalSources();loadApprovalCenter(false);});
+  el("approvalAllClassesBox")?.addEventListener("change",e=>{setApprovalAllClasses(e.target.checked);renderApprovalScope();unwatchApprovalSources();loadApprovalCenter(false);});
   el("approvalCenterModal")?.addEventListener("click",e=>{if(e.target===el("approvalCenterModal"))closeApprovalCenter();});
   document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeVersionModal();closeApprovalCenter();}});
   function handleTeacherCombinedTile(e){
@@ -2650,11 +2703,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!show){closeHomeClassAccess();return;}
     if(homeClassUnsub)return;
     const ref=db.ref("b3Games/workspaces/"+workspaceId+"/classes");
-    const onValue=snapshot=>{
-      const rows=snapshot.val()||{};
-      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
-      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
-      const list=all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+    const applyList=list=>{
       homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"||c.id==="wt"?c.id.toUpperCase():c.name);
       if(!homeClassNames[homeClassId])homeClassId=list[0].id;
       const select=el("homeClassSelect");select.innerHTML="";
@@ -2662,9 +2711,39 @@ document.addEventListener("DOMContentLoaded",function(){
       select.value=homeClassId;
       syncHomeClassAccess();
     };
-    ref.on("value",onValue,e=>console.warn("Could not load classes for the home class bar",e));
+    const onValue=snapshot=>{
+      const rows=snapshot.val()||{};
+      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
+      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
+      applyList(all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}]);
+    };
+    // Some databases (the staging one) allow reading one class at a time but not the whole list: then use the admin's own classes.
+    const onError=async e=>{
+      console.warn("Could not load classes for the home class bar",e);
+      try{
+        const ids=new Set();
+        try{const saved=localStorage.getItem("b3ControlClass");if(saved)ids.add(saved)}catch(err){}
+        const uid=firebase.auth().currentUser&&firebase.auth().currentUser.uid;
+        if(uid){const mine=(await db.ref("b3Games/workspaces/"+workspaceId+"/teachers/"+uid+"/classIds").once("value")).val()||{};Object.keys(mine).forEach(id=>{if(mine[id]===true)ids.add(id)});}
+        const found=(await Promise.all([...ids].filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)).map(async id=>{try{const row=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).once("value")).val();return row&&row.active!==false?{id,name:String(row.name||id)}:null}catch(err){return null}}))).filter(Boolean);
+        if(found.length)applyList(found);
+      }catch(err){console.warn("Home class bar fallback failed",err);}
+    };
+    ref.on("value",onValue,onError);
     homeClassUnsub=()=>ref.off("value",onValue);
   }
+  // The picker inside the Class Access panel changes the class too: keep this title and picker in step with it.
+  window.addEventListener("message",e=>{
+    if(e.origin!==location.origin||!e.data||e.data.type!=="b3-class-access-class")return;
+    const id=String(e.data.classId||"");
+    if(!/^[A-Za-z0-9_-]{1,100}$/.test(id))return;
+    if(e.data.className&&!homeClassNames[id])homeClassNames[id]=String(e.data.className);
+    homeClassId=id;
+    el("homeAccessTitle").textContent="🔒 Class Access · "+(homeClassNames[id]||id);
+    const select=el("homeClassSelect");
+    if(![...select.options].some(o=>o.value===id)){const o=document.createElement("option");o.value=id;o.textContent=homeClassNames[id]||id;select.appendChild(o);}
+    select.value=id;
+  });
   el("homeClassSelect").addEventListener("change",e=>{
     homeClassId=e.target.value;
     try{localStorage.setItem("b3ControlClass",homeClassId)}catch(err){}
@@ -2718,7 +2797,7 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 },{once:true});
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261123-tiles2"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261124-pages1"></script>
 </body>
 </html>
 

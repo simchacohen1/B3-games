@@ -55,8 +55,10 @@ function makeBackend(seed){
     status:token=>call({headers:{authorization:'Bearer '+token},body:{action:'rashi-student-status'}}),
     teacher:(token,action,body={})=>call({headers:{authorization:'Bearer '+token},body:{action,...body}})};
 }
-function seed(){
-  const cls=(name,members)=>({active:true,name,toolGrants:{'rashi-letters':true,chazara:true},members});
+// Everything is practice-only until the teacher opens it, so these tests open everything for both classes
+// (submissionOpen.all) except where a test is about the closed default.
+function seed(open=true){
+  const cls=(name,members)=>({active:true,name,toolGrants:{'rashi-letters':true,chazara:true},members,...(open?{submissionOpen:{all:true}}:{})});
   const stud=(id,classId)=>({['b3Games/students/'+id+'/profile']:{name:id,classId,active:true}});
   return {
     b3Games:{
@@ -478,4 +480,49 @@ test('Delete gives back the reading slot of the day (3 per day), so a bad record
   assert.equal((await sendText(b,'kid1','tsadi')).code,429,'the 4th reading today is refused');
   const id=requestsFor(b,'bet')[0];await b.teacher('teacherEt','rashi-delete',{classId:'et',requestId:id});
   const ok=await sendText(b,'kid1','tsadi');assert.equal(ok.code,200,JSON.stringify(ok.body));
+});
+
+test('closed by default: a boy cannot send a Rashi reading, nothing is saved or charged',async()=>{
+  const b=makeBackend(seed(false)),r=await b.submit('kid1','zayin');
+  assert.equal(r.code,403,JSON.stringify(r.body));assert.equal(r.body.closed,true);
+  assert.equal(pendingRequests(b).length,0);assert.equal(Object.keys(b.files).length,0);assert.equal(balance(b,'rs1'),10);
+  const status=await b.status('kid1');assert.equal(status.body.open.zayin,false);assert.equal(status.body.open['vayeira-18-1'],false);
+});
+test('open for the class or for one boy only, and a Vayeira perek opens its passages',async()=>{
+  const seedWith=submissionOpen=>{const d=seed(false);d.b3Games.workspaces['b3-2026'].classes.et.submissionOpen=submissionOpen;return d;};
+  const one=makeBackend(seedWith({students:{kid1:{items:{'r:zayin':true}}}}));
+  assert.equal((await one.submit('kid1','zayin')).code,200);
+  assert.equal((await one.submit('kid1','bet')).code,403,'only the opened item');
+  const other=makeBackend(seedWith({students:{somebodyElse:{items:{'r:zayin':true}}}}));
+  assert.equal((await other.submit('kid1','zayin')).code,403,'open for another boy is not open for him');
+  const cls=makeBackend(seedWith({items:{'r:bet':true,'r:vayeira-18':true}}));
+  assert.equal((await cls.submit('kid1','bet')).code,200);
+  const st=await cls.status('kid1');assert.equal(st.body.open.bet,true);assert.equal(st.body.open['vayeira-18-1'],true);assert.equal(st.body.open['vayeira-19-1'],false);assert.equal(st.body.open.zayin,false);
+  const wt=makeBackend(seedWith({items:{'r:bet':true}}));
+  assert.equal((await wt.submit('kid2','bet')).code,403,'the other class stays closed');
+});
+test('Posuk: sending is refused unless the posuk is open; the status call names what is open',async()=>{
+  const posuk=(b,token,selectionKey)=>b.call({headers:{authorization:'Bearer '+token},body:{action:'posuk-submit',selectionKey,attemptId:'a1',hebrewText:'x',sefer:'Bereishis'}});
+  const status=(b,token,selectionKey)=>b.call({headers:{authorization:'Bearer '+token},body:{action:'submission-open-status',kind:'posuk',selectionKey}});
+  const closed=makeBackend(seed(false));
+  const refused=await posuk(closed,'kid1','Vayeira_18_1');
+  assert.equal(refused.code,403,JSON.stringify(refused.body));assert.equal(refused.body.closed,true);
+  const d=seed(false);d.b3Games.workspaces['b3-2026'].classes.et.submissionOpen={items:{'p:Vayeira_18_1-3':true}};
+  const b=makeBackend(d);
+  assert.notEqual((await posuk(b,'kid1','Vayeira_18_2')).code,403,'open: gets past the check (then fails only because no recording was uploaded)');
+  assert.equal((await posuk(b,'kid1','Vayeira_18_2-4')).code,403,'a range must be fully open');
+  assert.equal((await posuk(b,'kid1','Vayeira_19_1')).code,403);
+  const ok=await status(b,'kid1','Vayeira_18_3');assert.equal(ok.body.selectionOpen,true);assert.equal(ok.body.rules[0].label,'Vayeira · Perek 18 · Posuk 1–3');
+  assert.equal((await status(b,'kid1','Vayeira_18_9')).body.selectionOpen,false);
+  assert.equal((await status(b,'kid2','Vayeira_18_2')).body.selectionOpen,false,'WT is still closed');
+  assert.equal((await b.call({headers:{},body:{action:'submission-open-status',kind:'posuk'}})).code,401);
+});
+test('the teacher list says which waiting readings are for open items; sent ones stay listed',async()=>{
+  const d=seed(true);const b=makeBackend(d);
+  assert.equal((await b.submit('kid1','zayin')).code,200);
+  b.db.root.b3Games.workspaces['b3-2026'].classes.et.submissionOpen={items:{'r:bet':true}}; // zayin closed again after it was sent
+  const rows=(await b.teacher('teacherEt','rashi-list-pending')).body.requests;
+  assert.equal(rows.length,1);assert.equal(rows[0].sendOpen,false);
+  b.db.root.b3Games.workspaces['b3-2026'].classes.et.submissionOpen={items:{'r:zayin':true}};
+  assert.equal((await b.teacher('teacherEt','rashi-list-pending')).body.requests[0].sendOpen,true);
 });

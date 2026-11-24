@@ -41,13 +41,19 @@ function check({ files, read, manifest: m, features = FEATURES, resolves = () =>
     if (!/\bdefer\b/.test(full)) problems.push(`${file}: the lock script must be deferred (so it never blocks the page).`);
     if (!resolves(file, tags[0][1])) problems.push(`${file}: ${tags[0][1]} does not point at student-lock.js.`);
     const gate = /<script\b[^>]*game-gate\.js[^>]*data-game-id="([^"]+)"/i.exec(html) || /<script\b[^>]*data-game-id="([^"]+)"[^>]*game-gate\.js/i.exec(html);
-    if (gate && gate[1] !== feature) problems.push(`${file}: the older gate says "${gate[1]}" but the lock feature is "${feature}".`);
+    const quiz = (m.QUIZ_FEATURES || {})[file], declaredQuiz = /\bdata-feature-quiz="([^"]*)"/.exec(full);
+    if (quiz && (!declaredQuiz || declaredQuiz[1] !== quiz)) problems.push(`${file}: the script must say data-feature-quiz="${quiz}".`);
+    if (!quiz && declaredQuiz) problems.push(`${file}: data-feature-quiz is set but ${file} is not in QUIZ_FEATURES.`);
+    if (quiz && !features.has(quiz)) problems.push(`${file}: quiz feature "${quiz}" is not a feature in student-lock-core.js.`);
+    if (gate && (m.GATE_IS_TOOL_GRANT || {})[file] === gate[1]) { /* the older gate id is the tool grant, by design */ }
+    else if (gate && gate[1] !== feature) problems.push(`${file}: the older gate says "${gate[1]}" but the lock feature is "${feature}".`);
   }
   for (const file of Object.keys(exempt)) {
     if (!files.includes(file)) problems.push(`${file}: exempt but the file does not exist.`);
     else if (/b3Games_studentId/.test(read(file))) problems.push(`${file}: marked exempt but it uses the student sign-in, so it is a student page.`);
   }
-  for (const f of features) if (!Object.values(student).includes(f)) problems.push(`feature "${f}" is in the catalog but no page uses it.`);
+  const used = new Set([...Object.values(student), ...Object.values(m.QUIZ_FEATURES || {})]);
+  for (const f of features) if (!used.has(f)) problems.push(`feature "${f}" is in the catalog but no page uses it.`);
   return problems;
 }
 const realRead = file => fs.readFileSync(path.join(ROOT, file), 'utf8');

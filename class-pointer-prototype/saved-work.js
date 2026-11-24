@@ -137,7 +137,7 @@
       if(!id){await checkRoom(me);id=Core.newId()}
       const folder=firebase.storage().ref(me.prefix);
       if(me.teacher)await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'});
-      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,fromTeacher,important,savedAt:Date.now()})});
+      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,fromTeacher,important,boardPages:Array.isArray(data?.pages)?data.pages.length:1,savedAt:Date.now()})});
       // A student's small picture is only for looking at the file later. The save counts without it.
       if(!me.teacher&&picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
       return id;
@@ -296,7 +296,7 @@
       if(groups.length>1||group.folderId||group.subject)container.append(h('h3','ftt-saved-group','📁 '+group.label));
       for(const file of group.files){
         const row=h('div','ftt-saved-row'),name=h('span','ftt-saved-name',file.name);
-        if(file.savedAt||file.template)name.append(h('small',null,(file.template?'⭐ Template · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
+        if(file.savedAt||file.template)name.append(h('small',null,(file.template?'⭐ Template · ':'')+(file.boardPages>1?file.boardPages+' pages · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
         row.append(thumb(file),name,...actions(file));container.append(row);
       }
     }
@@ -437,20 +437,28 @@
   // student then has the picture on their own board with a private drawing layer of their own.
   const NOT_READY='Open the classroom first, then try again.';
   function boardsApi(){const api=window.ClassPointerBoards;return typeof api?.sendPictureToAll==='function'?api:null}
-  // The current whiteboard on the lesson screen.
-  async function sendCurrent(){
+  // The current whiteboard on the lesson screen. With pages, `options` says which: {page: 2} for one page, {all:true} for
+  // every page. One page (and an ordinary one-page whiteboard) goes exactly as it always did: one picture on every board.
+  async function sendCurrent(options){
     if(!teacherPage)return false;
-    const boards=boardsApi(),pdf=window.ClassPointerPdf;
+    const boards=boardsApi(),pdf=window.ClassPointerPdf,opts=options&&typeof options==='object'?options:{};
     if(!boards||typeof pdf?.exportPng!=='function'){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note',NOT_READY));return false}
-    let picture;
-    try{picture=await pdf.exportPng()}catch(_){picture=null}
-    if(!picture){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note','Open the whiteboard on the lesson first, then press Send whiteboard to students.'));return false}
-    return boards.sendPictureToAll(picture,'This is the whiteboard as it is now. Every student gets their own copy to draw on. What they draw stays on their own board.',{subject:current?.subject||''});
+    const info=pdf.pagesInfo?.(),all=opts.all===true&&info&&info.count>1&&typeof pdf.exportPagePngs==='function'&&typeof boards.sendPagesToAll==='function';
+    let pictures=null;
+    try{
+      if(all)pictures=await pdf.exportPagePngs();
+      else if(info&&info.count>1&&typeof pdf.exportPagePngs==='function')pictures=await pdf.exportPagePngs(Number(opts.page)||info.current+1);
+      else pictures=[await pdf.exportPng()];
+    }catch(_){pictures=null}
+    if(!pictures||!pictures.length||!pictures[0]){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note','Open the whiteboard on the lesson first, then press Send whiteboard to students.'));return false}
+    if(all)return boards.sendPagesToAll(pictures,'These are the '+pictures.length+' pages of the whiteboard as they are now. Every student gets their own copy of every page to draw on. What they draw stays on their own board.',{subject:current?.subject||''});
+    return boards.sendPictureToAll(pictures[0],'This is the whiteboard as it is now. Every student gets their own copy to draw on. What they draw stays on their own board.',{subject:current?.subject||''});
   }
   // A whiteboard saved earlier. Its small picture was saved with it.
   async function sendFile(file,ui){
     const boards=boardsApi();
     if(!boards){ui.say(NOT_READY);return}
+    if(file.boardPages>1){ui.say('This whiteboard has '+file.boardPages+' pages. Open it first, then press Send and choose one page or all pages.');return}
     ui.say('Getting the picture…');
     try{
       const picture=await store.picture(file);
@@ -537,7 +545,7 @@
     const row=h('div','ftt-saved-row'),box=h('span','ftt-saved-thumb',file.hasPicture?'…':'📝');
     box.setAttribute('aria-hidden','true');
     const name=h('span','ftt-saved-name',file.name);
-    name.append(h('small',null,(file.fromTeacher?'Sent by you · ':'')+(file.worksheet?'Worksheet, '+file.pages+(file.pages===1?' page':' pages')+' · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
+    name.append(h('small',null,(file.fromTeacher?'Sent by you · ':'')+(file.worksheet?'Worksheet, '+file.pages+(file.pages===1?' page':' pages')+' · ':'')+(file.boardPages>1?file.boardPages+' pages · ':'')+(file.savedAt?'Saved '+savedText(file.savedAt):'')));
     row.append(box,name);
     if(!file.hasPicture){name.append(h('small',null,'No picture saved for this file.'));return row}
     // One picture at a time, so a long list does not flood the server.
@@ -667,6 +675,32 @@
       return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     }catch(_){return null}
   }
+  // The same for pictures the teacher sent as pages: one file of my own with every page picture as the background of
+  // a page and nothing drawn on it yet. Opening it later brings the pages back (student-boards.js importBoard).
+  async function keepTeacherPages(sent){
+    const pages=Array.isArray(sent?.pages)?sent.pages.filter(p=>p&&typeof p.bg==='string'):[];
+    if(teacherPage||!pages.length||pages.length>20||pages.some(p=>p.bg.length>200000))return false;
+    const key=/^[A-Za-z0-9_-]{8,48}$/.test(String(sent.id||''))?'id:'+sent.id:copyKey(pages.map(p=>p.bg).join(''));
+    if(copying.has(key)||kept.has(key))return false;
+    copying.add(key);
+    try{
+      const me=await who(),memory=COPIES+me.prefix;
+      let seen=[];try{seen=JSON.parse(localStorage.getItem(memory)||'[]')}catch(_){}
+      if(!Array.isArray(seen)||seen.includes(key))return false;
+      const state=await store.folders().catch(()=>NO_FOLDERS);
+      const data={version:2,kind:'student-board',current:0,activity:null,pages:pages.map(p=>({strokes:[],images:[],text:null,bg:p.bg}))};
+      await store.saveBoard({name:'From your teacher '+new Date().toLocaleDateString()+' '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await copyPicture(pages[0].bg),
+        subject:Core.cleanName(sent.subject,Core.LIMITS.folderName),fromTeacher:true,important:sent.important===true});
+      kept.add(key);seen.push(key);try{localStorage.setItem(memory,JSON.stringify(seen.slice(-30)))}catch(_){}
+      toast('Your teacher sent '+pages.length+' whiteboard pages. Your own copy is saved in 📂 My files.');
+      try{window.dispatchEvent(new CustomEvent('ftt-myfiles-changed',{detail:{from:'teacher'}}))}catch(_){}
+      return true;
+    }catch(error){
+      const text=Core.errorText(error);
+      if(/already have \d+ saved files/.test(text))toast('Your teacher sent whiteboard pages, but My files is full ('+Core.LIMITS.studentFiles+' files), so your copy was NOT saved. Delete a file in 📂 My files, then ask your teacher to send them again.',15000);
+      return false;
+    }finally{copying.delete(key)}
+  }
   async function keepTeacherCopy(activity){
     if(teacherPage||activity?.kind!=='image'||typeof activity.data!=='string'||activity.data.length>420000)return false;
     // One copy for each send (its id). Older teacher pages send no id: then the picture itself decides.
@@ -713,5 +747,5 @@
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',back)};
   }
 
-  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,store,worksheets,snapshot,watch,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,keepTeacherCopy,keepTeacherPages,store,worksheets,snapshot,watch,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();

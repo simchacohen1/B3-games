@@ -23,14 +23,12 @@ test('toolbar only initializes for verified teachers and never in embedded stude
   assert.match(s, /all\[id\]\.active !== false/);
 });
 
-test('class selection reuses existing controls; the lock button opens Class Locks; no lock writes from the bar itself', () => {
+test('class selection reuses existing controls; the lock button opens the one Class Access panel', () => {
   const s = read('teacher-global-controls.js');
   assert.match(s, /b3ControlClass/);
   assert.match(s, /homeClassBar/);
-  assert.match(s, /class-locks\/index\.html/, 'the lock button opens the Class Locks panel');
-  assert.doesNotMatch(s, /updateClassMode|\.ref\(\)\.update\(/, 'every lock change goes through the studentLocks function');
-  // The older Class Access (class hours and modes) stays reachable from the panel.
-  assert.match(read('class-locks/index.html'), /admin\.html\?tab=access/);
+  assert.match(s, /classUrl\('admin\.html', id, \{tab:'access',embed:'1'\}\)/, 'the lock button opens Class Access');
+  assert.doesNotMatch(s, /class-locks|studentLocks|updateClassMode|\.ref\(\)\.update\(/, 'the bar has no second lock panel and writes no locks itself');
 });
 
 test('Follow can be opened and closed without removing its iframe, and standalone window is available', () => {
