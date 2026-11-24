@@ -2703,11 +2703,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!show){closeHomeClassAccess();return;}
     if(homeClassUnsub)return;
     const ref=db.ref("b3Games/workspaces/"+workspaceId+"/classes");
-    const onValue=snapshot=>{
-      const rows=snapshot.val()||{};
-      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
-      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
-      const list=all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
+    const applyList=list=>{
       homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"||c.id==="wt"?c.id.toUpperCase():c.name);
       if(!homeClassNames[homeClassId])homeClassId=list[0].id;
       const select=el("homeClassSelect");select.innerHTML="";
@@ -2715,9 +2711,39 @@ document.addEventListener("DOMContentLoaded",function(){
       select.value=homeClassId;
       syncHomeClassAccess();
     };
-    ref.on("value",onValue,e=>console.warn("Could not load classes for the home class bar",e));
+    const onValue=snapshot=>{
+      const rows=snapshot.val()||{};
+      const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
+      all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
+      applyList(all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}]);
+    };
+    // Some databases (the staging one) allow reading one class at a time but not the whole list: then use the admin's own classes.
+    const onError=async e=>{
+      console.warn("Could not load classes for the home class bar",e);
+      try{
+        const ids=new Set();
+        try{const saved=localStorage.getItem("b3ControlClass");if(saved)ids.add(saved)}catch(err){}
+        const uid=firebase.auth().currentUser&&firebase.auth().currentUser.uid;
+        if(uid){const mine=(await db.ref("b3Games/workspaces/"+workspaceId+"/teachers/"+uid+"/classIds").once("value")).val()||{};Object.keys(mine).forEach(id=>{if(mine[id]===true)ids.add(id)});}
+        const found=(await Promise.all([...ids].filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id)).map(async id=>{try{const row=(await db.ref("b3Games/workspaces/"+workspaceId+"/classes/"+id).once("value")).val();return row&&row.active!==false?{id,name:String(row.name||id)}:null}catch(err){return null}}))).filter(Boolean);
+        if(found.length)applyList(found);
+      }catch(err){console.warn("Home class bar fallback failed",err);}
+    };
+    ref.on("value",onValue,onError);
     homeClassUnsub=()=>ref.off("value",onValue);
   }
+  // The picker inside the Class Access panel changes the class too: keep this title and picker in step with it.
+  window.addEventListener("message",e=>{
+    if(e.origin!==location.origin||!e.data||e.data.type!=="b3-class-access-class")return;
+    const id=String(e.data.classId||"");
+    if(!/^[A-Za-z0-9_-]{1,100}$/.test(id))return;
+    if(e.data.className&&!homeClassNames[id])homeClassNames[id]=String(e.data.className);
+    homeClassId=id;
+    el("homeAccessTitle").textContent="🔒 Class Access · "+(homeClassNames[id]||id);
+    const select=el("homeClassSelect");
+    if(![...select.options].some(o=>o.value===id)){const o=document.createElement("option");o.value=id;o.textContent=homeClassNames[id]||id;select.appendChild(o);}
+    select.value=id;
+  });
   el("homeClassSelect").addEventListener("change",e=>{
     homeClassId=e.target.value;
     try{localStorage.setItem("b3ControlClass",homeClassId)}catch(err){}

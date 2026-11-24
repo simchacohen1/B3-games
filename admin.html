@@ -199,16 +199,21 @@ async function renderTeacherAccess(msg){
 // game with a one-tap Open/Closed switch. Starred games stay open while the
 // class is locked.
 let CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
-let cpRecords={},cpClassesUnsub=false,cpFallbackWatching=false;
+let cpRecords={},cpClassesUnsub=false,cpFallbackWatching=false,cpHostedClass="";
 let cpClass=requestedClassId||(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
 function cpClassTabs(){
  return CP_CLASSES.map(c=>'<button type="button" data-cp-class="'+cpEsc(c.id)+'" class="'+(c.id===cpClass?'on':'')+'"><span class="cp-dot"></span>'+cpEsc(c.name)+'</button>').join('');
 }
+// When this page is shown inside the owner home bar, tell it which class is showing (it names it in its title).
+function cpTellHost(){
+  try{if(window.parent!==window)window.parent.postMessage({type:"b3-class-access-class",classId:cpClass,className:(CP_CLASSES.find(c=>c.id===cpClass)||{}).name||cpClass},location.origin)}catch(e){}
+}
 function cpBindClassTabs(panel){
  panel.querySelectorAll("[data-cp-class]").forEach(b=>b.onclick=()=>{
    cpClass=b.dataset.cpClass;cpMsg="";
    try{localStorage.setItem("b3ControlClass",cpClass)}catch(e){}
+   cpTellHost();
    renderOwnerControl();
  });
 }
@@ -324,6 +329,7 @@ function cpMountSubmissionOpen(panel,classId,className){
   cpLoadNames(classId);
 }
 function renderOwnerControl(){
+  if(cpClass!==cpHostedClass){cpHostedClass=cpClass;cpTellHost();}
   const panel=document.getElementById("ownerControlPanel"),api=cpApi();
   if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
   if(!CP_CLASSES.length){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">No active classes yet. Add one in Administration.</div></div>';return}
