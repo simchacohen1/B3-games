@@ -35,6 +35,9 @@
 
   let cfg={isPreview:()=>false,onBack:()=>{},hideOthers:()=>{}};
   let statusMap=null,statusAt=0,statusPromise=null,dailyCount=0,dailyLimit=3,dailyDate='';
+  // Practice only unless the teacher opened this section for sending (the server checks too). Unknown = practice only.
+  let openMap={};
+  const sendOpen=id=>openMap[id]===true;
   const todayNY=()=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const dailyFull=()=>dailyCount>=dailyLimit;
   let vayeiraCatalogPromise=null;
@@ -57,7 +60,7 @@
         const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+await idToken()},body:JSON.stringify({action:'rashi-student-status'})});
         const data=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(data.error||'Could not check your recordings.');
-        statusMap=data.sections||{};dailyCount=Number(data.dailyCount)||0;dailyLimit=Number(data.dailyLimit)||3;dailyDate=todayNY();statusAt=Date.now();
+        statusMap=data.sections||{};openMap=data.open||{};dailyCount=Number(data.dailyCount)||0;dailyLimit=Number(data.dailyLimit)||3;dailyDate=todayNY();statusAt=Date.now();
       }catch(err){console.warn('Rashi recording status unavailable',err);if(!statusMap)statusMap={};statusAt=0;}
       finally{statusPromise=null;}
       return statusMap;
@@ -93,6 +96,7 @@
     +".rr-ltr{background:#fff;border:2px solid #e1dcfb;border-radius:12px;padding:6px 4px}.rr-ltr b{display:block;font-family:'Mekorot Rashi',serif;font-size:30px;line-height:1.2}.rr-ltr span{font-size:13px;font-weight:800}.rr-ltr-bad{background:#ffe8e8;border-color:#e08b8b;color:#a12b2b}.rr-ltr-ok{color:#176447}"
     +'.rr-pulse{animation:rrpulse 1s infinite}@keyframes rrpulse{50%{opacity:.55}}'
     +'.rr-chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800}'
+    +'.rr-open{border-radius:14px;padding:8px 12px;font-weight:800;margin:6px 0}.rr-open:empty{display:none}.rr-open-yes{background:#e3f6e8;color:#14532d}.rr-open-no{background:#f1f1f6;color:#40405a}'
     +'.rr-menu-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#fff;border:2px solid #e1dcfb;border-radius:14px;padding:8px 12px;margin:8px 0}'
     +'.rr-passage{font-family:"Mekorot Rashi",serif;font-size:30px;line-height:1.85;display:block;width:100%;white-space:pre-wrap;text-align:right;padding:16px 20px;background:white;border-radius:18px;border:2px solid #c9bff5}'
     +'.rr-vayeira-title{font-size:24px;font-weight:800;margin:10px 0}.rr-vayeira-select{font-size:18px;min-height:44px;padding:8px;border-radius:9px}';
@@ -158,11 +162,11 @@
     if(ui)return ui;
     const style=document.createElement('style');style.textContent=CSS;document.head.appendChild(style);
     const card=el('div','card');card.id='recordScreen';card.style.display='none';
-    ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),quota:el('p','rr-note'),words:el('div','rr-words'),banner:el('div','rr-banner'),
+    ui={card,title:el('h2',null,'🎤 Read Your Words!'),sub:el('p','rr-sub'),quota:el('p','rr-note'),openNote:el('p','rr-open'),words:el('div','rr-words'),banner:el('div','rr-banner'),
       review:el('div'),letters:el('div'),timer:el('div','rr-timer hidden'),controls:el('div','rr-row'),msg:el('div','rr-msg'),audio:null,
       note:el('p','rr-note','Sending costs '+POINTS+' points. After your teacher listens you earn up to 5 points: 1 for each fifth of the reading with every letter read right.'),footer:el('div','rr-row')};
     ui.words.setAttribute('dir','rtl');ui.words.setAttribute('lang','he');ui.msg.setAttribute('role','status');ui.msg.setAttribute('aria-live','polite');
-    card.append(ui.title,ui.sub,ui.quota,ui.words,ui.banner,ui.review,ui.letters,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
+    card.append(ui.title,ui.sub,ui.openNote,ui.quota,ui.words,ui.banner,ui.review,ui.letters,ui.timer,ui.controls,ui.msg,ui.note,ui.footer);
     const anchor=document.getElementById('closedScreen');
     (anchor&&anchor.parentNode?anchor.parentNode:document.body).insertBefore(card,anchor||null);
     return ui;
@@ -178,7 +182,9 @@
     const status=effStatus(s.id),b=bannerFor(status,statusMap&&statusMap[s.id]);
     u.sub.textContent=s.label||'';
     u.title.textContent=s.id.startsWith('vayeira-')?'🎤 Read This Rashi!':'🎤 Read Your Words!';
-    u.quota.textContent='Readings today: '+dailyCount+' / '+dailyLimit;
+    u.quota.textContent=sendOpen(s.id)?'Readings sent today: '+dailyCount+' / '+dailyLimit:'';
+    u.openNote.className='rr-open '+(sendOpen(s.id)?'rr-open-yes':'rr-open-no');
+    u.openNote.textContent=cfg.isPreview()?'':sendOpen(s.id)?'✅ Open for sending — you can send this reading to your teacher':'🎧 Practice only — your teacher has not opened this for sending yet. You can still record and listen as much as you like.';
     u.words.replaceChildren(...s.words.map(w=>el('span',s.id.startsWith('vayeira-')?'rr-passage':'rr-word',w)));
     u.banner.className='rr-banner '+b.cls;u.banner.textContent=b.icon+' '+b.text;
     const result=statusMap?.[s.id];
@@ -194,15 +200,16 @@
     u.note.classList.toggle('hidden',status==='approved');
     if(cfg.isPreview()){
       u.controls.append(el('p','rr-note','Preview only — students record here. Nothing is saved.'));
-    }else if(dailyFull()){
+    }else if(dailyFull()&&sendOpen(s.id)){
       u.controls.append(el('p','rr-note','You completed your 3 Rashi readings for today. Come back tomorrow!'));
     }else if(!canRecord(status)){
       // pending or approved: nothing more to do for this section
     }else if(s.state==='recording'){
       u.controls.append(button('⏹ Stop','rr-big rr-rec',stopRecording));
     }else if(s.blob){
-      u.controls.append(button(s.playing?'⏸ Pause':'▶ Play','',togglePlay),button('🔁 Rerecord','gold',rerecord),
-        button(s.sending?'Sending…':'📤 Submit','rr-big',submit));
+      u.controls.append(button(s.playing?'⏸ Pause':'▶ Play','',togglePlay),button('🔁 Rerecord','gold',rerecord));
+      if(sendOpen(s.id))u.controls.append(button(s.sending?'Sending…':'📤 Submit','rr-big',submit));
+      else u.controls.append(el('span','rr-chip rr-open-no','🎧 Practice only'));
       if(s.sending)u.controls.querySelectorAll('button').forEach(x=>x.disabled=true);
     }else{
       u.controls.append(button('🎤 Record Reading','rr-big rr-rec',startRecording));
@@ -214,7 +221,7 @@
   function setMsg(text,isErr){const u=ensureScreen();u.msg.textContent=text||'';u.msg.className='rr-msg'+(isErr?' rr-err':'');}
 
   async function startRecording(){
-    const s=session;if(!s||s.state==='recording'||dailyFull())return;
+    const s=session;if(!s||s.state==='recording'||(dailyFull()&&sendOpen(s.id)))return;
     setMsg('');
     if(!(root.navigator&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||!root.MediaRecorder){setMsg('This device cannot record. Ask your teacher for help.',true);return;}
     try{
@@ -251,7 +258,7 @@
     dropAudio();s.blob=null;s.playing=false;s.state='idle';setMsg('');render();
   }
   async function submit(){
-    const s=session;if(!s||!s.blob||s.sending)return;       // one send at a time (no double-click)
+    const s=session;if(!s||!s.blob||s.sending||!sendOpen(s.id))return;       // one send at a time (no double-click); practice-only sections cannot be sent
     s.sending=true;setMsg('Sending your recording…');render();
     try{
       const out=await sendRecording(s.id,s.words,s.blob,s.durationMs);
@@ -263,6 +270,7 @@
       setMsg(out.alreadySubmitted?'This reading was already sent.':'Sent! Now your teacher will listen.');
     }catch(err){
       // keep the recording so he can simply press Submit again
+      if(err&&/not opened this for sending/.test(err.message||'')){openMap[s.id]=false;setMsg(err.message,true);return;}
       const limitHit=err&&/3 Rashi readings/.test(err.message||'');
       if(limitHit){dailyCount=dailyLimit;dailyDate=todayNY();}
       setMsg((err&&err.message?err.message:'Could not send.')+(limitHit?'':' Your recording is still saved here — tap Submit to try again.'),true);
@@ -290,7 +298,8 @@
   async function offer(section,onDone){
     if(cfg.isPreview()||(root.B3Guest&&root.B3Guest.isGuest&&root.B3Guest.isGuest())){onDone&&onDone();return;}
     await loadStatus(false);
-    if(dailyFull()||!canRecord(statusOf(section.id))){onDone&&onDone();return;}
+    // Practice-only sections are not pushed at the boy after a lesson; he can still record them from "Reading with Mic".
+    if(!sendOpen(section.id)||dailyFull()||!canRecord(statusOf(section.id))){onDone&&onDone();return;}
     return open(section,onDone);
   }
   // "Reading with Mic" page: every section is a choice, each with its status.
@@ -304,11 +313,12 @@
     hub.style.display='block';
     hub.replaceChildren(el('h2',null,'🎤 Reading with Mic'),el('p','rr-sub','Pick a set of Rashi words, read them out loud, and send it to your teacher. Sending a reading costs '+POINTS+' points, and you earn up to 5 back (1 for each fifth read perfectly).'));
     const list=el('div'),rows=sections.map(sec=>{
-      const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),go=button('🎤 Record','',()=>open(sec,()=>openHub(sections),()=>openHub(sections)));
-      row.append(name,chip,go);list.append(row);return {sec,chip,go};});
+      const row=el('div','rr-menu-row'),name=el('strong',null,sec.label),chip=el('span','rr-chip','…'),openChip=el('span','rr-chip',''),go=button('🎤 Record','',()=>open(sec,()=>openHub(sections),()=>openHub(sections)));
+      row.append(name,openChip,chip,go);list.append(row);return {sec,chip,openChip,go};});
     hub.append(list,el('p','rr-note','Readings today: '+dailyCount+' / '+dailyLimit),button('⬅ Menu','gold',()=>{hub.style.display='none';cfg.onBack();}));
     const map=cfg.isPreview()?{}:await loadStatus(false);
-    rows.forEach(r=>{if(dailyFull())r.go.disabled=true;const e=map[r.sec.id],st=e&&e.canRerecord&&e.status==='approved'?'rerecord':(e&&e.status)||'none',b=bannerFor(st,e);
+    rows.forEach(r=>{const isOpen=sendOpen(r.sec.id);if(!cfg.isPreview()){r.openChip.textContent=isOpen?'✅ Open for sending':'🎧 Practice only';r.openChip.className='rr-chip '+(isOpen?'rr-open-yes':'rr-open-no');}
+      if(dailyFull()&&isOpen)r.go.disabled=true;const e=map[r.sec.id],st=e&&e.canRerecord&&e.status==='approved'?'rerecord':(e&&e.status)||'none',b=bannerFor(st,e);
       r.chip.textContent=st==='none'?'Not recorded yet':b.icon+' '+b.text;r.chip.className='rr-chip '+b.cls;
       if(st==='pending'||st==='approved')r.go.textContent='View';else if(st==='rerecord')r.go.textContent='🔁 Record again';
       // A graded reading can always be opened to see the teacher's marks, even when today's 3 readings are used up.
@@ -347,8 +357,9 @@
           const status=map[p.id]?.status||'none',row=el('div','rr-menu-row');
           const details=el('div'),name=el('strong',null,'Perek '+p.perek+', Pasuk '+p.pasuk),preview=el('div','rr-note',p.text.slice(0,110)+(p.text.length>110?'…':''));
           preview.setAttribute('dir','rtl');preview.setAttribute('lang','he');details.append(name,preview);
+          if(!cfg.isPreview()){const isOpen=sendOpen(p.id);details.append(el('span','rr-chip '+(isOpen?'rr-open-yes':'rr-open-no'),isOpen?'✅ Open for sending':'🎧 Practice only'));}
           const go=button(status==='pending'?'⏳ Waiting':status==='approved'?'✅ View':'🎤 Record Reading','',()=>open({id:p.id,label:'Parshas Vayeira · '+p.perek+':'+p.pasuk,words:[p.text]},()=>openVayeiraHub(),()=>openVayeiraHub()));
-          if(dailyFull()&&status!=='pending'&&status!=='approved')go.disabled=true;
+          if(dailyFull()&&sendOpen(p.id)&&status!=='pending'&&status!=='approved')go.disabled=true;
           row.append(details,go);list.append(row);
         });
       }

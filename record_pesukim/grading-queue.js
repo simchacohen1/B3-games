@@ -4,7 +4,9 @@
   const submissionsPath = "posukPractice/submissions";
   const isPending = submission => Boolean(submission?.id && submission.status === "pending");
 
-  function watchClassCounts(db, workspaceId, onCounts, onError){
+  // options.classIds: only count these classes (the teacher's own). Leave it out to count every class (the owner's "All classes").
+  function watchClassCounts(db, workspaceId, onCounts, onError, options){
+    const onlyClasses = options && Array.isArray(options.classIds) ? new Set(options.classIds) : null;
     const classesRef = db.ref("b3Games/workspaces/" + workspaceId + "/classes");
     const students = new Map();
     let classes = [];
@@ -42,7 +44,7 @@
     const onClasses = snap => {
       if (!watching) return;
       classes = Object.entries(snap.val() || {})
-        .filter(([id, row]) => /^[A-Za-z0-9_-]{1,100}$/.test(id) && row && row.active !== false)
+        .filter(([id, row]) => /^[A-Za-z0-9_-]{1,100}$/.test(id) && row && row.active !== false && (!onlyClasses || onlyClasses.has(id)))
         .map(([id, row]) => ({
           id,
           name: id === "et" || id === "wt" ? id.toUpperCase() : String(row.name || id).replace(/^B3\s+/i, ""),

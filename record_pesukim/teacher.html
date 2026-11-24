@@ -594,6 +594,8 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="../private-media.js?v=20261015-private"></script>
+<script src="../shared/one-audio-at-a-time.js?v=20261124"></script>
+<script src="../shared/submission-open-core.js?v=20261124"></script>
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
 <script src="grading-queue.js"></script><script src="posuk-word-marks-core.js?v=20261122"></script>
@@ -4587,6 +4589,35 @@ function gradeCardHtml(s, id, graded){
       ${graded ? '' : '<div class="grade-card-foot"><button type="button" class="btn-delete-sub" data-delete="1" title="Remove without grading and refund the 5 points">Delete</button></div>'}
     </div>`;
 }
+/* "Only items I've opened": a recording already sent stays on the list by default (the boy sent it while it was open).
+   Tick the box to see only recordings for posuk that are open for sending right now (for the class or for that boy). */
+const OPEN_ONLY_KEY = 'b3PosukGradeOpenOnly';
+function openOnlyPref(){ try{ return localStorage.getItem(OPEN_ONLY_KEY) === '1'; }catch(_e){ return false; } }
+function setOpenOnlyPref(on){ try{ localStorage.setItem(OPEN_ONLY_KEY, on ? '1' : '0'); }catch(_e){} }
+async function loadOpenConfigForGrading(){
+  if(!requestedTeacherClass || !window.B3SiteSettings || !window.B3SubmissionOpenCore) return null;
+  let out;
+  try{ out = await B3SiteSettings.manageClassAccessAction(requestedTeacherClass, 'submissionOpenRead'); }
+  catch(_e){
+    try{ out = await B3SiteSettings.manageClassAccessAction(requestedTeacherClass, 'submissionOpenRead', { actorMode:'admin' }); }
+    catch(_e2){ return null; }
+  }
+  const asConfig = st => ({ all: !!(st && st.all), items: Object.fromEntries(((st && st.rules) || []).map(r => [r.rule, true])) });
+  const config = asConfig(out); config.students = {};
+  Object.entries(out.students || {}).forEach(([id, st]) => { config.students[id] = asConfig(st); });
+  return config;
+}
+function submissionPosukKeys(s){
+  if(Array.isArray(s.posukKeys) && s.posukKeys.length) return s.posukKeys;
+  const parts = String(s.selectionKey || '').split('_');
+  if(parts.length < 3) return [];
+  const last = parts.pop(), perek = parts.pop(), prefix = parts.join('_');
+  const m = /^(\d+)(?:-(\d+))?$/.exec(last);
+  if(!m) return [];
+  const out = [];
+  for(let n = Number(m[1]); n <= Number(m[2] || m[1]); n++) out.push(prefix + '_' + perek + '_' + n);
+  return out;
+}
 async function loadGradeTab(){
   await flushGradeSaves();   // never lose a tap when the list is refreshed
   const mainEl = document.getElementById('mainContent');
@@ -4604,17 +4635,32 @@ async function loadGradeTab(){
   graded.sort((a, b) => (Number(b.gradedAt) || 0) - (Number(a.gradedAt) || 0));
   const recent = graded.slice(0, 30);
   document.getElementById('gradeTabCount').textContent = pending.length ? String(pending.length) : '';
+  const onlyOpen = openOnlyPref();
+  let openConfig = null, openFilterNote = '';
+  if(onlyOpen){
+    openConfig = await loadOpenConfigForGrading();
+    if(!openConfig) openFilterNote = ' Could not check what is open, so every recording is shown.';
+  }
+  const shown = openConfig ? pending.filter(s => B3SubmissionOpenCore.isPosukOpen(openConfig, s.sid, submissionPosukKeys(s))) : pending;
+  if(openConfig) openFilterNote = ' Showing ' + shown.length + ' of ' + pending.length + ' waiting recordings (the rest are for posuk that are not open for sending).';
+  const openFilterHtml = requestedTeacherClass
+    ? '<label style="display:flex;gap:8px;align-items:center;margin:6px 0 10px;font-weight:700;"><input type="checkbox" id="gradeOpenOnly"' + (onlyOpen ? ' checked' : '') + '> Only show posuk I have opened for sending</label>' +
+      '<div style="color:var(--ink-soft);margin:-4px 0 10px;">Recordings a boy already sent stay on this list unless you tick the box.' + escapeHtml(openFilterNote) + '</div>'
+    : '';
   let html = '<h2>🎙️ Recordings to grade</h2><p style="color:var(--ink-soft);margin-top:-4px;">Each recording has the student reading the Hebrew and then translating it. Oldest first. ' +
     'Tap a number from 0 to 10: that is the student’s points (<b>10 = gold standard 🏅</b>, and the posuk is locked for a month; anything lower lets the student try again). ' +
     'There is no Save button: the grade is saved a few seconds after your last tap, and you can change it again at any time. ' +
     'If a student re-records a posuk they already earned points on, they only get the difference. The student already paid 5 points to send it. ' +
     '<b>Delete</b> removes a recording without grading it, refunds the 5 points, and lets the student send it again.</p>';
-  if(!pending.length) html += '<div class="empty-msg">Nothing waiting. 🎉</div>';
-  html += pending.map((s, i) => gradeCardHtml(s, 'gradeCard_' + i, false)).join('');
+  html += openFilterHtml;
+  if(!shown.length) html += '<div class="empty-msg">' + (pending.length ? 'No waiting recordings are for posuk you have opened.' : 'Nothing waiting. 🎉') + '</div>';
+  html += shown.map((s, i) => gradeCardHtml(s, 'gradeCard_' + i, false)).join('');
   if(recent.length) html += '<h2 style="margin-top:22px;">✔️ Recently graded</h2><p style="color:var(--ink-soft);margin-top:-4px;">Tap a different number to change a grade. The student’s points and the lock are adjusted for you.</p>' +
     recent.map((s, i) => gradeCardHtml(s, 'gradedCard_' + i, true)).join('');
   mainEl.innerHTML = html;
-  pending.forEach((s, i) => wireGradeCard(document.getElementById('gradeCard_' + i), s));
+  const openOnlyBox = document.getElementById('gradeOpenOnly');
+  if(openOnlyBox) openOnlyBox.onchange = () => { setOpenOnlyPref(openOnlyBox.checked); loadGradeTab(); };
+  shown.forEach((s, i) => wireGradeCard(document.getElementById('gradeCard_' + i), s));
   recent.forEach((s, i) => wireGradeCard(document.getElementById('gradedCard_' + i), s));
 }
 async function flushGradeSaves(){

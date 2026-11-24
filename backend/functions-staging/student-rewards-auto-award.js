@@ -8,6 +8,7 @@ const rtdb = admin.database();
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
 const posukReviewCore=require('./posuk-review-core.cjs');
+const submissionOpenCore=require('./submission-open-core.cjs');
 const letterMarks=require('./rashi-letter-marks-core.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
@@ -183,6 +184,29 @@ async function authorizeChazaraAction(teacher,body){
 }
 
 
+// ---------- Open for sending: practice-only unless the teacher opened the item ----------
+// A boy can always record, listen and practice. He can only SEND to the teacher when the item is open for him
+// (for his class or for him alone). This is the real check; the pages only mirror it.
+const SEND_CLOSED_MESSAGE='Your teacher has not opened this for sending yet. You can still record and practice it, but it cannot be sent.';
+async function submissionOpenConfig(classId){
+  return (await rtdb.ref(`b3Games/workspaces/b3-2026/classes/${classId}/submissionOpen`).get()).val()||{};
+}
+// Student page: what is open for me, with names, and (optionally) whether one posuk selection is open.
+async function submissionOpenStatus(req,res,body){
+  const kind=body.kind==='rashi'?'rashi':'posuk';
+  const student=await requirePracticeStudent(req,kind==='rashi'?rashiCore.RASHI_SOURCE:posukReviewCore.SOURCES.submit);
+  if(!student.ok)return res.status(student.status||401).json({error:student.error});
+  const config=await submissionOpenConfig(student.classId);
+  const out={ok:true,...submissionOpenCore.publicStatus(config,student.studentId,rashiCore.sectionLabel)};
+  if(kind==='rashi'){
+    out.sections=Object.fromEntries([...Object.keys(rashiCore.SECTIONS),...Object.keys(rashiCore.PASSAGES)].map(id=>[id,submissionOpenCore.isRashiOpen(config,student.studentId,id)]));
+  }else if(body.selectionKey){
+    const sel=posukReviewCore.posukKeysForSelection(String(body.selectionKey));
+    out.selectionOpen=!!sel&&submissionOpenCore.isPosukOpen(config,student.studentId,sel.keys);
+  }
+  return res.status(200).json(out);
+}
+
 // ---------- Rashi Letters reading recordings (2026-10-23) ----------
 const rashiBucket=()=>admin.storage().bucket();
 const rashiRecordRef=(studentId,sectionId)=>rtdb.ref(`rashiLetters/recordings/${studentId}/${sectionId}`);
@@ -214,6 +238,7 @@ async function rashiStudentSubmit(req,res){
   const {studentId,classId}=student;
   const sectionId=String(req.query.section||'');
   if(!rashiCore.isSection(sectionId))return res.status(400).json({error:'Unknown Rashi section.'});
+  if(!submissionOpenCore.isRashiOpen(await submissionOpenConfig(classId),studentId,sectionId))return res.status(403).json({error:SEND_CLOSED_MESSAGE,closed:true});
   const rewardStudentId=await resolveRewardStudentId(studentId);
   if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
   // For Vayeira, the server supplies the canonical entire passage, never client-provided text.
@@ -300,7 +325,9 @@ async function rashiStudentStatus(req,res){
     }
     sections[sectionId]=rashiCore.publicStatus(record,reqStatus);
   }
-  return res.status(200).json({ok:true,sections,dailyCount:await rashiDailyCount(student.studentId,rashiDate()),dailyLimit:RASHI_DAILY_LIMIT});
+  const openConfig=await submissionOpenConfig(student.classId);
+  const open=Object.fromEntries([...Object.keys(rashiCore.SECTIONS),...Object.keys(rashiCore.PASSAGES)].map(id=>[id,submissionOpenCore.isRashiOpen(openConfig,student.studentId,id)]));
+  return res.status(200).json({ok:true,sections,open,dailyCount:await rashiDailyCount(student.studentId,rashiDate()),dailyLimit:RASHI_DAILY_LIMIT});
 }
 // A student's own running letter scores (which letters he still needs to practice), worked out from his graded readings.
 async function rashiStudentLetters(req,res){
@@ -318,6 +345,13 @@ async function rashiTeacherList(teacher){
   const scope=teacher.scope;
   const all=(await rtdb.ref(`${SR_ROOT}/pointRequests`).get()).val()||{};
   const bucket=rashiBucket(),pending=[],decided=[];
+  // Is each recording for an item that is open for sending right now? (Sent recordings always stay on the list.)
+  const openConfigs=new Map();
+  const openFor=async(classId,studentId,sectionId)=>{
+    if(!classId||!/^[A-Za-z0-9_-]{1,100}$/.test(String(classId)))return false;
+    if(!openConfigs.has(classId))openConfigs.set(classId,submissionOpenConfig(classId).catch(()=>({})));
+    return submissionOpenCore.isRashiOpen(await openConfigs.get(classId),studentId,sectionId);
+  };
   for(const [id,item] of Object.entries(all)){
     if(!isRashiRequest(item))continue;
     if(scope&&!teacherClassScope.recordAllowed(scope,item.practiceStudentId,item))continue;
@@ -331,7 +365,8 @@ async function rashiTeacherList(teacher){
     let audioUrl=null;
     try{[audioUrl]=await bucket.file(record.storagePath).getSignedUrl({action:'read',expires:Date.now()+60*60*1000});}catch(err){console.warn('Rashi recording URL failed',err);}
     const info=scope?.students?.[item.practiceStudentId];
-    return {id,studentId:item.practiceStudentId,studentName:item.studentName||info?.name||item.practiceStudentId,
+    const sendOpen=await openFor(item.workspaceClassId||info?.classId,item.practiceStudentId,item.sectionId);
+    return {id,sendOpen,studentId:item.practiceStudentId,studentName:item.studentName||info?.name||item.practiceStudentId,
       classId:item.workspaceClassId||info?.classId||'',className:info?.className||item.workspaceClassId||'',sectionId:item.sectionId,
       sectionLabel:rashiCore.sectionLabel(item.sectionId),words:record.words||[],attempt:record.attempt||1,createdAt:item.createdAt||record.createdAt||0,
       durationMs:record.durationMs||0,amount:item.amount,audioUrl,
@@ -1746,6 +1781,7 @@ exports.studentRewardsAutoAward = onRequest(
       if(req.query&&req.query.rashi==="submit")return await rashiStudentSubmit(req,res);
       const body=req.body&&typeof req.body==="object"&&!Buffer.isBuffer(req.body)?req.body:{};
       const action=String(body.action||"").trim();
+      if(action==="submission-open-status")return await submissionOpenStatus(req,res,body);
       if(action==="rashi-student-status")return await rashiStudentStatus(req,res);
       if(action==="rashi-student-letters")return await rashiStudentLetters(req,res);
       if(action){
@@ -1768,6 +1804,8 @@ exports.studentRewardsAutoAward = onRequest(
         if(action==="posuk-submit"){
           const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
           if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+          const openSel=posukReviewCore.posukKeysForSelection(String(body.selectionKey||''));
+          if(openSel&&!submissionOpenCore.isPosukOpen(await submissionOpenConfig(practice.classId),practice.studentId,openSel.keys))return res.status(403).json({error:SEND_CLOSED_MESSAGE,closed:true});
           const result=await posukReview.submit({studentId:practice.studentId,classId:practice.classId,
             selectionKey:String(body.selectionKey||''),attemptId:String(body.attemptId||''),
             hebrewText:String(body.hebrewText||''),sefer:String(body.sefer||'')});
