@@ -6765,11 +6765,13 @@ function combinedRefLabel(s){
 /* Open for sending. A boy can always record, listen and practice any posuk. He can only SEND to the teacher when the
    teacher has opened that posuk for him or his class. The server enforces this; this only shows it clearly. */
 let combinedSendOpen = false, combinedOpenKey = null;
+// Read-only check (no points, nothing saved), so unlike sending it also works on the staging site, where the staging build points it at the staging function.
+const SUBMISSION_OPEN_STATUS_URL = "https://us-central1-b3-games.cloudfunctions.net/studentRewardsAutoAward";
 async function fetchCombinedOpen(key){
   const user = window.firebase && firebase.auth && firebase.auth().currentUser;
-  if(!user || !STUDENT_REWARDS_AUTO_AWARD_URL) return null;
+  if(!user) return null;
   const idToken = await user.getIdToken();
-  const response = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL, {
+  const response = await fetch(SUBMISSION_OPEN_STATUS_URL, {
     method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
     body: JSON.stringify({ action:'submission-open-status', kind:'posuk', selectionKey:key })
   });
