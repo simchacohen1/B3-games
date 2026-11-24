@@ -401,3 +401,20 @@ test('the toolbar\'s Groups button works from the real boards: available with wh
   none.boards.navigateWorkspace('teach');
   assert.equal(none.boards.groups.available(),false,'not while the teacher is showing the lesson');
 });
+
+test('Groups and Save group boards are in the "Send to all boards" bar, which is the bar the teacher sees',async()=>{
+  const f=await teacherFixture();
+  const bar=f.dom.created.find(n=>n.className==='boards-activity-bar');
+  assert.ok(bar,'the Send to all boards bar exists');
+  const labels=bar.children.filter(n=>n.tag==='button').map(n=>n.textContent);
+  assert.ok(labels.some(t=>/Groups/.test(t)),'Groups: '+labels);
+  assert.ok(labels.some(t=>/Save group boards/.test(t)));
+  assert.equal(bar.hidden,false,'shown with the student whiteboards');
+  const groups=bar.children.find(n=>n.tag==='button'&&/Groups/.test(n.textContent));
+  assert.equal(groups.hidden,false);
+  groups.click();
+  assert.ok(f.button('Make random groups'),'it opens the Groups window');
+  const solo=await teacherFixture({grouped:false});
+  const soloBar=solo.dom.created.find(n=>n.className==='boards-activity-bar');
+  assert.equal(soloBar.children.find(n=>n.tag==='button'&&/Save group boards/.test(n.textContent)).hidden,true,'Save group boards appears once there are groups');
+});

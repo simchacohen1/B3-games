@@ -1136,7 +1136,7 @@
   groupsBtn.hidden=!Groups;saveGroupsBtn.hidden=true;
   const groupsDialog=el('div','boards-groups-dialog');groupsDialog.hidden=true;groupsDialog.setAttribute('role','dialog');groupsDialog.setAttribute('aria-label','Groups');
   groupsDialog.style.cssText='position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:none;align-items:center;justify-content:center;padding:18px';
-  gridBar.append(el('strong','boards-title','🧑‍🎨 Students'),count,modes,chooseParticipants,groupsBtn,saveGroupsBtn,el('span','boards-hint','Click a tile to open it large · 🚫 pauses a student'),el('span','boards-spacer'),clearAll,
+  gridBar.append(el('strong','boards-title','🧑‍🎨 Students'),count,modes,chooseParticipants,el('span','boards-hint','Click a tile to open it large · 🚫 pauses a student'),el('span','boards-spacer'),clearAll,
     button('✕ Close boards','Return everyone to the lesson. Whiteboards are kept until the class ends.',()=>setOn(false)));
 
   // Teacher sends an identical, non-erasable activity background to all boys.
@@ -1371,7 +1371,8 @@
   stage.appendChild(tilesDialog);shield(tilesDialog);
   stage.appendChild(groupsDialog);shield(groupsDialog);
   if(!Tiles)sendTiles.hidden=true;
-  activityBar.append(el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendTiles,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
+  // Groups sit first in this bar: it is the bar that shows on the teacher page (the gallery's own top bar is hidden there).
+  activityBar.append(groupsBtn,saveGroupsBtn,el('strong',null,'Send to all boards:'),wordInput,instructionInput,sendWord,sendTiles,sendImage,pasteAll,removeActivity,imageFile,activityLabel,el('span','boards-paste-hint','📋 Ctrl+V here to send copied text or pictures'));
   wordInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendWord.click()}});
   imageFile.addEventListener('change',async()=>{
     const file=imageFile.files?.[0];imageFile.value='';
