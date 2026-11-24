@@ -328,7 +328,20 @@ function cpMountSubmissionOpen(panel,classId,className){
     students:()=>cpStudentList(classId)});
   cpLoadNames(classId);
 }
+// The class panel is rebuilt on every class or settings change and every 30 seconds. That moves the "Open for sending" box
+// and closes any dropdown the teacher has open in it, so while the teacher is working inside that box the rebuild waits.
+let cpRenderPending=false;
+function cpUserIsEditingOpenForSending(){
+  const card=document.getElementById("submissionOpenCard");
+  return Boolean(card&&card.contains(document.activeElement));
+}
+document.addEventListener("focusout",()=>{
+  if(!cpRenderPending)return;
+  setTimeout(()=>{if(!cpRenderPending||cpUserIsEditingOpenForSending())return;cpRenderPending=false;if(currentTab==="access")renderOwnerControl();},0);
+});
 function renderOwnerControl(){
+  if(cpUserIsEditingOpenForSending()){cpRenderPending=true;return}
+  cpRenderPending=false;
   if(cpClass!==cpHostedClass){cpHostedClass=cpClass;cpTellHost();}
   const panel=document.getElementById("ownerControlPanel"),api=cpApi();
   if(!cpSettings||!api){panel.innerHTML='<div class="cp-wrap"><div class="ta-card">Loading your classes…</div></div>';return}
