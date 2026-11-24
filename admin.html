@@ -199,7 +199,7 @@ async function renderTeacherAccess(msg){
 // game with a one-tap Open/Closed switch. Starred games stay open while the
 // class is locked.
 let CP_CLASSES=[{id:"et",name:"ET"},{id:"wt",name:"WT"}];
-let cpRecords={},cpClassesUnsub=false;
+let cpRecords={},cpClassesUnsub=false,cpFallbackWatching=false;
 let cpClass=requestedClassId||(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
 let cpSettings=null,cpUnsub=null,cpTimer=null,cpBusy=false,cpMsg="";
 function cpClassTabs(){
@@ -219,14 +219,7 @@ function cpWatchClasses(){
  if(access.role!=="admin"){
    const ids=(access.classIds||[]).filter(id=>typeof id==="string"&&/^[A-Za-z0-9_-]{1,100}$/.test(id));
    if(!ids.length){CP_CLASSES=[];cpRecords={};return}
-   let loaded=0;
-   ids.forEach(id=>db.ref("b3Games/workspaces/"+ws+"/classes/"+id).on("value",snapshot=>{
-     const row=snapshot.val();if(row)cpRecords[id]=row;else delete cpRecords[id];loaded++;
-     if(loaded<ids.length)return;
-     CP_CLASSES=ids.filter(key=>cpRecords[key]?.active!==false&&cpRecords[key]).map(key=>({id:key,name:String(cpRecords[key].name||key)}));
-     if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
-     if(currentTab==="access"&&!isOwnerNow())renderOwnerControl();
-   },e=>{console.error("Could not load assigned class",id,e)}));
+   cpWatchClassIds(db,ws,ids,()=>currentTab==="access"&&!isOwnerNow());
    return;
  }
  db.ref("b3Games/workspaces/"+ws+"/classes").on("value",snapshot=>{
@@ -239,7 +232,37 @@ function cpWatchClasses(){
    CP_CLASSES=all.map(([id,row])=>({id,name:String(row.name||id)}));
    if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
    if(currentTab==="access"&&isOwnerNow())renderOwnerControl();
- },e=>{console.error("Could not load class registry",e);cpClassesUnsub=false});
+ },e=>{
+   console.error("Could not load class registry",e);cpClassesUnsub=false;
+   cpWatchOwnClassesFallback(db,ws,w);
+ });
+}
+// Some databases (the staging one) allow reading a class at a time but not the whole class list. Then an admin still gets
+// the classes they are assigned to, plus the class in the address or last used, instead of the ET/WT placeholders.
+async function cpWatchOwnClassesFallback(db,ws,w){
+  if(cpFallbackWatching)return;
+  cpFallbackWatching=true;
+  const ids=new Set([requestedClassId]);
+  try{const saved=localStorage.getItem("b3ControlClass");if(saved)ids.add(saved)}catch(e){}
+  try{
+    const uid=w.firebase.auth().currentUser?.uid;
+    const mine=uid?(await db.ref("b3Games/workspaces/"+ws+"/teachers/"+uid+"/classIds").once("value")).val()||{}:{};
+    Object.keys(mine).forEach(id=>{if(mine[id]===true)ids.add(id)});
+  }catch(e){}
+  const valid=[...ids].filter(id=>id&&id!=="*"&&/^[A-Za-z0-9_-]{1,100}$/.test(id));
+  if(!valid.length){cpFallbackWatching=false;return}
+  cpWatchClassIds(db,ws,valid,()=>currentTab==="access",true);
+}
+function cpWatchClassIds(db,ws,ids,shouldRender,isFallback){
+  let loaded=0;
+  ids.forEach(id=>db.ref("b3Games/workspaces/"+ws+"/classes/"+id).on("value",snapshot=>{
+    const row=snapshot.val();if(row)cpRecords[id]=row;else delete cpRecords[id];loaded++;
+    if(loaded<ids.length)return;
+    CP_CLASSES=ids.filter(key=>cpRecords[key]?.active!==false&&cpRecords[key]).map(key=>({id:key,name:String(cpRecords[key].name||key)}));
+    if(isFallback&&!CP_CLASSES.length)return;
+    if(!CP_CLASSES.some(c=>c.id===cpClass))cpClass=CP_CLASSES[0]?.id||"";
+    if(shouldRender())renderOwnerControl();
+  },e=>{console.error("Could not load class",id,e)}));
 }
 function cpApi(){return frame.contentWindow?.B3SiteSettings}
 function cpGames(){
