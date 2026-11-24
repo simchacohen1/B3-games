@@ -4580,6 +4580,7 @@ function renderClassPosukDetail(posukKey, bodyEl){
   .gm-seg button{ font:700 .9rem system-ui,sans-serif; padding:7px 13px; border:0; background:#fff; color:var(--ink); cursor:pointer; }
   .gm-seg button+button{ border-left:2px solid #d9cba6; }
   .gm-seg button.on{ background:var(--navy); color:#fff; }
+  .grade-hint{ color:var(--ink-soft); font-size:.85rem; }
   .gm-start{ margin-left:auto; }
   .gm-mark-head{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:2px 0 6px; }
   .gm-mark-count{ font-size:1.35rem; color:var(--ink); }
@@ -4665,7 +4666,7 @@ function gradeCardHtml(s, id, graded){
         ${B3PosukWordMarks.splitWords(s.hebrewText).length ? '<span class="grade-suggested" data-field="suggested" title="Only a suggestion, worked out from the word marks. It never changes the 0-10 grade or the points."></span>' : ''}
       </div>
       <div class="grade-msg" data-field="msg">${saved === null ? '' : 'Saved: ' + saved + '/10. You can still change it.'}</div>
-      ${graded ? '' : '<div class="grade-card-foot"><button type="button" class="btn-delete-sub" data-delete="1" title="Remove without grading and refund the 5 points">Delete</button></div>'}
+      ${graded ? '<div class="grade-card-foot grade-hint">Graded recordings cannot be deleted (the points were already paid). Tap a different number to change the grade.</div>' : '<div class="grade-card-foot"><button type="button" class="btn-delete-sub" data-delete="1" title="Remove without grading and refund the 5 points">Delete</button></div>'}
     </div>`;
 }
 /* "Only items I've opened": a recording already sent stays on the list by default (the boy sent it while it was open).
