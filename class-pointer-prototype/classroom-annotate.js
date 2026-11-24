@@ -180,13 +180,6 @@
       onClick(){spot.checked=!spot.checked;spot.dispatchEvent(new Event('change',{bubbles:true}))}});
     return out;
   }
-  function groupItems(){
-    const groups=window.ClassPointerBoards?.groups,active=!!groups?.active?.();
-    return [
-      {icon:'\u{1F3B2}',label:active?'Change groups':'Make groups',title:'Split the students into groups, move a student, or rename a group',onClick:()=>groups?.open?.()},
-      {icon:'\u{1F4BE}',label:'Save group boards',title:'Save every group\u2019s board in your whiteboard files',disabled:!active,onClick:()=>groups?.save?.()}
-    ];
-  }
   function sendItems(){
     // A whiteboard with several pages: send the page on the screen (one picture, as always) or every page (one page each).
     const pages=window.ClassPointerPdf?.pagesInfo?.(),send=window.FTTSavedWork?.sendCurrent;
@@ -197,6 +190,13 @@
     return [
       ...board,
       {icon:'📄',label:'A PDF from my library',disabled:!window.PointerPdfLibrary?.openForSend,onClick:()=>window.PointerPdfLibrary?.openForSend?.()}
+    ];
+  }
+  function groupItems(){
+    const groups=window.ClassPointerBoards?.groups,active=!!groups?.active?.();
+    return [
+      {icon:'\u{1F3B2}',label:active?'Change groups':'Make groups',title:'Split the students into groups, move a student, or rename a group',onClick:()=>groups?.open?.()},
+      {icon:'\u{1F4BE}',label:'Save group boards',title:'Save every group\u2019s board in your whiteboard files',disabled:!active,onClick:()=>groups?.save?.()}
     ];
   }
   function actions(){
