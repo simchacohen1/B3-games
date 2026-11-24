@@ -2478,10 +2478,21 @@ async function checkAccess(name,pin,idHint=''){
   const typed=String(name||'').trim(),enteredPin=String(pin||'').trim();
   if(!typed.replace(/[^a-z0-9]/gi,'')||!enteredPin)return {ok:false,reason:'Enter your name and passcode.'};
   let data;
-  try{
+  // A boy in two classes picked one on the main site. Ask for THAT class: with none named the server starts him in his
+  // first class, and the new token would then not match the class this page reads (every class read is refused).
+  let pickedClass='';
+  try{if(idHint&&sessionStorage.getItem('b3Games_studentId')===idHint)pickedClass=String(sessionStorage.getItem('b3Games_studentClass')||'').trim();}catch(_e){}
+  const loginOnce=async classId=>{
     const response=await fetch(STUDENT_AUTH_URL,{method:'POST',signal:AbortSignal.timeout(15000),
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',name:typed,pin:enteredPin})});
-    data=await response.json().catch(()=>({}));
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',name:typed,pin:enteredPin,...(classId?{classId}:{})})});
+    return {response,data:await response.json().catch(()=>({}))};
+  };
+  try{
+    let out=await loginOnce(pickedClass);
+    // The picked class may have been closed to him since: fall back to the server's own choice, as before.
+    if(!out.response.ok&&pickedClass&&out.response.status===403)out=await loginOnce('');
+    const response=out.response;
+    data=out.data;
     if(!response.ok)return {ok:false,reason:data.error||'Check your name and passcode. Sign in from the main site if needed.'};
   }catch(err){
     return {ok:false,reason:'Could not check your login. Try again.'};
