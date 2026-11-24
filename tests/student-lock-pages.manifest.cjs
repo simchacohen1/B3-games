@@ -78,7 +78,8 @@ const EXEMPT_PAGES = {
   "weekly-quiz/teacher.html": "teacher",
   "word-bank/teacher.html": "teacher",
   "yiddish/sync.html": "teacher story timing tool",
-  "yiddish/teacher.html": "teacher"
+  "yiddish/teacher.html": "teacher",
+  "yiddish/story2/teacher.html": "teacher-only Story 2 settings (Google sign-in and backend authorization)"
 };
 // Folders that never serve student pages (tests, tooling, copies for previews).
 const IGNORED_DIRS = ['preview-', '_worktrees/', 'tests/', 'e2e', 'docs/', 'scripts/', 'staging/', 'security/', 'testing/', 'vendor/', 'auth-hosting/', 'sols-site/', 'sync-to-nigri/', 'backup-', 'node_modules/'];

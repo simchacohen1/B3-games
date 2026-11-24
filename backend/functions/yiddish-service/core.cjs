@@ -80,12 +80,55 @@ async function identity(body){
  return {id:session.studentId,name:row.profile?.name||row.classRecord.members[session.studentId].name||session.studentId,classId};
 }
 
+// Story 2 is independent of the legacy Wine Merchant lesson configuration and rewards.
+const STORY2_PARTS=8;
+const story2Path=c=>'yiddishPrivate/story2/classes/'+WORKSPACE+'/'+c+'/settings';
+const story2ProgressPath=(c,id)=>'yiddishPrivate/story2/classes/'+WORKSPACE+'/'+c+'/progress/'+id;
+const newStory2=()=>({version:0,openParts:0,vocabulary:Array.from({length:STORY2_PARTS},()=>[])});
+const validateStory2=v=>{
+ if(!v||!Number.isInteger(v.openParts)||v.openParts<0||v.openParts>STORY2_PARTS||!Array.isArray(v.vocabulary)||v.vocabulary.length!==STORY2_PARTS)fail(400,'Invalid Story 2 lesson settings.');
+ v.vocabulary.forEach(part=>{
+  if(!Array.isArray(part)||part.length>15)fail(400,'Use up to 15 vocabulary words per part.');
+  const used=new Set();
+  part.forEach(w=>{
+   if(!w||typeof w.yi!=='string'||typeof w.en!=='string'||!w.yi.trim()||!w.en.trim()||w.yi.length>100||w.en.length>140)fail(400,'Each word needs Yiddish and English meanings.');
+   if(used.has(w.yi.trim()))fail(400,'Do not repeat words in a part.');
+   used.add(w.yi.trim());
+  });
+ });
+ return v;
+};
 function allowed(c,who,g){if(!Number.isInteger(g)||g<0||g>3||g>=c.unlocked[who.classId]||!c.sections[g].verified)fail(403,'This section is not open yet.')}
 return async function handle(b,ip='unknown'){
  if(!b||typeof b.action!=='string')fail(400,'Choose an action.');
  if(b.action.startsWith('teacher')){
   const access=await teacher(b.idToken,b.classId),classId=access.classId;
   if(legacy(classId)&&!access.owner)fail(403,'Legacy B3 lesson editing is available to the owner during migration.');
+  if(b.action==='teacherStory2Load'){
+   const settings=await get(story2Path(classId))||newStory2();
+   const classRow=await get('b3Games/workspaces/'+WORKSPACE+'/classes/'+classId);
+   const members=legacy(classId)&&access.owner?await get('posukPractice/allowedStudents'):classRow?.members;
+   const students={};
+   for(const [id,v] of Object.entries(members||{})){
+    if(v?.active===false)continue;
+    students[id]={name:v.name||id,progress:await get(story2ProgressPath(classId,id))||{}};
+   }
+   return {settings,students,classId};
+  }
+  if(b.action==='teacherStory2Save'){
+   const input=b.settings;
+   if(!input||!Number.isInteger(input.version)||input.version<0)fail(400,'Invalid Story 2 settings.');
+   validateStory2(input);
+   let outcome=null;
+   await store.tx(story2Path(classId),cur=>{
+    outcome=null;
+    const base=cur||newStory2();
+    if(base.version!==input.version){outcome={code:409,message:'Story 2 settings changed elsewhere. Refresh and try again.'};return cur}
+    return {version:base.version+1,openParts:input.openParts,vocabulary:input.vocabulary.map(part=>part.map(w=>({yi:w.yi.trim(),en:w.en.trim()})))};
+   });
+   if(outcome)fail(outcome.code,outcome.message);
+   return {settings:await get(story2Path(classId))};
+  }
   if(b.action==='teacherLoad'){
    const [c,classRow]=await Promise.all([cfg(classId),get('b3Games/workspaces/'+WORKSPACE+'/classes/'+classId)]);
    const members=legacy(classId)&&access.owner?await get('posukPractice/allowedStudents'):classRow?.members;
@@ -196,6 +239,36 @@ return async function handle(b,ip='unknown'){
   fail(403,'Your class does not have a Yiddish story yet.');
  }
 
+ if(b.action==='story2Status'){
+  const settings=await get(story2Path(who.classId))||newStory2();
+  const progress=await get(story2ProgressPath(who.classId,who.id))||{};
+  return {openParts:settings.openParts,parts:settings.vocabulary.map((v,i)=>({number:i+1,wordCount:v.length,words:i<settings.openParts?v.map(w=>({yi:w.yi,en:w.en})):[]})),progress};
+ }
+ if(b.action==='story2Practice'){
+  const settings=await get(story2Path(who.classId))||newStory2();
+  const part=Number(b.part);
+  if(!Number.isInteger(part)||part<0||part>=settings.openParts)fail(403,'This story part is not open.');
+  const vocab=settings.vocabulary[part]||[];
+  if(vocab.length<2)fail(400,'Teacher needs to add at least two vocabulary words to this part.');
+  const position=Number(b.position);
+  if(!Number.isInteger(position)||position<0||position>=vocab.length)fail(400,'Choose a valid vocabulary question.');
+  const correct=vocab[position];
+  if(b.answer===undefined){
+   const options=vocab.map(w=>w.en);
+   // Stable order is intentional: this is practice, not a secure assessment.
+   return {question:correct.yi,options,position,total:vocab.length};
+  }
+  if(typeof b.answer!=='string'||b.answer.length>140)fail(400,'Choose a valid answer.');
+  const ok=b.answer===correct.en;
+  const pp=story2ProgressPath(who.classId,who.id);
+  if(ok)await store.tx(pp,cur=>{
+   const next=cur&&typeof cur==='object'?cur:{};
+   const done={...(next.completed||{})},hits={...(done[part]||{})};
+   hits[position]=true;done[part]=hits;
+   return {...next,completed:done,updatedAt:now()};
+  });
+  return {correct:ok,correctAnswer:correct.en};
+ }
  if(b.action==='status'){const p=await get(path)||{};return {student:who,config:c,progress:p.words||{},round:publicRound(p.round),storyTimes:await storyTimes()}}
  if(b.action==='start'){allowed(c,who,b.group);const shuffle=a=>a.map(v=>({v,n:crypto.randomInt(1000000)})).sort((a,b)=>a.n-b.n).map(x=>x.v);const secWords=c.sections[b.group].words;let selected=secWords,part=null;if(b.part!==undefined&&b.part!==null){part=Number(b.part);const parts=Math.max(1,Math.ceil(secWords.length/4));if(!Number.isInteger(part)||part<0||part>=parts)fail(400,'Choose a valid step.');const openSteps=c.unlockedSteps&&c.unlockedSteps[who.classId];const stepNo=c.sections.slice(0,b.group).reduce((n,s)=>n+Math.max(1,Math.ceil(s.words.length/4)),0)+part+1;if(Number.isInteger(openSteps)&&stepNo>openSteps)fail(403,'This step is not open yet.');const fresh=secWords.slice(part*4,part*4+4);const earlier=[...c.sections.slice(0,b.group).flatMap(s=>s.words),...secWords.slice(0,part*4)];const prog=(await get(path))?.words||{};const review=shuffle(earlier).sort((x,y)=>(prog[x]?.credits||0)-(prog[y]?.credits||0)).slice(0,4);selected=[...fresh,...review]}const round={id:random(),group:b.group,part,version:c.version,index:0,started:now(),items:shuffle(selected).map(id=>({wordId:id,choices:shuffle([id,...shuffle(words.filter(w=>w.id!==id).map(w=>w.id)).slice(0,3)])})),results:{},responses:{}};await store.tx(path,p=>{p=p||{};p.rounds=p.rounds||{};p.rounds[round.id]=round;p.round=round;const ids=Object.keys(p.rounds).sort((a,b)=>(p.rounds[b]?.started||0)-(p.rounds[a]?.started||0));for(const id of ids.slice(6))delete p.rounds[id];return p});return {round:publicRound(round)}}
  if(b.action==='storyAnswer'){allowed(c,who,b.group);const sec=c.sections[b.group],paragraph=Number(b.paragraph),position=Number(b.position),total=Number(b.total),wrongCount=Number(b.wrongCount),requestId=String(b.requestId||'');if(!Number.isInteger(paragraph)||paragraph<sec.first||paragraph>sec.last||!Number.isInteger(position)||position<1||!Number.isInteger(total)||total<1||position>total||!Number.isInteger(wrongCount)||wrongCount<0||wrongCount>20||!/^[a-f0-9-]{20,64}$/.test(requestId))fail(400,'Invalid Story Detective result.');await store.tx(path,p=>{p=p||{};p.storyDetective=p.storyDetective||{sections:{},responses:{}};const sd=p.storyDetective;sd.sections=sd.sections||{};sd.responses=sd.responses||{};if(sd.responses[requestId])return p;const key=String(b.group),ss=sd.sections[key]||{answers:0,firstTryCorrect:0,misses:0,completedRounds:0,paragraphs:{}};ss.answers=Number(ss.answers||0)+1;ss.firstTryCorrect=Number(ss.firstTryCorrect||0)+(wrongCount===0?1:0);ss.misses=Number(ss.misses||0)+wrongCount;ss.lastPosition=position;ss.lastTotal=total;ss.lastParagraph=paragraph;ss.lastActive=now();if(position===total)ss.completedRounds=Number(ss.completedRounds||0)+1;ss.paragraphs=ss.paragraphs||{};const pk=String(paragraph),ps=ss.paragraphs[pk]||{answers:0,firstTryCorrect:0,misses:0};ps.answers=Number(ps.answers||0)+1;ps.firstTryCorrect=Number(ps.firstTryCorrect||0)+(wrongCount===0?1:0);ps.misses=Number(ps.misses||0)+wrongCount;ps.lastActive=now();ss.paragraphs[pk]=ps;sd.sections[key]=ss;sd.lastGroup=b.group;sd.lastActive=now();sd.responses[requestId]=now();const responseIds=Object.keys(sd.responses).sort((a,b)=>Number(sd.responses[b]||0)-Number(sd.responses[a]||0));for(const id of responseIds.slice(200))delete sd.responses[id];p.storyDetective=sd;p.lastActive=now();return p});return {ok:true}}
