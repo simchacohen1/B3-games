@@ -19,7 +19,16 @@ header .who{margin-left:auto;font-weight:800}
 main{max-width:640px;margin:0 auto;padding:18px 16px 60px}
 .banner{background:#fff8e1;border:2px solid #f1d58a;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-weight:700}
 .banner a{color:var(--navy)}
-.date{text-align:center;color:var(--muted);font-weight:800;margin:4px 0 6px}
+.daynav{display:flex;align-items:center;gap:10px;margin:4px 0 10px}
+.daynav .arr{flex:none;width:54px;height:54px;border-radius:14px;border:2px solid var(--navy);background:#fff;color:var(--navy);font-size:26px;font-weight:900;line-height:1}
+.daynav .arr[disabled]{opacity:.25;cursor:default;border-color:var(--line)}
+.date{flex:1;text-align:center;color:var(--navy);font-weight:900;font-size:18px;border-radius:14px;padding:8px 6px;background:#fff;border:2px solid var(--line)}
+.date small{display:block;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+.date.yest{background:#fff3d6;border-color:#e0a21a;color:#7a4b00}
+.pic{flex:none;width:50px;height:50px;border-radius:12px;background:#eef5fb;display:flex;align-items:center;justify-content:center;font-size:32px}
+.spk{flex:none;width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:#fff;font-size:22px;line-height:1}
+.spk.on{background:var(--navy);border-color:var(--navy)}
+@media(max-width:420px){.row{flex-wrap:wrap}.row .nm{min-width:0;flex-basis:calc(100% - 120px)}.mini{width:100%}.mini button{flex:1}}
 .progress{height:10px;background:#dbe6ef;border-radius:999px;overflow:hidden;margin:6px 0 4px}
 .progress i{display:block;height:100%;background:var(--navy);width:0;transition:width .25s}
 .count{text-align:center;color:var(--muted);font-weight:800;font-size:14px;margin-bottom:14px}
@@ -65,7 +74,11 @@ main{max-width:640px;margin:0 auto;padding:18px 16px 60px}
 </header>
 <main>
   <div class="banner hidden" id="banner"></div>
-  <div class="date" id="dateLabel"></div>
+  <div class="daynav">
+    <button type="button" class="arr" id="prevDay" aria-label="Go back to yesterday">◀</button>
+    <div class="date" id="dateLabel" aria-live="polite"></div>
+    <button type="button" class="arr" id="nextDay" aria-label="Go forward to today">▶</button>
+  </div>
   <div id="loading" class="note">Loading…</div>
 
   <section id="summary" class="hidden">
@@ -85,9 +98,13 @@ var isGuest=function(){return !!(window.B3Guest&&window.B3Guest.isGuest())};
 var studentId=String(sessionStorage.getItem("b3Games_studentId")||sessionStorage.getItem("posukPractice_studentId")||"").trim();
 var studentName=String(sessionStorage.getItem("b3Games_studentName")||"").trim();
 var items=C.DEFAULT_ITEMS.map(function(x,i){return {id:x.id,name:x.name,star:x.star,order:i}});
-var answers={};      // itemId -> 1 | 0 (today only)
+var answers={};      // itemId -> 1 | 0 (for the day being shown)
 var today=C.schoolDate();
-var dayRef=null;     // answers/{today}/{studentId}; null means "nothing is saved" (guest, teacher demo, no class)
+var yesterday=C.shiftDate(today,-1);
+var viewDay=today;   // the day being shown: today or yesterday
+var answersByDay={};answersByDay[today]=answers;
+var loadedDays={};
+var db=null,base=null;
 var saveFailed=false;
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]})}
@@ -101,16 +118,43 @@ function render(){
   if(!items.length){show("loading");$("loading").textContent="Your teacher has not added any checklist items yet.";return}
   renderSummary();
 }
+function dayRefFor(day){return(db&&base&&studentId)?db.ref(base+"/answers/"+day+"/"+studentId):null}
+function updateNav(){
+  var y=viewDay===yesterday;
+  $("dateLabel").innerHTML='<small>'+(y?"Yesterday":"Today")+'</small>'+esc(pretty(viewDay));
+  $("dateLabel").classList.toggle("yest",y);
+  $("prevDay").disabled=y;$("nextDay").disabled=!y;
+}
+var canSpeak=!!(window.speechSynthesis&&window.SpeechSynthesisUtterance);
+var HEB=/[֐-׿]/;
+function speak(text,btn){
+  if(!canSpeak)return;
+  var ss=window.speechSynthesis;ss.cancel();
+  var parts=String(text).match(/[֐-׿][֐-׿\s'"׳״]*|[^֐-׿]+/g)||[];
+  var last=null;
+  parts.forEach(function(p){
+    if(!p.trim())return;
+    var u=new SpeechSynthesisUtterance(p.trim());u.lang=HEB.test(p)?"he-IL":"en-US";
+    var pre=u.lang.slice(0,2);
+    var v=ss.getVoices().filter(function(x){var l=String(x.lang||"").toLowerCase().replace("_","-");return l.slice(0,2)===pre||(pre==="he"&&l.slice(0,2)==="iw")})[0];
+    if(v)u.voice=v;
+    u.rate=.85;last=u;ss.speak(u);
+  });
+  if(last&&btn){btn.classList.add("on");var off=function(){btn.classList.remove("on")};last.onend=off;last.onerror=off}
+}
 function renderSummary(){
   show("summary");
-  $("doneMsg").textContent=items.every(function(it){return answers[it.id]!=null})?"All done for today! 🎉":"Tap YES or NO for each one.";
+  var yd=viewDay===yesterday;
+  $("doneMsg").textContent=items.every(function(it){return answers[it.id]!=null})?(yd?"All done for yesterday! 🎉":"All done for today! 🎉"):(yd?"Tap YES or NO for what you did yesterday.":"Tap YES or NO for each one.");
   $("list").innerHTML=items.map(function(it,i){var a=answers[it.id];
-    return '<div class="row"><div class="nm" dir="auto">'+nameHtml(it)+'</div><div class="mini">'+
+    return '<div class="row"><div class="pic" aria-hidden="true">'+C.iconFor(it)+'</div><div class="nm" dir="auto">'+nameHtml(it)+'</div>'+
+      (canSpeak?'<button type="button" class="spk" data-s="'+i+'" aria-label="Read aloud: '+esc(it.name)+'">🔊</button>':'')+'<div class="mini">'+
       '<button type="button" class="yes'+(a===1?' on':'')+'" data-i="'+i+'" data-v="1">YES</button>'+
       '<button type="button" class="no'+(a===0?' on':'')+'" data-i="'+i+'" data-v="0">NO</button></div></div>'}).join("");
 }
 function setAnswer(it,v){
   answers[it.id]=v;
+  var dayRef=dayRefFor(viewDay);
   if(!dayRef)return;
   var upd={name:studentName||studentId,t:firebase.database.ServerValue.TIMESTAMP};
   upd["items/"+it.id]={v:v,n:it.name,s:it.star?1:0,o:it.order};
@@ -119,6 +163,8 @@ function setAnswer(it,v){
 }
 
 $("list").onclick=function(e){
+  var sp=e.target.closest("button[data-s]");
+  if(sp){speak(items[+sp.dataset.s].name,sp);return}
   var b=e.target.closest("button[data-i]");if(!b)return;
   setAnswer(items[+b.dataset.i],+b.dataset.v);renderSummary();
 };
@@ -130,8 +176,31 @@ async function waitForAuth(){
   }catch(e){}
 }
 
+/* Read a day's saved answers once (cached). Today and yesterday are the only days a boy can open. */
+async function loadDay(day){
+  var ref=dayRefFor(day);
+  if(!ref||loadedDays[day])return;
+  var snap=await ref.child("items").once("value");
+  var saved=snap.val()||{},a=answersByDay[day]||(answersByDay[day]={});
+  items.forEach(function(it){var s=saved[it.id];if(s&&(s.v===1||s.v===0)&&a[it.id]==null)a[it.id]=s.v});
+  loadedDays[day]=true;
+}
+async function goDay(day){
+  if(day===viewDay)return;
+  viewDay=day;answers=answersByDay[day]||(answersByDay[day]={});
+  updateNav();setNote("");
+  if(dayRefFor(day)&&!loadedDays[day]){
+    show("loading");$("loading").textContent="Loading…";
+    try{await loadDay(day)}catch(e){console.warn("Daily Checklist day load failed",e);setNote("Could not load that day's saved answers. You can still answer.")}
+    if(viewDay!==day)return; // the boy tapped an arrow again while this was loading
+  }
+  render();
+}
+$("prevDay").onclick=function(){goDay(yesterday)};
+$("nextDay").onclick=function(){goDay(today)};
+
 async function start(){
-  $("dateLabel").textContent=pretty(today);
+  updateNav();
   if(isGuest()){
     $("whoName").textContent="Guest";
     setNote("Guest preview — nothing is saved.");
@@ -152,19 +221,16 @@ async function start(){
     if(!window.firebase||!window.B3_FIREBASE_CONFIG)throw new Error("Firebase not loaded");
     if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
     await waitForAuth();
-    var db=firebase.database();
+    db=firebase.database();
     var info=await window.FunTorahStudentClass.resolve(db,studentId);
     if(!info.classId){setNote("Ask your teacher to add you to a class to save your answers.");render();return}
-    var base=C.basePath(info.workspaceId,info.classId);
+    base=C.basePath(info.workspaceId,info.classId);
     try{var cfg=await db.ref(base+"/config/items").once("value");if(cfg.val())items=C.itemsFromConfig(cfg.val(),false)}
     catch(e){console.warn("Daily Checklist items unavailable, using the standard list",e)}
-    dayRef=db.ref(base+"/answers/"+today+"/"+studentId);
-    var snap=await dayRef.child("items").once("value");
-    var saved=snap.val()||{};
-    items.forEach(function(it){var s=saved[it.id];if(s&&(s.v===1||s.v===0))answers[it.id]=s.v});
+    await loadDay(today);
     render();
   }catch(e){
-    console.error(e);dayRef=null;
+    console.error(e);db=null;base=null;
     setNote("Could not connect, so answers will not be saved right now. Please refresh.");
     render();
   }

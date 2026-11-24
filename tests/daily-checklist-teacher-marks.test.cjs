@@ -50,3 +50,11 @@ test('teacher page: only current items are clickable, with keyboard support, and
   const inline = html.match(/<script>([\s\S]*?)<\/script>/g).map(s => s.replace(/<\/?script>/g, '')).join('\n');
   assert.doesNotThrow(() => new Function(inline));
 });
+
+test('day arrows: shiftDate crosses month/year edges and every standard item has a picture', () => {
+  assert.equal(C.shiftDate('2026-12-01', -1), '2026-11-30');
+  assert.equal(C.shiftDate('2027-01-01', -1), '2026-12-31');
+  assert.equal(C.shiftDate('2026-03-01', -1), '2026-02-28');
+  C.DEFAULT_ITEMS.forEach(it => assert.ok(C.iconFor(it) && C.iconFor(it) !== '📝', it.id));
+  assert.equal(C.iconFor({ id: 'i123', name: 'Something new' }), '📝');
+});

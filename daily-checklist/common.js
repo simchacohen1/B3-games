@@ -23,6 +23,20 @@
     var v=function(t){var p=parts.find(function(x){return x.type===t});return p?p.value:""};
     return v("year")+"-"+v("month")+"-"+v("day");
   }
+  // The day before/after a YYYY-MM-DD key (pure calendar math, no time zone involved).
+  function shiftDate(key,n){
+    var p=String(key).split("-");var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+n));
+    return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");
+  }
+  // A simple picture for each standard item, so a boy who cannot read yet knows what it is.
+  var ICONS={"tzedaka":"🪙","shacharis":"🌅","mincha":"☀️","rebbes-kapitel":"📖","sefer-hamitzvos":"📚","tanya-lines":"📜","homework":"✏️","nigel-vasser":"💧","prepare-nigel-vasser":"🫗","tehillim":"🙏"};
+  var ICON_WORDS=[[/tzedak|charity|צדק/i,"🪙"],[/shachar|שחר/i,"🌅"],[/mincha|מנח/i,"☀️"],[/maariv|ערבית|מעריב/i,"🌙"],[/tehillim|תהל/i,"🙏"],[/tanya|תני/i,"📜"],[/homework|hw/i,"✏️"],[/wash|נעגל|וואסער|water/i,"💧"],[/read|kapitel|book/i,"📖"],[/daven|pray/i,"🙏"]];
+  function iconFor(item){
+    if(item&&ICONS[item.id])return ICONS[item.id];
+    var n=String(item&&item.name||"");
+    for(var i=0;i<ICON_WORDS.length;i++)if(ICON_WORDS[i][0].test(n))return ICON_WORDS[i][1];
+    return "📝";
+  }
   function isDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||""))}
   // Turn the stored config/items object into an ordered list. removed items are kept only when asked.
   function itemsFromConfig(raw,includeRemoved){
@@ -40,5 +54,5 @@
     u["items/"+item.id]=(v===1||v===0)?{v:v,n:item.name,s:item.star?1:0,o:item.order}:null;
     return u;
   }
-  window.B3DailyChecklist={DEFAULT_ITEMS:DEFAULT_ITEMS,schoolDate:schoolDate,isDateKey:isDateKey,itemsFromConfig:itemsFromConfig,newItemId:newItemId,basePath:basePath,nextMark:nextMark,markUpdate:markUpdate};
+  window.B3DailyChecklist={DEFAULT_ITEMS:DEFAULT_ITEMS,schoolDate:schoolDate,shiftDate:shiftDate,iconFor:iconFor,isDateKey:isDateKey,itemsFromConfig:itemsFromConfig,newItemId:newItemId,basePath:basePath,nextMark:nextMark,markUpdate:markUpdate};
 })();
