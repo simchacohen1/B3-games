@@ -142,11 +142,13 @@
       if (used[id]) id = id + '-' + i;
       used[id] = 1;
       out[id] = { name: m.name, star: !!m.star, order: i, removed: false };
+      if (base[id] && typeof base[id].icon === 'string' && base[id].icon) out[id].icon = base[id].icon; // keep the teacher's picture
     });
     Object.keys(base).forEach(function (id) {
       if (out[id]) return;
       var b = base[id] || {};
       out[id] = { name: String(b.name || id), star: !!b.star, order: Number(b.order) || 0, removed: true };
+      if (typeof b.icon === 'string' && b.icon) out[id].icon = b.icon;
     });
     var same = Object.keys(out).length === Object.keys(base).length && Object.keys(out).every(function (id) {
       var b = base[id]; if (!b) return false;
