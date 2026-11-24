@@ -36,7 +36,7 @@ test('non-owner teacher opens Shorashim without a second sign-in', async ({ page
   await ownerPage.locator('#addSchool').click();
   await expect(ownerPage.locator('#schools')).toContainText('Fictional Pilot School');
   await ownerPage.locator('#schools').getByRole('button',{name:'Fictional Pilot School'}).click();
-  await ownerPage.locator('#oaNav').getByRole('button',{name:'Classes'}).click();
+  await ownerPage.locator('#oaNav').getByRole('button',{name:/Classes$/}).click();
   await ownerPage.locator('#className').fill('Pilot Room Alpha');
   await ownerPage.locator('#addClass').click();
   await expect(ownerPage.locator('#classes')).toContainText('Pilot Room Alpha');
@@ -45,7 +45,7 @@ test('non-owner teacher opens Shorashim without a second sign-in', async ({ page
   await ownerPage.locator('#teacherName').fill('Fictional Teacher');
   await ownerPage.locator('#addTeacher').click();
   await expect(ownerPage.locator('#teachers')).toContainText('Fictional Teacher');
-  await ownerPage.locator('#oaNav').getByRole('button',{name:'Classes'}).click();
+  await ownerPage.locator('#oaNav').getByRole('button',{name:/Classes$/}).click();
   await ownerPage.locator('#classes').getByRole('button',{name:'Pilot Room Alpha'}).click();
   await ownerPage.locator('#teacherSelect').selectOption('teacher_example_test');
   await ownerPage.locator('#assign').click();

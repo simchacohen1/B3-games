@@ -30,14 +30,14 @@ function harness(){
   catch(e){return {ok:false,json:async()=>({error:e.message})};}
  };
  const els={};
- const el=id=>els[id]??={id,style:{},value:'',textContent:'',innerHTML:'',disabled:false,files:[],scrollTop:0,scrollHeight:0,querySelectorAll:()=>[],insertAdjacentHTML(){} ,remove(){}};
+ const el=id=>els[id]??={id,style:{},value:'',textContent:'',innerHTML:'',disabled:false,files:[],scrollTop:0,scrollHeight:0,querySelectorAll:()=>[],addEventListener(){},insertAdjacentHTML(){} ,remove(){}};
  const downloads=[];
  const scope={current:null}; // the school that is open in Owner Admin; null = no school scoping
  const ctx={q:el,fetch,WS:'b3-2026',schoolScope:()=>scope.current,classData:tree.b3Games.workspaces['b3-2026'].classes,
   auth:{currentUser:{getIdToken:async()=>'owner-token'}},
   firebase:{app:()=>({options:{projectId:'b3-games'}}),database:{ServerValue:{TIMESTAMP:{'.sv':'timestamp'}}}},
   safe:s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'),
-  load:async()=>{},confirm:()=>true,FTTBulkRoster:R,
+  load:async()=>{},confirm:()=>true,FTTBulkRoster:R,B3OwnerClasses:{remember(){}},schoolData:{},
   AbortSignal:{timeout:()=>undefined},
   FileReader:class{readAsText(f){Promise.resolve().then(()=>this.onload({target:{result:f.text}}));}},
   document:{createElement:()=>({click(){downloads.push(1)}})},

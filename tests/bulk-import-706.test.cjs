@@ -85,11 +85,13 @@ test('legacy "class" header still accepted; same name+passcode rows become ONE s
  assert.equal(plan.students.length,1);
  assert.equal(plan.students[0].classes.length,2);
 });
-test('validation: 6-digit passcodes, unknown classes, bad emails, ambiguous classes',()=>{
+test('validation: 6-digit passcodes, bad emails, rows without classes; unknown and shared class names are decisions, not errors',()=>{
  const plan=R.plan(R.parse(csv(['Student,A Kid,,12345,ET','Student,B Kid,,123456,Nowhere','Teacher,T,not-an-email,,ET','Student,C Kid,,654321,'])),['ET']);
- assert.equal(plan.errors.length,4,plan.errors.join('\n'));
+ assert.equal(plan.errors.length,3,plan.errors.join(' '));
+ assert.deepEqual(plan.missingClasses.map(m=>m.name),['Nowhere']);
+ // Two site classes with one name: the page and server ask which one (see tests/class-roster-tools.test.cjs); it is not a file error.
  const amb=R.plan(R.parse(csv(['Student,D Kid,,123456,B2 ET Morning'])),['B2 ET · Morning','B2 ET � Morning']);
- assert.match(amb.errors.join(' '),/more than one class/);
+ assert.deepEqual(amb.errors,[]);
 });
 test('two unrelated children with the same name but different passcodes stay separate (warned)',()=>{
  const plan=R.plan(R.parse(csv(['Student,Twin Name,,111222,ET','Student,Twin Name,,333444,WT'])),['ET','WT']);
