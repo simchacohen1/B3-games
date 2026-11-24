@@ -102,6 +102,52 @@
   .btn-delete-rec{ margin-left:auto; background:#fff; color:#b3261e; border:1.5px solid #e0a29d; border-radius:8px; padding:3px 10px; font-size:.75rem; font-weight:700; cursor:pointer; }
   .btn-delete-rec:hover{ background:#fdecea; border-color:#b3261e; }
   .btn-delete-rec:disabled{ opacity:.5; cursor:not-allowed; }
+  .gm-bar{ display:flex; flex-wrap:wrap; gap:10px 22px; align-items:center; margin:4px 0 8px; }
+  .gm-field{ display:flex; gap:8px; align-items:center; font-weight:800; color:var(--ink); }
+  .gm-field select{ font:inherit; padding:7px 10px; border:2px solid #cfd6ee; border-radius:10px; background:#fff; min-width:190px; }
+  .gm-seg{ display:inline-flex; border:2px solid #cfd6ee; border-radius:10px; overflow:hidden; }
+  .gm-seg button{ font:700 .9rem 'Quicksand',Arial,sans-serif; padding:7px 13px; border:0; background:#fff; color:var(--ink); cursor:pointer; }
+  .gm-seg button+button{ border-left:2px solid #cfd6ee; }
+  .gm-seg button.on{ background:var(--rimon-dark); color:#fff; }
+  .gm-scope{ color:var(--ink-soft); font-size:.88rem; margin:0 0 8px; }
+  .gm-scope label{ font-weight:700; cursor:pointer; }
+  .gm-warn{ color:#8e1b10; font-weight:700; }
+  .gm-link{ border:0; background:none; color:var(--rimon-dark); font:inherit; font-weight:800; text-decoration:underline; cursor:pointer; padding:0; }
+  .gm-start{ margin-left:auto; padding:10px 18px; font-size:1rem; }
+  .gm-btn{ font:800 .9rem 'Quicksand',Arial,sans-serif; padding:8px 14px; border:2px solid #cfd6ee; border-radius:10px; background:#fff; color:var(--ink); cursor:pointer; }
+  .gm-day{ margin:0 0 12px; }
+  .gm-day>summary{ cursor:pointer; display:flex; gap:12px; align-items:baseline; padding:9px 4px; border-bottom:2px solid #e5eafa; color:var(--ink); }
+  .gm-day>summary span{ color:var(--ink-soft); font-size:.85rem; }
+  .gm-item{ border-bottom:1px solid #eee; }
+  .gm-row{ display:flex; flex-wrap:wrap; gap:4px 16px; align-items:center; width:100%; text-align:left; padding:10px 8px; border:0; background:none; font:inherit; color:var(--ink); cursor:pointer; }
+  .gm-row:hover, .gm-item.is-open>.gm-row{ background:#f6f8ff; }
+  .gm-item.is-open>.gm-row{ font-weight:800; }
+  .gm-who{ font-weight:800; min-width:130px; }
+  .gm-cls{ font-size:.75rem; font-weight:800; background:var(--rimon); color:#fff; border-radius:999px; padding:2px 10px; }
+  .gm-ref{ flex:1 1 180px; }
+  .gm-time{ color:var(--ink-soft); font-size:.85rem; }
+  .gm-chip{ font-size:.82rem; font-weight:800; border-radius:999px; padding:3px 10px; background:#E4F4E4; color:#33511E; }
+  .gm-chip.wait{ background:#fff0cf; color:#8a5a00; }
+  .gm-open{ padding:4px 0 14px; }
+  .gm-open .rec-item{ border-top:0; }
+  .gm-player{ margin:10px 0 6px; }
+  .gm-player-bar{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
+  .gm-play{ width:46px; height:46px; border-radius:50%; border:0; background:var(--rimon-dark); color:#fff; font-size:1.2rem; cursor:pointer; }
+  .gm-clock{ font-variant-numeric:tabular-nums; font-weight:700; color:var(--ink-soft); }
+  .gm-speed{ margin-left:auto; display:inline-flex; gap:6px; }
+  .gm-speed button{ font:800 .85rem 'Quicksand',Arial,sans-serif; min-width:46px; padding:7px 10px; border:2px solid #cfd6ee; border-radius:10px; background:#fff; color:var(--ink); cursor:pointer; }
+  .gm-speed button.on{ background:var(--rimon-dark); border-color:var(--rimon-dark); color:#fff; }
+  .gm-scrub{ display:block; width:100%; height:44px; margin:6px 0 0; cursor:pointer; accent-color:var(--rimon-dark); }
+  .gm-mark-head{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:2px 0 6px; }
+  .gm-mark-count{ font-size:1.35rem; color:var(--ink); }
+  .gm-mark-bar{ flex:1 1 160px; height:10px; background:#e5eafa; border-radius:999px; overflow:hidden; }
+  .gm-mark-bar i{ display:block; height:100%; background:var(--rimon-dark); }
+  .gm-mark-keys{ color:var(--ink-soft); font-size:.85rem; margin:0 0 4px; }
+  .gm-mark-last{ min-height:1.3em; font-size:.9rem; font-weight:700; color:var(--ink); margin:0 0 8px; }
+  .gm-mark-warn{ color:#8e1b10; font-weight:700; }
+  .gm-mark-done{ text-align:center; padding:30px 10px; }
+  .gm-marking .rec-item{ border:3px solid #cfd6ee; border-radius:14px; padding:18px 20px; }
+  .gm-marking .rec-text .lt, .gm-marking .rec-text .lp{ font-size:4rem; }
   #letterPanel{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:14px 18px; margin-bottom:18px; }
   #letterPanel h2{ margin:0 0 4px; font-size:1.25rem; color:var(--rimon-dark); }
   #letterPanel .rec-sub{ margin:0 0 10px; color:var(--ink-soft); font-size:0.9rem; }
@@ -144,7 +190,9 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
     <p class="rec-sub">Listen and follow along. All letters count as correct: tap a letter that was <b>not recognized</b> (tap again to undo). The text is split into 5 equal parts and each part with no missed letter earns <b>1 point</b> (perfect = 5). The student paid 2 points to send it; if it earned less than 5 he can record it again (and pay 2 again), and you will see the new one here. <b>Delete</b> removes a bad recording and refunds the 2 points. There is no Save button: it saves a few seconds after your last tap, and you can change it again at any time (points are adjusted for you, never paid twice). If every letter was right, press <b>Done</b>.</p>
     <div class="rec-bulk"><button class="btn green hidden" id="approveLegacyAllBtn" type="button">✅ Approve All Legacy Readings</button><span id="approveLegacyAllMsg" aria-live="polite"></span></div>
+    <div id="recNav"></div>
     <div id="recList"><div class="empty">Loading…</div></div>
+    <div id="recMarking" hidden></div>
   </section>
 
   <section id="letterPanel">
@@ -299,7 +347,7 @@ function rashiCardHtml(r,graded){
       '<span>'+escapeHtml(r.sectionLabel)+(r.attempt>1?' · try #'+Number(r.attempt):'')+'</span></div>'+
     rashiTextHtml(r)+
     '<div class="rec-meta">'+escapeHtml(fmtTime(r.createdAt))+(r.durationMs?' · '+Math.round(r.durationMs/1000)+' sec':'')+(graded&&r.gradedAt?' · Graded '+escapeHtml(new Date(Number(r.gradedAt)).toLocaleDateString()):'')+'</div>'+
-    (r.audioUrl?'<audio controls preload="none" src="'+escapeHtml(r.audioUrl)+'"></audio>':'<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>')+
+    rashiPlayerHtml(r)+
     '<div class="rec-form"><span class="rec-score" data-field="score"></span>'+
       '<button type="button" class="btn green" data-done="1"'+(graded?' hidden':'')+'>✅ Done — save</button>'+
       '<button type="button" class="btn-delete-rec" data-delete="1" title="Remove this bad recording and refund the 2 points">Delete</button></div>'+
@@ -310,35 +358,389 @@ function rashiCardHtml(r,graded){
 const OPEN_ONLY_KEY='b3RashiGradeOpenOnly';
 function openOnlyPref(){ try{ return localStorage.getItem(OPEN_ONLY_KEY)==='1'; }catch(_e){ return false; } }
 function setOpenOnlyPref(on){ try{ localStorage.setItem(OPEN_ONLY_KEY,on?'1':'0'); }catch(_e){} }
-function renderRecordings(allRows,recent){
-  const list=document.getElementById('recList');
-  recent=recent||[];
-  const onlyOpen=openOnlyPref();
-  const rows=onlyOpen?allRows.filter(r=>r.sendOpen!==false):allRows;
-  recRows={};rows.concat(recent).forEach(r=>{recRows[r.id]=r;});
-  document.getElementById('recCount').textContent=rows.length?'('+rows.length+')':'';
+/* ---------- Marking list: one place for all of my classes ----------
+   Filters at the top (Today / This week / All, one boy, needs grading / graded). Recordings are grouped by day.
+   Click a row to open it right there. "Start marking" goes through the waiting ones one after another. */
+const rashiView = { range:'all', sid:'', status:'pending', openKey:'' };
+let rashiData = { items:[], scope:[], warn:'' };
+let rashiMarking = null;     // { queue, idx, total, graded, skipped, failed, saves, lastText, card }
+let rashiOnDeleted = null;   // set while marking, so a Delete moves on instead of reloading the list
+let rashiSpeed = 1;
+const MARKING_ALL_CLASSES_KEY='b3ApprovalAllClasses';   // the same owner switch the Approval Center uses
+function markingAllClassesPref(){ try{ return localStorage.getItem(MARKING_ALL_CLASSES_KEY)==='1'; }catch(_e){ return false; } }
+function setMarkingAllClassesPref(on){ try{ localStorage.setItem(MARKING_ALL_CLASSES_KEY,on?'1':'0'); }catch(_e){} }
+const markingViewRequested=new URLSearchParams(location.search).get('view')==='marking';
+// MY classes: a teacher's assigned classes; the owner's own teaching classes (ET and WT unless the owner's teacher record says otherwise).
+async function myMarkingClassIds(access){
+  const safe=id=>id!=='*'&&/^[A-Za-z0-9_-]{1,100}$/.test(id);
+  if(access.role!=='admin') return (access.classIds||[]).filter(safe);
+  const user=firebase.auth().currentUser;
+  if(user){
+    try{
+      const row=(await db.ref('b3Games/workspaces/b3-2026/teachers/'+user.uid+'/classIds').once('value')).val()||{};
+      const ids=Object.keys(row).filter(id=>row[id]===true&&safe(id));
+      if(ids.length) return ids;
+    }catch(_e){}
+  }
+  return ['et','wt'];
+}
+let myClassIdsCache=[];
+const rashiPending=r=>!r.letterReview;
+const rashiMarkable=r=>LM.tokenize(rashiTextOf(r)).total>0;
+function rashiDayKey(ts){
+  const d=new Date(Number(ts)||0);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function rashiDayLabel(key){
+  const today=rashiDayKey(Date.now()),yesterday=rashiDayKey(Date.now()-86400000);
+  const [y,m,d]=key.split('-').map(Number);
+  const text=new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
+  return key===today?'Today · '+text:key===yesterday?'Yesterday · '+text:text;
+}
+function rashiRangeStart(range){
+  const d=new Date(); d.setHours(0,0,0,0);
+  if(range==='week') d.setDate(d.getDate()-d.getDay());   // this week starts on Sunday
+  return range==='all'?0:d.getTime();
+}
+function rashiChipText(r){
+  if(rashiPending(r)) return '⏳ Needs grading';
+  return LM.score(rashiTextOf(r),r.letterReview.missed||[]).points+'/5';
+}
+function rashiFiltered(){
+  const from=rashiRangeStart(rashiView.range),onlyOpen=openOnlyPref();
+  return rashiData.items.filter(r=>
+    (!rashiView.sid||r.studentId===rashiView.sid)&&
+    (Number(r.createdAt)||0)>=from&&
+    (rashiView.status==='all'||(rashiView.status==='pending')===rashiPending(r))&&
+    (!onlyOpen||!rashiPending(r)||r.sendOpen!==false));
+}
+function rashiDaysOf(rows){
+  const days=new Map();
+  rows.slice().sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0)).forEach(r=>{
+    const k=rashiDayKey(r.createdAt);
+    if(!days.has(k)) days.set(k,[]);
+    days.get(k).push(r);
+  });
+  days.forEach(items=>items.sort((a,b)=>(Number(a.createdAt)||0)-(Number(b.createdAt)||0)));   // oldest first inside a day
+  return days;
+}
+function rashiWaitingInOrder(){
+  return [...rashiDaysOf(rashiFiltered().filter(r=>rashiPending(r)&&rashiMarkable(r))).values()].flat();
+}
+function rashiNavHtml(){
+  const seg=(name,opts,cur)=>'<span class="gm-seg" role="group" aria-label="'+name+'">'+
+    opts.map(([v,l])=>'<button type="button" data-'+name+'="'+v+'" class="'+(v===cur?'on':'')+'" aria-pressed="'+(v===cur)+'">'+l+'</button>').join('')+'</span>';
+  const waiting={},names={};
+  rashiData.items.forEach(r=>{ names[r.studentId]=r.studentName; if(rashiPending(r)) waiting[r.studentId]=(waiting[r.studentId]||0)+1; });
+  const boys=Object.keys(names).sort((a,b)=>names[a].localeCompare(names[b]));
+  const n=rashiWaitingInOrder().length;
+  const classNames=rashiData.scope.map(id=>id.length<=3?id.toUpperCase():id).join(' + ');
+  return '<div class="gm-bar">'+
+    '<label class="gm-field">When '+seg('range',[['today','Today'],['week','This week'],['all','All']],rashiView.range)+'</label>'+
+    '<label class="gm-field">Boy <select data-boy="1"><option value="">All boys</option>'+
+      boys.map(id=>'<option value="'+escapeHtml(id)+'"'+(id===rashiView.sid?' selected':'')+'>'+escapeHtml(names[id])+(waiting[id]?' ('+waiting[id]+' waiting)':'')+'</option>').join('')+'</select></label>'+
+    '<label class="gm-field">Status '+seg('status',[['pending','Needs grading'],['graded','Graded'],['all','Both']],rashiView.status)+'</label>'+
+    '<button type="button" class="btn green gm-start" data-start="1"'+(n?'':' disabled')+'>▶ Start marking'+(n?' ('+n+' waiting)':'')+'</button>'+
+    '</div>'+
+    '<div class="gm-scope">Showing: <b>'+escapeHtml(classNames||'all classes')+'</b>'+
+      (isOwner?' · <label><input type="checkbox" data-allclasses="1"'+(markingAllClassesPref()?' checked':'')+'> Owner: all classes</label>':'')+
+      ' · <label><input type="checkbox" data-openonly="1"'+(openOnlyPref()?' checked':'')+'> Only items I have opened for sending</label>'+
+      ' · <button type="button" class="gm-link" data-refresh="1">↻ Refresh</button>'+
+      (rashiData.warn?' · <span class="gm-warn">'+escapeHtml(rashiData.warn)+'</span>':'')+'</div>';
+}
+function rashiRowHtml(r,showBoy){
+  const pending=rashiPending(r);
+  const time=new Date(Number(r.createdAt)||0).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+(r.durationMs?' · '+Math.round(r.durationMs/1000)+' sec':'');
+  return '<div class="gm-item" data-item="'+escapeHtml(r.id)+'"><button type="button" class="gm-row" data-row="1" aria-expanded="false">'+
+    (showBoy?'<span class="gm-who">'+escapeHtml(r.studentName)+'</span>':'')+
+    (r.className&&rashiData.scope.length!==1?'<span class="gm-cls">'+escapeHtml(r.className)+'</span>':'')+
+    '<span class="gm-ref">'+escapeHtml(r.sectionLabel)+(r.attempt>1?' · try #'+Number(r.attempt):'')+'</span><span class="gm-time">'+escapeHtml(time)+'</span>'+
+    '<span class="gm-chip'+(pending?' wait':'')+'">'+escapeHtml(rashiChipText(r))+'</span></button><div class="gm-open" hidden></div></div>';
+}
+function renderRashiList(){
+  const listEl=document.getElementById('recList');
+  if(!listEl) return;
+  const rows=rashiFiltered();
+  if(!rows.length){
+    listEl.innerHTML='<div class="empty">'+(rashiView.status==='pending'?'Nothing waiting for these filters. 🎉':'No recordings for these filters.')+'</div>';
+    return;
+  }
+  const days=rashiDaysOf(rows),today=rashiDayKey(Date.now()),keepOpen=rows.length<=12;
+  listEl.innerHTML=[...days.entries()].map(([k,items])=>{
+    const waiting=items.filter(rashiPending).length;
+    const open=keepOpen||k===today||items.some(r=>r.id===rashiView.openKey);
+    return '<details class="gm-day"'+(open?' open':'')+'><summary><b>'+escapeHtml(rashiDayLabel(k))+'</b><span>'+items.length+' recording'+(items.length===1?'':'s')+(waiting?' · '+waiting+' waiting':'')+'</span></summary>'+
+      items.map(r=>rashiRowHtml(r,!rashiView.sid)).join('')+'</details>';
+  }).join('');
+}
+function updateRashiCounts(){
+  const waiting=rashiData.items.filter(rashiPending);
+  document.getElementById('recCount').textContent=waiting.length?'('+waiting.length+')':'';
   // Older recordings (sent before letter marking) can be approved all at once: +2 points, no letter data.
-  pendingLegacyIds=rows.filter(r=>!r.v2&&!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
+  pendingLegacyIds=waiting.filter(r=>!r.v2&&!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
   const bulk=document.getElementById('approveLegacyAllBtn');
   bulk.classList.toggle('hidden',!pendingLegacyIds.length);
   bulk.textContent='✅ Approve All Legacy Readings ('+pendingLegacyIds.length+')';
-  let html='<label style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:700;"><input type="checkbox" id="recOpenOnly"'+(onlyOpen?' checked':'')+'> Only show items I have opened for sending</label>'+
-    '<div class="rec-sub">Readings a boy already sent stay on this list unless you tick the box.'+(onlyOpen?' Showing '+rows.length+' of '+allRows.length+' waiting readings.':'')+'</div>';
-  html+=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="empty">'+(allRows.length?'No waiting readings are for items you have opened.':'✅ No Rashi recordings are waiting.')+'</div>';
-  if(recent.length) html+='<h3 class="rec-section-title">✔️ Recently graded</h3><p class="rec-sub">Tap letters to change the marks. The points are adjusted for you (a student is never paid twice).</p>'+recent.map(r=>rashiCardHtml(r,true)).join('');
-  list.innerHTML=html;
-  const openOnlyBox=document.getElementById('recOpenOnly');
-  if(openOnlyBox)openOnlyBox.onchange=()=>{setOpenOnlyPref(openOnlyBox.checked);loadRecordings();};
-  list.querySelectorAll('.rec-item').forEach(card=>wireRashiCard(card,recRows[card.dataset.id]));
+}
+async function closeRashiOpen(){
+  await flushGradeSaves();   // never lose a tap when a recording is closed
+  document.querySelectorAll('.gm-item.is-open').forEach(item=>{
+    item.querySelectorAll('audio').forEach(a=>{ try{ a.pause(); }catch(_e){} });
+    item.classList.remove('is-open');
+    const box=item.querySelector('.gm-open'); box.hidden=true; box.innerHTML='';
+    item.querySelector('[data-row]').setAttribute('aria-expanded','false');
+  });
+}
+async function openRashiItem(id,scrollTo){
+  const itemEl=[...document.querySelectorAll('.gm-item')].find(e=>e.dataset.item===id);
+  const r=rashiData.items.find(x=>x.id===id);
+  if(!itemEl||!r) return false;
+  if(itemEl.classList.contains('is-open')){ await closeRashiOpen(); rashiView.openKey=''; return true; }
+  await closeRashiOpen();
+  const day=itemEl.closest('details'); if(day) day.open=true;
+  const box=itemEl.querySelector('.gm-open');
+  box.innerHTML=rashiCardHtml(r,!rashiPending(r));
+  box.hidden=false; itemEl.classList.add('is-open');
+  itemEl.querySelector('[data-row]').setAttribute('aria-expanded','true');
+  const card=box.firstElementChild;
+  wireRashiCard(card,r); wireRashiPlayer(card,r);
+  rashiView.openKey=id;
+  if(scrollTo) itemEl.scrollIntoView({behavior:'smooth',block:'start'});
+  return true;
+}
+/* The player: one big scrubber the width of the text, play/pause, and 1x / 1.5x / 2x. The sound still comes from a plain
+   <audio> element, so the "one recording at a time" rule (shared/one-audio-at-a-time.js) keeps working. */
+function rashiPlayerHtml(r){
+  if(!r.audioUrl) return '<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>';
+  return '<div class="gm-player" data-player="1"><audio preload="metadata" src="'+escapeHtml(r.audioUrl)+'"></audio>'+
+    '<div class="gm-player-bar"><button type="button" class="gm-play" data-play="1" aria-label="Play">▶</button><span class="gm-clock" data-clock="1">0:00 / 0:00</span>'+
+      '<span class="gm-speed" role="group" aria-label="Speed">'+[1,1.5,2].map(v=>'<button type="button" data-speed="'+v+'" aria-pressed="false">'+v+'x</button>').join('')+'</span></div>'+
+    '<input type="range" class="gm-scrub" data-scrub="1" min="0" max="1000" step="1" value="0" aria-label="Recording position — click anywhere to jump"></div>';
+}
+function wireRashiPlayer(card,r){
+  const box=card.querySelector('[data-player]');
+  if(!box) return;
+  const audio=box.querySelector('audio'),scrub=box.querySelector('[data-scrub]'),play=box.querySelector('[data-play]'),clock=box.querySelector('[data-clock]');
+  const total=()=>Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:(Number(r.durationMs)||0)/1000;
+  const fmt=sec=>{ sec=Math.max(0,Math.round(sec||0)); return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'); };
+  let dragging=false;
+  const paint=()=>{
+    const t=total();
+    if(!dragging) scrub.value=t?String(Math.min(1000,Math.round(audio.currentTime/t*1000))):'0';
+    clock.textContent=fmt(audio.currentTime)+' / '+fmt(t);
+    play.textContent=audio.paused?'▶':'⏸';
+    play.setAttribute('aria-label',audio.paused?'Play':'Pause');
+  };
+  const setSpeed=v=>{
+    rashiSpeed=v; audio.playbackRate=v;
+    box.querySelectorAll('[data-speed]').forEach(b=>{ const on=Number(b.dataset.speed)===v; b.classList.toggle('on',on); b.setAttribute('aria-pressed',String(on)); });
+  };
+  ['timeupdate','play','pause','ended','loadedmetadata','durationchange'].forEach(ev=>audio.addEventListener(ev,paint));
+  audio.addEventListener('loadedmetadata',()=>{ audio.playbackRate=rashiSpeed; });
+  audio.addEventListener('play',()=>{ audio.playbackRate=rashiSpeed; });
+  play.onclick=()=>{ if(audio.paused){ const p=audio.play(); if(p&&p.catch) p.catch(()=>{}); } else audio.pause(); };
+  scrub.addEventListener('pointerdown',()=>{ dragging=true; });
+  scrub.addEventListener('input',()=>{ const t=total(); if(t) audio.currentTime=Number(scrub.value)/1000*t; clock.textContent=fmt(audio.currentTime)+' / '+fmt(t); });
+  const done=()=>{ dragging=false; paint(); };
+  scrub.addEventListener('change',done); scrub.addEventListener('pointerup',done); scrub.addEventListener('pointercancel',done);
+  box.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>setSpeed(Number(b.dataset.speed)));
+  setSpeed(rashiSpeed);
+  paint();
+  // Used by Start marking: start playing as soon as the recording has loaded.
+  card._player={
+    toggle:()=>play.click(),
+    autoplay:()=>{
+      const go=()=>{ const pr=audio.play(); if(pr&&pr.catch) pr.catch(()=>{}); };
+      if(audio.readyState>=2) go(); else audio.addEventListener('canplay',go,{once:true});
+    }
+  };
+}
+
+/* ---------- Start marking: work through the waiting recordings one after another ----------
+   Opens the first waiting recording (in the order of the list, with the filters on) big on screen and plays it.
+   Tap the letters that were not recognized, then press Enter (or "Done — save"): it saves in the background and moves
+   straight to the next one. Keys: Space = play/pause, Enter = save and next, S = skip. */
+function rashiKeysHint(){ return 'Space = play / pause · Enter = save and next (all correct if you tapped nothing) · S = skip · tap a letter that was not recognized'; }
+async function startRashiMarking(){
+  await closeRashiOpen();
+  const queue=rashiWaitingInOrder();
+  if(!queue.length) return;
+  rashiView.openKey='';
+  rashiMarking={queue,idx:0,total:queue.length,graded:0,skipped:0,failed:[],saves:new Set(),lastText:'',card:null};
+  document.getElementById('recNav').hidden=true;
+  document.getElementById('recList').hidden=true;
+  document.getElementById('recMarking').hidden=false;
+  document.body.classList.add('gm-marking');
+  rashiOnDeleted=r=>{
+    rashiData.items=rashiData.items.filter(x=>x!==r);
+    if(rashiMarking) rashiMarking.card=null;
+    rashiSetLast('🗑️ Deleted '+r.studentName+' · '+r.sectionLabel+'.');
+    rashiAdvance(false);
+  };
+  renderRashiMarking();
+}
+function rashiSetLast(text){
+  if(!rashiMarking) return;
+  rashiMarking.lastText=text;
+  const el=document.getElementById('recMarkingLast');
+  if(el) el.textContent=text;
+}
+function renderRashiMarking(){
+  const st=rashiMarking,panel=document.getElementById('recMarking');
+  if(!st||!panel) return;
+  if(st.idx>=st.queue.length){
+    st.card=null;
+    panel.innerHTML='<div class="gm-mark-done"><h2>🎉 All done</h2><p>'+st.graded+' graded'+(st.skipped?', '+st.skipped+' skipped (still waiting)':'')+'.</p>'+
+      (st.failed.length?'<p class="gm-mark-warn">⚠️ These did not save and are still waiting: '+st.failed.map(r=>escapeHtml(r.studentName+' · '+r.sectionLabel)).join('; ')+'.</p>':'')+
+      '<p id="recMarkingLast" class="gm-mark-last">'+escapeHtml(st.lastText)+'</p><button type="button" class="btn green" data-mback="1">Back to list</button></div>';
+    return;
+  }
+  const r=st.queue[st.idx],left=st.queue.length-st.idx;
+  panel.innerHTML='<div class="gm-mark-head"><b class="gm-mark-count">'+left+' of '+st.total+' left</b>'+
+    '<span class="gm-mark-bar"><i style="width:'+Math.round((st.total-left)/st.total*100)+'%"></i></span>'+
+    '<button type="button" class="gm-btn" data-mskip="1">Skip ⏭</button><button type="button" class="gm-btn" data-mback="1">Back to list</button></div>'+
+    '<div class="gm-mark-keys">'+rashiKeysHint()+'</div><div id="recMarkingLast" class="gm-mark-last"></div><div id="recMarkingCard"></div>';
+  rashiSetLast(st.lastText);
+  const box=document.getElementById('recMarkingCard');
+  box.innerHTML=rashiCardHtml(r,false);
+  const card=box.firstElementChild;
+  st.card=card;
+  wireRashiCard(card,r);
+  wireRashiPlayer(card,r);
+  if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();
+  if(card._player) card._player.autoplay();
+}
+function rashiMarkingPause(){
+  document.querySelectorAll('#recMarking audio').forEach(a=>{ try{ a.pause(); }catch(_e){} });
+}
+function rashiMarkingSave(){
+  const st=rashiMarking;
+  if(!st||!st.card) return;
+  const card=st.card,r=st.queue[st.idx];
+  st.card=null;   // one save per recording; a second press while moving on is ignored
+  const who=r.studentName+' · '+r.sectionLabel;
+  rashiSetLast('Saving '+who+'…');
+  const done=card.querySelector('[data-done]');
+  if(done&&!done.hidden) done.click();   // "Done — save": sends the marks now (all correct if no letter was tapped)
+  // Send everything now instead of after the usual few seconds, and move on without waiting.
+  const p=flushGradeSaves().then(()=>{
+    if(card.classList.contains('is-graded')){
+      const missed=card._missed?[...card._missed].sort((a,b)=>a-b):[];
+      r.letterReview={total:LM.tokenize(rashiTextOf(r)).total,missed};
+      r.gradedAt=Date.now();
+      rashiSetLast('✔ Saved '+who+' → '+LM.score(rashiTextOf(r),missed).points+'/5');
+    }else{
+      st.failed.push(r);
+      rashiSetLast('⚠️ Could not save '+who+'. It is still waiting in the list.');
+    }
+  }).finally(()=>st.saves.delete(p));
+  st.saves.add(p);
+  st.graded++;
+  rashiAdvance(false);
+}
+function rashiAdvance(skipped){
+  const st=rashiMarking;
+  if(!st) return;
+  rashiMarkingPause();
+  if(skipped) st.skipped++;
+  st.idx++;
+  renderRashiMarking();
+}
+async function exitRashiMarking(){
+  const st=rashiMarking;
+  if(!st) return;
+  rashiMarkingPause();
+  await flushGradeSaves();
+  await Promise.allSettled([...st.saves]);
+  rashiMarking=null; rashiOnDeleted=null;
+  document.body.classList.remove('gm-marking');
+  const panel=document.getElementById('recMarking');
+  if(panel){ panel.hidden=true; panel.innerHTML=''; }
+  const nav=document.getElementById('recNav'),list=document.getElementById('recList');
+  if(nav){ nav.hidden=false; nav.innerHTML=rashiNavHtml(); }
+  if(list){ list.hidden=false; renderRashiList(); }
+  updateRashiCounts();
+  loadLetterScores();
+}
+function rashiMarkingKey(e,down){
+  const st=rashiMarking;
+  if(!st||e.ctrlKey||e.metaKey||e.altKey) return;
+  const t=e.target;
+  if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)&&t.type!=='range') return;
+  const card=st.card;
+  if(e.key===' '||e.code==='Space'){
+    e.preventDefault();                       // also stops a focused button from being "clicked" by the space bar
+    if(down&&!e.repeat&&card&&card._player) card._player.toggle();
+    return;
+  }
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(down&&!e.repeat&&card) rashiMarkingSave();
+    return;
+  }
+  if((e.key==='s'||e.key==='S')&&down&&!e.repeat&&card){
+    e.preventDefault();
+    st.card=null; st.lastText=''; rashiAdvance(true);
+  }
+}
+document.addEventListener('keydown',e=>rashiMarkingKey(e,true));
+document.addEventListener('keyup',e=>rashiMarkingKey(e,false));
+
+async function rashiFetchAll(){
+  const owner=isOwner,all=owner&&markingAllClassesPref();
+  const ids=all?['']:myClassIdsCache;
+  if(!ids.length) throw new Error('No classes are assigned to your account.');
+  const settled=await Promise.allSettled(ids.map(id=>rashiApi('rashi-list-pending',{classId:id})));
+  const seen=new Set(),items=[];
+  let failedClasses=0,lastError=null;
+  settled.forEach((res,i)=>{
+    if(res.status!=='fulfilled'){ failedClasses++; lastError=res.reason; return; }
+    const out=res.value;
+    (out.requests||[]).concat(out.recent||[]).forEach(r=>{
+      if(seen.has(r.id)) return;      // a boy in two classes can be listed twice
+      seen.add(r.id); r._classId=ids[i]; items.push(r);
+    });
+  });
+  if(failedClasses===ids.length) throw lastError||new Error('Could not load recordings.');
+  return {items,scope:all?[]:ids.filter((_id,i)=>settled[i].status==='fulfilled'),warn:failedClasses?failedClasses+' class'+(failedClasses===1?'':'es')+' could not be loaded':''};
 }
 async function flushGradeSaves(){ await Promise.all([...gradeSavers].map(fn=>fn())); }
 window.addEventListener('beforeunload',e=>{ if(gradeSavers.size){ e.preventDefault(); e.returnValue=''; } });
 async function loadRecordings(){
-  const list=document.getElementById('recList');
+  const list=document.getElementById('recList'),panelList=document.getElementById('recPanel');
   if(!teacherScope){ list.innerHTML='<div class="empty">Sign in to see recordings.</div>'; return; }
   await flushGradeSaves();   // never lose a tap when the list is refreshed
-  try{ const out=await rashiApi('rashi-list-pending'); renderRecordings(out.requests||[],out.recent||[]); }
-  catch(error){ list.innerHTML='<div class="empty">'+escapeHtml(error.message||'Could not load recordings.')+'</div>'; }
+  if(rashiMarking){ await Promise.allSettled([...rashiMarking.saves]); rashiMarking=null; rashiOnDeleted=null; document.body.classList.remove('gm-marking'); }
+  try{
+    rashiData=await rashiFetchAll();
+  }catch(error){ list.hidden=false; list.innerHTML='<div class="empty">'+escapeHtml(error.message||'Could not load recordings.')+'</div>'; return; }
+  const nav=document.getElementById('recNav'),marking=document.getElementById('recMarking');
+  list.hidden=false; nav.hidden=false; marking.hidden=true; marking.innerHTML='';
+  if(rashiView.sid&&!rashiData.items.some(r=>r.studentId===rashiView.sid)) rashiView.sid='';
+  updateRashiCounts();
+  const rerender=async()=>{ await closeRashiOpen(); rashiView.openKey=''; nav.innerHTML=rashiNavHtml(); renderRashiList(); };
+  nav.innerHTML=rashiNavHtml();
+  nav.onclick=e=>{
+    const r=e.target.closest('[data-range]'),st=e.target.closest('[data-status]');
+    if(r){ rashiView.range=r.dataset.range; rerender(); }
+    else if(st){ rashiView.status=st.dataset.status; rerender(); }
+    else if(e.target.closest('[data-refresh]')) { loadRecordings(); loadLetterScores(); }
+    else if(e.target.closest('[data-start]')) startRashiMarking();
+  };
+  nav.onchange=e=>{
+    if(e.target.matches('[data-boy]')){ rashiView.sid=e.target.value; rerender(); }
+    else if(e.target.matches('[data-openonly]')){ setOpenOnlyPref(e.target.checked); rerender(); }
+    else if(e.target.matches('[data-allclasses]')){ setMarkingAllClassesPref(e.target.checked); rashiView.sid=''; loadRecordings(); }
+  };
+  marking.onclick=e=>{
+    if(e.target.closest('[data-mskip]')){ if(rashiMarking&&rashiMarking.card){ rashiMarking.card=null; rashiMarking.lastText=''; rashiAdvance(true); } }
+    else if(e.target.closest('[data-mback]')) exitRashiMarking();
+  };
+  list.onclick=e=>{
+    const row=e.target.closest('[data-row]');
+    if(row) openRashiItem(row.closest('.gm-item').dataset.item,false);
+  };
+  renderRashiList();
 }
 function wireRashiCard(card,r){
   if(!card||!r) return;
@@ -348,6 +750,7 @@ function wireRashiCard(card,r){
   if(!box||!total){ scoreEl.textContent='This recording has no letters to mark.'; if(doneBtn) doneBtn.hidden=true; return; }
   const review=r.letterReview;
   const missed=new Set(review&&review.total===total?review.missed:[]);
+  card._missed=missed;
   let graded=!!review, savedKey=graded?JSON.stringify([...missed].sort((a,b)=>a-b)):null;
   let timer=null,busy=null,dirty=false;
   const paint=()=>{
@@ -368,7 +771,7 @@ function wireRashiCard(card,r){
     busy=(async()=>{
       msg.textContent='Saving…';
       try{
-        const out=await rashiApi('rashi-letter-marks',{requestId:r.id,missed:[...missed].sort((a,b)=>a-b)});
+        const out=await rashiApi('rashi-letter-marks',{requestId:r.id,missed:[...missed].sort((a,b)=>a-b),classId:r._classId});
         graded=true;savedKey=key;
         const moved=Number(out.points)||0;
         msg.textContent='✔️ Saved. '+out.parts+' of 5 parts perfect'+(out.priorPoints?' (he already earned '+out.priorPoints+' before, so this send adds '+out.paidTotal+')':'')+(moved>0?' · +'+moved+' points now':moved<0?' · '+Math.abs(moved)+' points taken back':'')+'.'+(out.canRerecord?' He can record it again.':'');
@@ -397,9 +800,9 @@ function wireRashiCard(card,r){
     clearTimeout(timer);timer=null;gradeSavers.delete(send);dirty=false;
     card.querySelectorAll('button').forEach(b=>b.disabled=true);msg.textContent='Deleting…';
     try{
-      const out=await rashiApi('rashi-delete',{requestId:r.id});
+      const out=await rashiApi('rashi-delete',{requestId:r.id,classId:r._classId});
       msg.textContent='🗑️ Deleted. '+(out.refunded?out.refunded+' points refunded.':'Nothing had been charged, so nothing to refund.')+(out.takenBack?' '+out.takenBack+' earned points taken back.':'')+' He can send it again.';
-      setTimeout(()=>{ loadRecordings(); loadLetterScores(); },900);
+      if(rashiOnDeleted) rashiOnDeleted(r); else setTimeout(()=>{ loadRecordings(); loadLetterScores(); },900);
     }catch(err){
       console.error(err);msg.textContent='⚠️ '+(err.message||'Could not delete the recording.');
       card.querySelectorAll('button').forEach(b=>b.disabled=false);
@@ -443,7 +846,7 @@ document.getElementById('approveLegacyAllBtn').addEventListener('click',async e=
   let done=0,failed=0;
   for(const requestId of ids){
     msg.textContent='Approving '+(done+failed+1)+' of '+ids.length+'…';
-    try{await rashiApi('rashi-approve',{requestId});done++;}catch(err){failed++;console.warn('Rashi bulk approval failed',err);}
+    try{const row=rashiData.items.find(x=>x.id===requestId);await rashiApi('rashi-approve',{requestId,classId:row?row._classId:undefined});done++;}catch(err){failed++;console.warn('Rashi bulk approval failed',err);}
   }
   msg.textContent='✅ '+done+' approved.'+(failed?' '+failed+' could not be approved.':'');
   btn.disabled=false;await loadRecordings();
@@ -474,7 +877,11 @@ async function loadTeacher(user, access){
       if(!row || row.active === false) throw new Error('Your teacher account is not active.');
       access = { ...access, classIds: Object.keys(row.classIds || {}).filter(id => id !== '*' && row.classIds[id] === true) };
     }
-    const chosenClass = await B3ClassGate.requireInUrl(async p => (await db.ref(p).once('value')).val(), access);
+    myClassIdsCache = await myMarkingClassIds(access);
+    // ?view=marking opens straight on the marking list for all of my classes (no class chooser).
+    const chosenClass = (markingViewRequested && !new URLSearchParams(location.search).get('class'))
+      ? (myClassIdsCache[0] || '')
+      : await B3ClassGate.requireInUrl(async p => (await db.ref(p).once('value')).val(), access);
     teacherScope = await window.FunTorahTeacherScope.roster(async p => (await db.ref(p).once('value')).val(), access, chosenClass, 'rashi-letters');
     document.getElementById('scopeLabel').textContent = Object.values(teacherScope.classes).map(c => c.name).join(' + ');
     document.getElementById('lockLabel').style.display = isOwner ? '' : 'none';
