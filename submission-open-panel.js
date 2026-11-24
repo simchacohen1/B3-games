@@ -21,6 +21,8 @@
     + '.so-list{margin-top:14px}.so-list h4{margin:0 0 6px;font-size:15px}.so-chips{display:flex;gap:6px;flex-wrap:wrap}'
     + '.so-chip{display:inline-flex;gap:6px;align-items:center;background:#e3f6e8;color:#14532d;border:1px solid #86efac;border-radius:999px;padding:4px 6px 4px 12px;font-weight:700;font-size:14px}'
     + '.so-chip button{min-height:28px!important;padding:0 8px!important;border-radius:999px!important;border:0!important;background:#fff!important;color:#b91c1c!important;line-height:1}'
+    + '.so-picklist{max-height:300px;overflow:auto;border:1px solid #cbd5e1;border-radius:12px;padding:6px 10px;margin:8px 0;background:#f8fafc}.so-pick-head{font-weight:800;margin:10px 0 4px;color:#0f172a}'
+    + '.so-pick{display:block;padding:5px 2px;font-weight:600;cursor:pointer}.so-pick.done{color:#166534}.so-pick input{margin-right:6px}'
     + '.so-empty{color:#64748b;font-weight:600}.so-msg{min-height:1.4em;margin-top:10px;font-weight:700}.so-msg.err{color:#b91c1c}'
     + '.so-boys{margin-top:10px;font-size:14px;color:#334155}.so-boys b{color:#0f172a}';
   const RASHI_SECTIONS = [
@@ -73,18 +75,37 @@
       (removable ? '<button type="button" data-so-close="' + esc(r.rule) + '" title="Close this" aria-label="Close ' + esc(r.label) + '"' + (state.busy ? ' disabled' : '') + '>✕</button>' : '') + '</span>').join('') + '</div>';
   }
 
+  function openRulesOfView() {
+    const d = state.data;
+    if (!d) return [];
+    const view = state.who !== 'class' ? ((d.students && d.students[state.who]) || { rules: [] }) : d;
+    const all = (d.rules || []).concat(state.who !== 'class' ? (view.rules || []) : []);
+    return all.map(r => r.rule);
+  }
+
   function pickerHtml() {
     if (state.kind === 'rashi') {
-      const passages = (state.vayeira || []);
+      const passages = state.vayeira || [];
       const perakim = [...new Set(passages.map(p => p.perek))];
-      const opts = ['<optgroup label="Letter missions and word sets">' + RASHI_SECTIONS.map(([id, label]) => '<option value="' + id + '">' + esc(label) + '</option>').join('') + '</optgroup>'];
+      const open = openRulesOfView();
+      const covered = rule => open.some(r => r === rule || (rule.indexOf(r + '-') === 0));
+      const box = (rule, label, extra) => {
+        const done = covered(rule);
+        return '<label class="so-pick' + (done ? ' done' : '') + '"' + (extra ? ' style="' + extra + '"' : '') + '><input type="checkbox" data-so-pick="' + esc(rule) + '"' +
+          (done ? ' disabled checked' : (state.picks[rule] ? ' checked' : '')) + (state.busy ? ' disabled' : '') + '> ' + esc(label) + (done ? ' <small>✅ open</small>' : '') + '</label>';
+      };
+      const rows = ['<div class="so-pick-head">Letter missions and word sets</div>'].concat(RASHI_SECTIONS.map(([id, label]) => box('r:' + id, label)));
       if (perakim.length) {
-        opts.push('<optgroup label="Vayeira Rashi">' + '<option value="vayeira">All of Vayeira</option>' +
-          perakim.map(p => '<option value="vayeira-' + p + '">Vayeira · Perek ' + p + ' (all)</option>').join('') +
-          passages.map(p => '<option value="' + esc(p.id) + '">Vayeira ' + p.perek + ':' + p.pasuk + '</option>').join('') + '</optgroup>');
+        rows.push('<div class="so-pick-head">Vayeira Rashi</div>', box('r:vayeira', 'All of Vayeira'));
+        perakim.forEach(perek => {
+          rows.push(box('r:vayeira-' + perek, 'Perek ' + perek + ' (all)'));
+          passages.filter(p => p.perek === perek).forEach(p => rows.push(box('r:' + p.id, 'Vayeira ' + p.perek + ':' + p.pasuk, 'margin-left:22px')));
+        });
       }
-      return '<div class="so-row"><label for="soRashi">Rashi</label><select id="soRashi">' + opts.join('') + '</select>' +
-        '<button type="button" class="go" data-so-open-rashi' + (state.busy ? ' disabled' : '') + '>Open</button></div>';
+      const count = Object.keys(state.picks).filter(rule => state.picks[rule] && !covered(rule)).length;
+      return '<div class="so-picklist" role="group" aria-label="Rashi items">' + rows.join('') + '</div>' +
+        '<div class="so-row"><button type="button" class="go" data-so-open-rashi' + (state.busy || !count ? ' disabled' : '') + '>Open selected' + (count ? ' (' + count + ')' : '') + '</button>' +
+        '<small>Tick one or more items, then press Open selected.</small></div>';
     }
     const sefarim = root.B3ChumashParshiyos || [];
     const parshiyos = parshaOptions(state.sefer);
@@ -141,7 +162,7 @@
 
   function bind() {
     const el = state.el, q = sel => el.querySelector(sel);
-    const who = q('#soWho'); if (who) who.onchange = () => { state.who = who.value; setMsg(''); draw(); };
+    const who = q('#soWho'); if (who) who.onchange = () => { state.who = who.value; state.picks = {}; setMsg(''); draw(); };
     el.querySelectorAll('[data-so-kind]').forEach(b => b.onclick = () => { state.kind = b.dataset.soKind; draw(); });
     const sefer = q('#soSefer'); if (sefer) sefer.onchange = () => { state.sefer = sefer.value; state.parsha = ''; state.perek = ''; draw(); };
     const parsha = q('#soParsha'); if (parsha) parsha.onchange = () => { state.parsha = parsha.value; state.perek = ''; state.from = state.to = ''; draw(); };
@@ -173,8 +194,23 @@
       }
       run('Opened', () => change({ op: 'open', rule }));
     };
+    el.querySelectorAll('[data-so-pick]').forEach(box => box.onchange = () => {
+      state.picks[box.dataset.soPick] = box.checked;
+      const btn = q('[data-so-open-rashi]');
+      if (btn) {
+        const n = Object.keys(state.picks).filter(rule => state.picks[rule]).length;
+        btn.disabled = !n || state.busy; btn.textContent = 'Open selected' + (n ? ' (' + n + ')' : '');
+      }
+    });
     const openRashi = q('[data-so-open-rashi]');
-    if (openRashi) openRashi.onclick = () => run('Opened', () => change({ op: 'open', rule: 'r:' + (q('#soRashi') || {}).value }));
+    if (openRashi) openRashi.onclick = () => {
+      const rules = Object.keys(state.picks).filter(rule => state.picks[rule]);
+      if (!rules.length) return;
+      run(rules.length === 1 ? 'Opened' : rules.length + ' items opened', async () => {
+        for (const rule of rules) await change({ op: 'open', rule });
+        state.picks = {};
+      });
+    };
   }
 
   async function loadVayeira() {
@@ -189,7 +225,7 @@
   function mount(host, options) {
     ensureStyle();
     if (!state) {
-      state = { el: root.document.createElement('section'), kind: 'posuk', who: 'class', sefer: '', parsha: '', perek: '', from: '', to: '', data: null, vayeira: [], busy: false, msg: '', msgErr: false, loadError: '' };
+      state = { el: root.document.createElement('section'), kind: 'posuk', who: 'class', sefer: '', parsha: '', perek: '', from: '', to: '', data: null, vayeira: [], picks: {}, busy: false, msg: '', msgErr: false, loadError: '' };
       state.el.className = 'so-card'; state.el.id = 'submissionOpenCard';
       state.sefer = ((root.B3ChumashParshiyos || [])[0] || {}).name || '';
       loadVayeira();
@@ -198,7 +234,7 @@
     state.classId = options.classId; state.className = options.className;
     state.call = options.call; state.students = options.students || (() => []);
     if (host && state.el.parentNode !== host) host.insertBefore(state.el, options.before && options.before.parentNode === host ? options.before : null);
-    if (changedClass) { state.who = 'class'; state.data = null; state.msg = ''; state.loadError = ''; draw(); refresh(); }
+    if (changedClass) { state.who = 'class'; state.picks = {}; state.data = null; state.msg = ''; state.loadError = ''; draw(); refresh(); }
     else if (!state.data && !state.loadError) { draw(); refresh(); }
     return state.el;
   }
