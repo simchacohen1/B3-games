@@ -56,7 +56,7 @@ test('a PDF or worksheet shows page 1 as a small picture, made only when its til
 
 test('new versions so students load it', () => {
   const html=read('my-files.html');
-  for(const [f,v] of [['saved-work','20261124-pages1'],['my-files-core','20261116-live2'],['my-files','20261116-live2']])assert.match(html,new RegExp(f+'\\.js\\?v='+v));
-  assert.match(read('activity-share.js'),/saved-work\.js\?v=20261124-pages1/);
-  assert.match(read('classroom.html'),/saved-work\.js\?v=20261124-pages1/);
+  for(const [f,v] of [['saved-work','20261124-groups1'],['my-files-core','20261116-live2'],['my-files','20261116-live2']])assert.match(html,new RegExp(f+'\\.js\\?v='+v));
+  assert.match(read('activity-share.js'),/saved-work\.js\?v=20261124-groups1/);
+  assert.match(read('classroom.html'),/saved-work\.js\?v=20261124-groups1/);
 });
