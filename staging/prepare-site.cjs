@@ -5,6 +5,8 @@ const path = require('node:path');
 const { configFromEnvironment, renderConfigScript } = require('./generate-config.cjs');
 
 const TEXT_EXTENSIONS = new Set(['.html', '.js', '.mjs', '.cjs', '.css', '.json', '.txt', '.svg', '.xml', '.webmanifest', '.map', '.yaml', '.yml']);
+// Staging Firebase Auth ids (project fun-torah-tools-staging only) that may open Owner Admin in staging besides the staging owner account.
+const STAGING_EXTRA_OWNER_UIDS = ['4rUS8c2iqafUrs7w31ugAo5J2Sg1'];
 const FORBIDDEN = [
   'b3-games.firebaseapp.com',
   'simcha5770@gmail.com',
@@ -198,6 +200,12 @@ function stageSource(siteRoot, env = process.env) {
       const refusal = 'q("gateMsg").textContent=user?"This Google account is not the Fun Torah Tools owner.":';
       if (!content.includes(refusal)) throw new Error('Cannot find the Owner Admin refusal message to extend for staging.');
       content = content.replace(refusal, 'q("gateMsg").textContent=user?"This account is not the staging owner. This browser is signed in as "+(user.email||"(no email)")+", email verified: "+(user.emailVerified?"yes":"NO")+". The staging owner is owner@funtorahtools-staging.test: sign in at /staging/owner-signin.html.":');
+      // Staging only: the owner's own Google account (matched by its staging user id, so the real email is never written into staging pages)
+      // may also open Owner Admin. The staging database rules and functions already treat this id as an active owner (b3Games/admins).
+      const ownerCheck = 'function isOwner(user){return user?.emailVerified===true&&String(user.email||"").toLowerCase()===OWNER;}';
+      if (!content.includes(ownerCheck)) throw new Error('Cannot find the Owner Admin owner check to extend for staging.');
+      content = content.replace(ownerCheck, 'function isOwner(user){return user?.emailVerified===true&&(String(user.email||"").toLowerCase()===OWNER||STAGING_EXTRA_OWNER_UIDS.indexOf(user.uid)>=0);}');
+      content = content.replace('function isOwner(user)', 'const STAGING_EXTRA_OWNER_UIDS=' + JSON.stringify(STAGING_EXTRA_OWNER_UIDS) + ';\nfunction isOwner(user)');
     }
     if (relative === 'guest-mode.js') {
       // The Guest Mode sample gradebook is keyed by real student names (Last First). Staging gets generic names.
