@@ -50,6 +50,7 @@ const EXEMPT_PAGES = {
   "all-pages.html": "index of every page (links only)",
   "assignment-center/prototype.html": "design prototype",
   "assignment-center/teacher.html": "teacher",
+  "chayus-meter/teacher-preview.html": "fictional teacher layout preview, no student data",
   "chazara/teacher.html": "teacher",
   "class-dashboard/index.html": "teacher dashboard",
   "class-pointer-prototype/dashboard.html": "teacher dashboard",
