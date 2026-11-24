@@ -29,6 +29,9 @@
   // Every student feature. A page declares which one it is with data-feature (see tests/student-lock-pages.test.cjs).
   var FEATURES = Object.freeze([
     { id: 'posuk-practice-scroll', label: 'Posuk & Mishnayos Practice', icon: '📜', group: 'learning' },
+    { id: 'chumash-quiz', label: 'Chumash חידון', icon: '🧠', group: 'learning' },
+    { id: 'record-mishnayos', label: 'Mishnayos Practice', icon: '📖', group: 'learning' },
+    { id: 'record-mishnayos-quiz', label: 'Mishnayos חידון', icon: '🧠', group: 'learning' },
     { id: 'mishnayos-practice', label: 'Mishnayos Practice (classic)', icon: '📖', group: 'learning' },
     { id: 'chazara', label: 'Chazara', icon: '🔁', group: 'learning' },
     { id: 'shorashim', label: 'Shorashim', icon: '🌱', group: 'learning' },

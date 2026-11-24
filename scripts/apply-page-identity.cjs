@@ -48,7 +48,6 @@ const PAGES = {
   'chossid-lamdan.html': ['Weekly Marks', 'nigri'],
   'class-dashboard/index.html': ['Class Dashboard', 'dashboard'],
   'class-gallery/index.html': ['Class Wall', 'gallery'],
-  'class-locks/index.html': ['Class Locks', 'locks'],
   'class-pointer-prototype/classroom.html': ['Pointer Classroom', 'pointer'],
   'class-pointer-prototype/dashboard.html': ['Class Pointer', 'pointer' + T],
   'class-pointer-prototype/index.html': ['Pointer Home', 'pointer'],

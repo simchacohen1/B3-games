@@ -83,6 +83,10 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
       return route.fulfill({contentType:'text/javascript',body:bootstrap});
     }
     if(url.hostname==='b3-games-default-rtdb.firebaseio.com'){
+      // Student pages hold live Firebase streams (EventSource) so a lock reaches them in seconds. route.fetch waits for a
+      // response body that never ends, which would still be pending when the test finishes. Answer a stream with an empty
+      // one: the page keeps working from its normal polling and the browser simply reconnects later.
+      if(String(req.headers()['accept']||'').includes('text/event-stream'))return route.fulfill({status:200,headers:{'content-type':'text/event-stream','cache-control':'no-cache','access-control-allow-origin':origin()},body:': synthetic stream, no live events\n\n'});
       url.protocol='http:';url.host=`127.0.0.1:${DB_PORT}`;url.searchParams.set('ns',PROJECT);
       const response=await route.fetch({url:url.href});
       return route.fulfill({response,headers:{...response.headers(),'access-control-allow-origin':origin()}});

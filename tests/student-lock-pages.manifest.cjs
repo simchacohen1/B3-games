@@ -25,7 +25,7 @@ const STUDENT_PAGES = {
   "multiplayer/index.html": "multiplayer-center",
   "rashi-letters/student.html": "rashi-letters",
   "record-mishnayos/progress.html": "posuk-practice-scroll",
-  "record-mishnayos/student.html": "posuk-practice-scroll",
+  "record-mishnayos/student.html": "record-mishnayos",
   "record_pesukim/progress.html": "posuk-practice-scroll",
   "record_pesukim/student.html": "posuk-practice-scroll",
   "sefer-hamitzvos/index.html": "sefer-hamitzvos",
@@ -52,7 +52,6 @@ const EXEMPT_PAGES = {
   "assignment-center/teacher.html": "teacher",
   "chazara/teacher.html": "teacher",
   "class-dashboard/index.html": "teacher dashboard",
-  "class-locks/index.html": "teacher Locks panel (teacher sign-in only)",
   "class-pointer-prototype/dashboard.html": "teacher dashboard",
   "comment-log/b3-comment-log.html": "teacher tool",
   "daily-checklist/teacher.html": "teacher",
@@ -82,4 +81,11 @@ const EXEMPT_PAGES = {
 };
 // Folders that never serve student pages (tests, tooling, copies for previews).
 const IGNORED_DIRS = ['preview-', '_worktrees/', 'tests/', 'e2e', 'docs/', 'scripts/', 'staging/', 'security/', 'testing/', 'vendor/', 'auth-hosting/', 'sols-site/', 'sync-to-nigri/', 'backup-', 'node_modules/'];
-module.exports = { STUDENT_PAGES, EXEMPT_PAGES, IGNORED_DIRS };
+// Pages that serve two tiles (practice and ?mode=quiz): the second tile has its own lock feature (data-feature-quiz). The older
+// gate id stays the tool's grant ("posuk-practice-scroll") because the four Chumash Cheder tiles are one tool grant.
+const QUIZ_FEATURES = {
+  "record_pesukim/student.html": "chumash-quiz",
+  "record-mishnayos/student.html": "record-mishnayos-quiz"
+};
+const GATE_IS_TOOL_GRANT = { "record-mishnayos/student.html": "posuk-practice-scroll" };
+module.exports = { STUDENT_PAGES, EXEMPT_PAGES, IGNORED_DIRS, QUIZ_FEATURES, GATE_IS_TOOL_GRANT };
