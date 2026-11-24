@@ -474,10 +474,10 @@ function renderRashiList(){
   }).join('');
 }
 function updateRashiCounts(){
-  const waiting=rashiData.items.filter(rashiPending);
-  document.getElementById('recCount').textContent=waiting.length?'('+waiting.length+')':'';
+  const rows=rashiData.items.filter(rashiPending);
+  document.getElementById('recCount').textContent=rows.length?'('+rows.length+')':'';
   // Older recordings (sent before letter marking) can be approved all at once: +2 points, no letter data.
-  pendingLegacyIds=waiting.filter(r=>!r.v2&&!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
+  pendingLegacyIds=rows.filter(r=>!r.v2&&!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
   const bulk=document.getElementById('approveLegacyAllBtn');
   bulk.classList.toggle('hidden',!pendingLegacyIds.length);
   bulk.textContent='✅ Approve All Legacy Readings ('+pendingLegacyIds.length+')';
