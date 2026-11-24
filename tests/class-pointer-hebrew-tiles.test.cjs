@@ -152,8 +152,8 @@ test('student-boards.js is wired to the tiles: messages, saving, restoring, and 
   assert.match(s,/ClassPointerTiles/);
   assert.match(s,/op\.type==='board-tile'/);
   assert.match(s,/message\.tiles=b\.tiles/);
-  assert.match(s,/boardFromMessage\(message\.strokes,message\.text,message\.tiles\)/);
-  assert.match(s,/tiles:board\.tiles\.map/,'the student\'s tile places are saved with the board');
+  assert.match(s,/boardFromMessage\(message\.strokes,message\.text,message\.tiles(,message)?\)/);
+  assert.match(s,/tiles:(board|page)\.tiles\.map/,'the student\'s tile places are saved with the board');
   assert.match(s,/data\.tiles/,'and put back when it is opened');
   assert.match(s,/Hebrew tiles/);
   assert.match(s,/grab:\{hit:/,'tiles can be picked up through the drawing toolbar');

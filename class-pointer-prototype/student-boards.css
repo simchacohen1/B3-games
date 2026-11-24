@@ -147,3 +147,15 @@ body.boards-on #studentDock{display:none!important}
 .board-screen-large{display:flex;flex-direction:column;align-items:stretch;padding:6px}
 .board-screen-large video{position:relative;inset:auto;flex:1;min-height:0;width:100%;height:auto}
 .board-screen-large .board-panel-text{margin:auto}
+
+/* ---------- Pages (slides) on a student board: the strip in the bar and the small pictures of every page ---------- */
+.board-pages-group{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.board-pages-group[hidden]{display:none}
+.board-pages-group .board-pages-label{font-weight:700;white-space:nowrap}
+.board-pages-group button:disabled{opacity:.4;cursor:default}
+.board-pages-thumbs{display:flex;gap:8px;overflow-x:auto;flex:none;padding:8px 12px;background:#101827;border-bottom:1px solid #243049}
+.board-pages-thumbs[hidden]{display:none}
+.board-page-thumb{position:relative;flex:none;padding:0;border:3px solid transparent;border-radius:9px;background:#fff;cursor:pointer;overflow:hidden}
+.board-page-thumb.current{border-color:#60a5fa}
+.board-page-thumb canvas{display:block;width:128px;height:72px}
+.board-page-thumb .board-page-num{position:absolute;left:4px;top:4px;min-width:20px;padding:1px 6px;border-radius:9px;background:#101827cc;color:#fff;font:800 12px system-ui;text-align:center}
