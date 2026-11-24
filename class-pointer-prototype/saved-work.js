@@ -367,6 +367,13 @@
   }
 
   async function saveCurrent(){
+    // Teacher with a student group's board open large: Save keeps that board (the same file Save group boards makes).
+    if(teacherPage&&window.ClassPointerBoards?.groupBoardOpen?.()){
+      let item=null;
+      try{item=await window.ClassPointerBoards.openGroupBoardItem()}catch(error){const ui=openDialog('Save group board');ui.fail(error);return false}
+      if(!item){openDialog('Save group board').say('This group board is empty. Draw something on it first, then press Save.');return false}
+      return saveGroupBoards([item]);
+    }
     const ui=openDialog(teacherPage?'Save whiteboard':'Save my whiteboard');
     ui.say('Getting ready…');
     try{

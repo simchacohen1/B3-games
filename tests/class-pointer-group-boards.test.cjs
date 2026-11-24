@@ -418,3 +418,34 @@ test('Groups and Save group boards are in the "Send to all boards" bar, which is
   const soloBar=solo.dom.created.find(n=>n.className==='boards-activity-bar');
   assert.equal(soloBar.children.find(n=>n.tag==='button'&&/Save group boards/.test(n.textContent)).hidden,true,'Save group boards appears once there are groups');
 });
+
+// ---------- the regular Save on the toolbar saves the group board that is open large ----------
+test('with a group board open large, the regular Save has that board to save; other screens do not',async()=>{
+  const f=await teacherFixture();
+  const api=f.boards;
+  assert.equal(api.groupBoardOpen(),false,'in the gallery nothing is open large');
+  await wait(()=>f.grid.children.length===2,'two tiles');
+  const soloTile=f.grid.children.find(tile=>tile.children.some(c=>c.className==='board-name'&&c.textContent==='Yossi'));
+  soloTile.click();
+  assert.equal(api.groupBoardOpen(),false,'one student\'s own board is not a group board');
+  f.dom.created.find(n=>n.tag==='button'&&/Back to gallery/.test(n.textContent)).click();
+  const groupTile=f.grid.children.find(tile=>tile.children.some(c=>c.className==='board-name'&&/Lions/.test(c.textContent)));
+  groupTile.click();
+  assert.equal(api.groupBoardOpen(),true);
+  assert.equal(await api.openGroupBoardItem(),null,'an empty group board has nothing to save yet');
+  f.from(f.arik,{type:'board-add',pg:'pg0',stroke:stroke('s1')});
+  const item=await api.openGroupBoardItem();
+  assert.match(item.name,/Lions/);assert.equal(item.pages.length,1);assert.match(item.pages[0],/^data:image\/jpeg/);assert.ok(item.picture);
+  api.navigateWorkspace('teach');
+  assert.equal(api.groupBoardOpen(),false,'not while the teacher shows the lesson');
+});
+
+test('saved-work.js: Save checks for an open group board first, and saves it with the same code as Save group boards',()=>{
+  const src=read('class-pointer-prototype/saved-work.js');
+  const start=src.indexOf('async function saveCurrent(){');
+  const head=src.slice(start,src.indexOf("const ui=openDialog(teacherPage?'Save whiteboard'",start));
+  assert.match(head,/teacherPage&&window\.ClassPointerBoards\?\.groupBoardOpen\?\.\(\)/);
+  assert.match(head,/return saveGroupBoards\(\[item\]\)/);
+  assert.match(head,/This group board is empty/);
+  assert.match(read('class-pointer-prototype/saved-work.js'),/saveGroupBoards,keepTeacherCopy/);
+});

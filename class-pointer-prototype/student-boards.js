@@ -1311,25 +1311,30 @@
     c.width=0;
     return data.length<=limit?data:null;
   }
+  // One group's board as something saved-work.js can save: its name, a picture of every page, and a picture of page 1.
+  // null when the board has nothing on it yet.
+  async function groupItem(g){
+    const set=boards.get('group:'+g.id);
+    if(!set||!set.pages.some(page=>page.strokes.length||page.bg))return null;
+    const limit=Math.max(150000,Math.min(600000,Math.floor(8500000/set.pages.length)));
+    const pages=[];
+    for(const page of set.pages){
+      const jpeg=await pageJpeg(page,limit);
+      if(!jpeg)throw Error('A page of '+g.name+' is too detailed to save.');
+      pages.push(jpeg);
+    }
+    const members=Groups.membersOf(gstate,g.id).map(key=>gstate.assign[key].n).filter(Boolean).join(', ');
+    return{name:g.name+(members?' - '+members:''),pages,picture:await boardPng(set.pages[0])};
+  }
+  // The group board that is open large right now (its group id), or ''. The regular Save on the toolbar saves this one.
+  const openGroupId=()=>mode==='boards'&&on&&!suspended&&!view.hidden&&typeof focusId==='string'&&focusId.startsWith('g:')&&Groups?.groupById(gstate,focusId.slice(2))?focusId.slice(2):'';
   async function saveGroupBoards(){
     const api=window.FTTSavedWork;
     if(typeof api?.saveGroupBoards!=='function'){B.status('Saving is not ready yet. Try again in a moment.');return}
     saveGroupsBtn.disabled=true;
     try{
       const items=[];
-      for(const g of gstate.groups){
-        const set=boards.get('group:'+g.id);
-        if(!set||!set.pages.some(page=>page.strokes.length||page.bg))continue;
-        const limit=Math.max(150000,Math.min(600000,Math.floor(8500000/set.pages.length)));
-        const pages=[];
-        for(const page of set.pages){
-          const jpeg=await pageJpeg(page,limit);
-          if(!jpeg)throw Error('A page of '+g.name+' is too detailed to save.');
-          pages.push(jpeg);
-        }
-        const members=Groups.membersOf(gstate,g.id).map(key=>gstate.assign[key].n).filter(Boolean).join(', ');
-        items.push({name:g.name+(members?' - '+members:''),pages,picture:await boardPng(set.pages[0])});
-      }
+      for(const g of gstate.groups){const item=await groupItem(g);if(item)items.push(item)}
       if(!items.length){B.status('The group boards are empty. There is nothing to save yet.');return}
       await api.saveGroupBoards(items);
     }catch(error){B.fail(error?.message||'Could not save the group boards.')}
@@ -1928,6 +1933,9 @@
   window.ClassPointerBoards={
     // What the teacher is looking at, for the tabs above the lesson: null (My screen), 'screens' or 'boards'.
     workspace:()=>on&&!suspended&&!view.hidden?mode:null,
+    // The regular Save (saved-work.js) saves a group board that is open large: is one open, and what is on it?
+    groupBoardOpen:()=>!!openGroupId(),
+    async openGroupBoardItem(){const gid=openGroupId();return gid?groupItem(Groups.groupById(gstate,gid)):null},
     // Groups, for the drawing toolbar (classroom-annotate.js): the gallery's own top bar is hidden on the teacher page, so the
     // toolbar carries the Groups button. `available` = student whiteboards are showing; `active` = there are groups.
     groups:{
