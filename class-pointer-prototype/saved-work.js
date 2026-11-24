@@ -137,7 +137,7 @@
       if(!id){await checkRoom(me);id=Core.newId()}
       const folder=firebase.storage().ref(me.prefix);
       if(me.teacher)await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'});
-      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,fromTeacher,important,savedAt:Date.now()})});
+      await folder.child(Core.objectName(id,'json')).put(blob,{contentType:'application/json',customMetadata:Core.fileMetadata({name,kind:'whiteboard',folderId,subject,template,fromTeacher,important,boardPages:Array.isArray(data?.pages)?data.pages.length:1,savedAt:Date.now()})});
       // A student's small picture is only for looking at the file later. The save counts without it.
       if(!me.teacher&&picture&&!Core.sizeProblem('png',picture.size))await folder.child(Core.objectName(id,'png')).put(picture,{contentType:'image/png'}).then(null,()=>{});
       return id;

@@ -243,6 +243,10 @@
   // ---------- Teacher controls (inside the lesson so they also work in full screen) ----------
   let nav=null,pageInput=null,pageTotal=null,zoomLabel=null,twoBtn=null,flipBtn=null,shiftBtn=null,movePicturesBtn=null;
   let boardSize=null,boardPictures=[],pictureEdits=[],pictureBar=null,boardUpdate=Promise.resolve();
+  // Whiteboard pages (slides). wbPages lists the pages of the open whiteboard; the page being shown (wbPages[wbAt]) lives
+  // in boardPictures and the lesson marks, and is copied back into the list when the teacher changes page or saves.
+  const Pages=window.ClassPointerPages||null;
+  let wbPages=null,wbAt=0,wbSwitching=false,pagesBar=null,pagesPanel=null,pagesPanelOpen=false,pagesSig='',pagesTimer=0;
   // A read-only video of the teacher board lets activity pages watch without
   // navigating away or participating in the document editing protocol.
   let boardPresentation=null,boardPresentationTimer=null,boardBackground=null;
@@ -471,11 +475,12 @@
   }
   function updateControls(){
     if(!isTeacher||!nav)return;
-    nav.hidden=!doc;if(!doc)return;
+    nav.hidden=!doc;if(!doc){syncPagesBar();return}
     nav.setAttribute('aria-label',navWord()+' controls');
     if(nav.classList.contains('min'))nav.querySelector('.pdf-toggle').textContent='▴ '+navWord()+' controls';
     nav.querySelectorAll('.pdf-jump,.pdf-two,.pdf-spread-only').forEach(node=>node.hidden=webMode);
     if(movePicturesBtn)movePicturesBtn.hidden=!(isBoardOpen()&&boardPictures.length&&!pictureEdits.length);
+    syncPagesBar();
     nav.querySelectorAll('.pdf-board-only').forEach(node=>node.hidden=!isBoardOpen()||!window.ClassPointerClipboard);
     nav.querySelectorAll('button').forEach(node=>{if(node.title==='Previous page'||node.title==='Next page'||node.title==='Jump to this page')node.hidden=webMode;if(node.classList.contains('pdf-close')){node.textContent='✕ Close '+navWord().toLowerCase().replace('pdf','PDF');node.title='Close the '+navWord().toLowerCase().replace('pdf','PDF')+' for everyone'}});
     pageTotal.textContent=' of '+lay.count;pageInput.max=String(lay.count);
@@ -1041,6 +1046,7 @@
       await loadWebDoc(data);if(opening!==committed)return;
       bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
       boardSize=board?{w:width,h:height}:null;
+      if(board&&Pages){wbPages=[newWbPage()];wbAt=0}
       // The whole board at a glance; a captured tab keeps fitting the width.
       fitWhole=!!board;updateControls();syncFit();relayout();scroller.scrollTop=0;scroller.scrollLeft=0;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
@@ -1320,6 +1326,7 @@
     stopBoardPresentation();
     for(const item of pictureEdits)item.el.remove();
     pictureEdits=[];boardPictures=[];boardSize=null;if(pictureBar)pictureBar.hidden=true;
+    wbPages=null;wbAt=0;pagesPanelOpen=false;syncPagesBar();
   }
   // source: a picture file, or a data: URL from a saved whiteboard.
   function loadPicture(source){
@@ -1517,6 +1524,153 @@
     paintInk(c.getContext('2d'),c,strokes,c.width,c.height);
     return new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of the whiteboard.'))},'image/png'));
   }
+  // ---------- Whiteboard pages (slides) ----------
+  // The teacher can add, copy, delete and reorder pages, jump between them, and see a small picture of each. Only the
+  // teacher's whiteboard has pages here; students see the page the teacher shows, exactly as they see pictures and marks.
+  function newWbPage(){return{id:Pages.newId(),pictures:[],strokes:[],thumb:''}}
+  const cloneStrokes=list=>JSON.parse(JSON.stringify(list||[]));
+  // Copy what is on the lesson screen into the list entry of the page being shown.
+  function capturePage(){
+    if(!Pages||!wbPages||!wbPages[wbAt])return;
+    const page=wbPages[wbAt];
+    page.pictures=[...boardPictures,...pictureEdits.map(item=>({image:item.image,x:item.x,y:item.y,w:item.w,h:item.h,after:item.after}))];
+    page.strokes=cloneStrokes(B.highlights?.());
+  }
+  // Put a page of the list on the lesson screen for everyone: its pictures first, then its marks.
+  async function loadPage(index){
+    const page=wbPages[index];
+    selectedId=null;finishInline(true);
+    boardPictures=page.pictures.slice();
+    await publishBoard();
+    if(!isBoardOpen())return;
+    B.restoreMarks(page.strokes);
+    if(boardPresentation){try{boardBackground=new Image();boardBackground.src=composeBoard()}catch(_){}}
+    updateControls();
+  }
+  async function guardedPageChange(change){
+    if(!Pages||!wbPages||wbSwitching||!isBoardOpen())return false;
+    wbSwitching=true;
+    try{
+      if(pictureEdits.length)finishPictureEdit();
+      capturePage();
+      await change();
+      return true;
+    }catch(error){B.fail(error?.message||'Could not change the page.');return false}
+    finally{wbSwitching=false;renderPages(true)}
+  }
+  const showPage=index=>!wbPages||index===wbAt||index<0||index>=wbPages.length?Promise.resolve(false):guardedPageChange(async()=>{wbAt=index;await loadPage(index)});
+  function addPage(copy){
+    if(!Pages||!wbPages)return Promise.resolve(false);
+    if(wbPages.length>=Pages.MAX_PAGES){B.status('A whiteboard can have up to '+Pages.MAX_PAGES+' pages.');return Promise.resolve(false)}
+    return guardedPageChange(async()=>{
+      const from=wbPages[wbAt],page=newWbPage();
+      if(copy){page.pictures=from.pictures.slice();page.strokes=cloneStrokes(from.strokes)}
+      wbPages=Pages.insert(wbPages,wbAt+1,page);wbAt=wbPages.indexOf(page);
+      await loadPage(wbAt);
+      B.status((copy?'Page copied. ':'New blank page. ')+'This is page '+(wbAt+1)+' of '+wbPages.length+'.');
+    });
+  }
+  function deletePage(id){
+    if(!Pages||!wbPages)return Promise.resolve(false);
+    if(wbPages.length<=1){B.status('A whiteboard needs at least one page. Use Clear to empty it.');return Promise.resolve(false)}
+    const at=wbPages.findIndex(page=>page.id===id);
+    if(at<0)return Promise.resolve(false);
+    if(!confirm('Delete page '+(at+1)+'? You cannot get it back.'))return Promise.resolve(false);
+    return guardedPageChange(async()=>{
+      const shownId=wbPages[wbAt].id,place=Pages.after(wbPages,id),next=Pages.remove(wbPages,id);
+      if(shownId!==id){wbPages=next;wbAt=wbPages.findIndex(page=>page.id===shownId);return}
+      wbPages=next;wbAt=place;
+      await loadPage(wbAt);
+    });
+  }
+  // Move a page to a new place (the page being shown stays on screen).
+  function movePage(id,to){
+    if(!Pages||!wbPages)return Promise.resolve(false);
+    return guardedPageChange(async()=>{
+      const shownId=wbPages[wbAt].id;
+      wbPages=Pages.move(wbPages,id,to);wbAt=wbPages.findIndex(page=>page.id===shownId);
+    });
+  }
+  // A page painted at any width: its pictures, then its marks. `list` is the page's own marks.
+  function paintPage(canvas,pictures,list){
+    const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.imageSmoothingQuality='high';
+    for(const p of pictures)ctx.drawImage(p.image,p.x*canvas.width,p.y*canvas.height,p.w*canvas.width,p.h*canvas.height);
+    paintInk(ctx,canvas,list||[],canvas.width,canvas.height);
+  }
+  function pageCanvas(page,width,live){
+    const c=document.createElement('canvas');c.width=width;c.height=Math.max(1,Math.round(width*boardSize.h/boardSize.w));
+    paintPage(c,live?boardPictures:page.pictures,live?strokes:page.strokes);
+    return c;
+  }
+  // One PNG per page, full size, in page order (for Send to class). `only` = just that page number (1 up).
+  async function exportPagePngs(only){
+    if(!isBoardOpen())throw Error('The whiteboard is not open.');
+    if(!Pages||!wbPages)return[await exportPng()];
+    capturePage();
+    const blobs=[];
+    for(let i=0;i<wbPages.length;i++){
+      if(only&&only-1!==i)continue;
+      const c=pageCanvas(wbPages[i],boardSize.w,i===wbAt);
+      blobs.push(await new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of page '+(i+1)+'.'))},'image/png')));
+    }
+    return blobs;
+  }
+  function pagesInfo(){return isBoardOpen()&&Pages&&wbPages?{count:wbPages.length,current:wbAt}:null}
+  // The strip: previous / next, "Page 2 of 4", New page, and a panel of small pictures to jump to, copy, delete or move a page.
+  function pageSignature(){
+    const last=strokes[strokes.length-1];
+    return[wbAt,wbPages?.map(p=>p.id).join(','),boardPictures.length,strokes.length,last?.id,last?.points?.length,boardSize?.h].join('|');
+  }
+  function buildPagesBar(){
+    pagesBar=el('div',null,'board-pages-bar');pagesBar.dataset.stageUi='true';pagesBar.setAttribute('role','toolbar');pagesBar.setAttribute('aria-label','Whiteboard pages');
+    pagesPanel=el('div',null,'board-pages-panel');pagesPanel.hidden=true;
+    for(const type of ['pointerdown','pointermove','pointerup','pointercancel','click','dblclick','wheel','keydown','keyup'])pagesBar.addEventListener(type,event=>event.stopPropagation());
+    stage.appendChild(pagesBar);
+  }
+  function renderPages(force){
+    if(!isTeacher)return;
+    if(!pagesInfo()){if(pagesBar)pagesBar.hidden=true;clearInterval(pagesTimer);pagesTimer=0;return}
+    if(!pagesBar)buildPagesBar();
+    pagesBar.hidden=false;
+    if(!pagesTimer)pagesTimer=setInterval(()=>renderPages(false),1500);
+    const sig=pageSignature()+'|'+pagesPanelOpen+'|'+wbSwitching;
+    if(!force&&sig===pagesSig)return;
+    pagesSig=sig;
+    const n=wbPages.length,busy=wbSwitching;
+    const btn=(text,title,onClick,cls,disabled)=>{const b=el('button',null,cls||'pdf-btn',text);b.type='button';b.title=title;b.disabled=!!disabled;b.addEventListener('click',onClick);return b};
+    const row=el('div',null,'board-pages-row');
+    row.append(
+      btn('◀','Previous page',()=>void showPage(wbAt-1),'pdf-btn board-pages-step',busy||wbAt===0),
+      el('span',null,'board-pages-label','Page '+(wbAt+1)+' of '+n),
+      btn('▶','Next page',()=>void showPage(wbAt+1),'pdf-btn board-pages-step',busy||wbAt>=n-1),
+      btn('＋ New page','Add a blank page after this one',()=>void addPage(false),'pdf-btn',busy||n>=Pages.MAX_PAGES),
+      btn(pagesPanelOpen?'▾ Pages':'▴ Pages','Show small pictures of every page, to jump to, copy, delete or move a page',()=>{pagesPanelOpen=!pagesPanelOpen;renderPages(true)},'pdf-btn'));
+    pagesBar.replaceChildren(row,pagesPanel);
+    pagesPanel.hidden=!pagesPanelOpen;
+    if(!pagesPanelOpen)return;
+    pagesPanel.replaceChildren();
+    wbPages.forEach((page,i)=>{
+      const card=el('div',null,'board-page-card'+(i===wbAt?' current':''));card.draggable=!busy;
+      const img=el('img');img.alt='Page '+(i+1);img.draggable=false;
+      try{img.src=pageCanvas(page,160,i===wbAt).toDataURL('image/jpeg',0.7)}catch(_){}
+      const open=el('button',null,'board-page-open');open.type='button';open.title='Go to page '+(i+1);open.disabled=busy;open.append(img,el('span',null,'board-page-num',String(i+1)));
+      open.addEventListener('click',()=>void showPage(i));
+      const tools=el('div',null,'board-page-tools');
+      const small=(text,title,onClick,disabled)=>{const b=el('button',null,'board-page-tool',text);b.type='button';b.title=title;b.setAttribute('aria-label',title);b.disabled=!!disabled||busy;b.addEventListener('click',onClick);return b};
+      tools.append(
+        small('◀','Move this page earlier',()=>void movePage(page.id,i-1),i===0),
+        small('▶','Move this page later',()=>void movePage(page.id,i+1),i===n-1),
+        small('⧉','Copy this page',()=>{void showPage(i).then(()=>addPage(true))},n>=Pages.MAX_PAGES),
+        small('🗑','Delete this page',()=>void deletePage(page.id),n<=1));
+      card.addEventListener('dragstart',event=>{event.dataTransfer.setData('text/plain',page.id);event.dataTransfer.effectAllowed='move'});
+      card.addEventListener('dragover',event=>{event.preventDefault();event.dataTransfer.dropEffect='move'});
+      card.addEventListener('drop',event=>{event.preventDefault();const id=event.dataTransfer.getData('text/plain');if(id&&id!==page.id)void movePage(id,i)});
+      card.append(open,tools);pagesPanel.append(card);
+    });
+  }
+  function syncPagesBar(){renderPages(false)}
+
   // ---------- Save and restore (used by "Save whiteboard") ----------
   const SAVED_PICTURE=700000;
   function savedPicture(image){
@@ -1529,30 +1683,48 @@
   }
   // Everything needed to rebuild the teacher whiteboard: its pictures (also ones still being placed) and all marks.
   // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
+  // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
+  function savedStrokes(list){
+    return(list||[]).map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{}),...(s.font&&s.font!=='sans'?{font:s.font}:{})}:{}),...(s.fill===true?{fill:true}:{})}));
+  }
+  function savedPictures(list){
+    const out=[];
+    for(const p of list||[]){const data=savedPicture(p.image);if(data)out.push({data,x:p.x,y:p.y,w:p.w,h:p.h})}
+    return out;
+  }
   async function exportWhiteboard(){
     if(!isBoardOpen())return null;
-    const pictures=[];
-    for(const p of [...boardPictures,...pictureEdits]){const data=savedPicture(p.image);if(data)pictures.push({data,x:p.x,y:p.y,w:p.w,h:p.h})}
-    return{version:1,kind:'lesson-whiteboard',size:{w:boardSize.w,h:boardSize.h},pictures,
-      strokes:B.highlights().map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{}),...(s.font&&s.font!=='sans'?{font:s.font}:{})}:{}),...(s.fill===true?{fill:true}:{})}))};
+    const size={w:boardSize.w,h:boardSize.h};
+    if(!Pages||!wbPages||wbPages.length===1){
+      return{version:1,kind:'lesson-whiteboard',size,pictures:savedPictures([...boardPictures,...pictureEdits]),strokes:savedStrokes(B.highlights())};
+    }
+    capturePage();
+    const pages=wbPages.map(page=>({pictures:savedPictures(page.pictures),strokes:savedStrokes(page.strokes)}));
+    return{...Pages.wrap('lesson-whiteboard',pages,wbAt),size};
   }
   // Opens the whiteboard exactly as the Whiteboard button does, then puts the saved pictures and marks back for
-  // everyone. Saved data is checked as strictly as anything from the network.
+  // everyone. Saved data is checked as strictly as anything from the network. A one-page (version 1) file opens as one page.
   async function importWhiteboard(saved){
     const data=isTeacher?window.ClassPointerClipboard?.cleanLessonBoard(saved,C.cleanStroke):null,open=$('openWhiteboard');
     if(!data||!open||open.disabled||!B.restoreMarks)return false;
     const before=docId;open.click();
     for(let i=0;i<150&&!(isBoardOpen()&&docId!==before);i++)await sleep(100);
     if(!isBoardOpen()||docId===before)return false;
-    const board=docId;
-    for(const p of data.pictures){
-      let image=null;try{image=await loadPicture(p.data)}catch{}
-      if(!isBoardOpen()||docId!==board)return false;
-      if(image)boardPictures.push({image,x:p.x,y:p.y,w:p.w,h:p.h,after:null});
+    const board=docId,pages=[];
+    for(const saved of data.pages){
+      const page={id:Pages?Pages.newId():'pg',pictures:[],strokes:saved.strokes,thumb:''};
+      for(const p of saved.pictures){
+        let image=null;try{image=await loadPicture(p.data)}catch{}
+        if(!isBoardOpen()||docId!==board)return false;
+        if(image)page.pictures.push({image,x:p.x,y:p.y,w:p.w,h:p.h,after:null});
+      }
+      pages.push(page);
     }
+    if(Pages){wbPages=pages;wbAt=data.current}
+    boardPictures=pages[data.current].pictures.slice();
     if(boardPictures.length)await publishBoard();
     if(!isBoardOpen())return false;
-    B.restoreMarks(data.strokes);updateControls();
+    B.restoreMarks(pages[data.current].strokes);updateControls();
     return true;
   }
   if(isTeacher){
@@ -1621,6 +1793,7 @@
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
     pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,
+    pagesInfo,exportPagePngs,showPage,addPage,
     exportWhiteboard,importWhiteboard,exportPng,boardRatio,
     presentationStream:()=>boardPresentation
   };

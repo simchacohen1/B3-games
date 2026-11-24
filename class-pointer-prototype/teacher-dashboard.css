@@ -294,3 +294,20 @@ body.teacher-view.cp-is-live .cp-topbar-back{display:none}
 @media (min-width:1000px){body.teacher-view.cp-is-live .cp-topbar{flex-wrap:nowrap}}
 .cp-tabs-row .cp-tabs-spacer{flex:1 1 0;min-width:0;overflow:hidden}
 .cp-tabs-spacer #connectionStatus{margin:0!important;padding:0 6px!important;background:none!important;min-height:0!important;font-size:13px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Whiteboard pages (slides): the strip at the top right of the teacher's whiteboard ---------- */
+.board-pages-bar{position:absolute;z-index:11;top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:calc(100% - 24px);font:600 15px system-ui}
+.board-pages-bar[hidden]{display:none}
+.board-pages-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#101827f0;color:#fff;border-radius:14px;box-shadow:0 10px 30px #0006}
+.board-pages-label{min-width:92px;text-align:center;white-space:nowrap}
+.board-pages-panel{display:flex;gap:10px;max-width:min(92vw,720px);overflow-x:auto;padding:10px;background:#101827f0;border-radius:14px;box-shadow:0 10px 30px #0006}
+.board-pages-panel[hidden]{display:none}
+.board-page-card{flex:none;display:flex;flex-direction:column;gap:6px;padding:6px;border:2px solid transparent;border-radius:10px;background:#1b2740}
+.board-page-card.current{border-color:#60a5fa}
+.board-page-open{position:relative;display:block;padding:0;border:0;background:none;cursor:pointer;border-radius:6px;overflow:hidden}
+.board-page-open img{display:block;width:160px;height:auto;background:#fff;border-radius:6px}
+.board-page-num{position:absolute;left:6px;top:6px;min-width:22px;padding:1px 6px;border-radius:9px;background:#101827cc;color:#fff;font:800 13px system-ui;text-align:center}
+.board-page-tools{display:flex;justify-content:space-between;gap:4px}
+.board-page-tool{flex:1;min-height:34px;border:0;border-radius:8px;background:#2a3a5c;color:#fff;font:700 15px system-ui;cursor:pointer}
+.board-page-tool:disabled,.board-pages-bar button:disabled{opacity:.4;cursor:default}
+.board-page-tool:hover:not(:disabled){background:#3b5185}

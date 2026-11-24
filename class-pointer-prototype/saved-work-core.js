@@ -99,6 +99,8 @@
       ...(cleanName(file.subject,LIMITS.folderName)?{subject:cleanName(file.subject,LIMITS.folderName)}:{}),
       ...(file.template?{template:'1'}:{}),
       // A filled-in worksheet (pages = how many page pictures it has) and a student's PDF copy of a class worksheet.
+      // How many pages a multi-page whiteboard has (left out for a one-page board).
+      ...(Math.floor(Number(file.boardPages))>1?{boardPages:String(Math.min(MAX_BOARD_PAGES,Math.floor(Number(file.boardPages))))}:{}),
       ...(file.worksheet?{worksheet:'1',pages:String(Math.min(60,Math.max(1,Math.floor(Number(file.pages))||1)))}:{}),
       ...(validId(file.sheetId)?{sheetId:file.sheetId}:{}),
       // A copy the teacher sent (a board or a worksheet), and whether the teacher marked it important (it arrives starred).
@@ -123,6 +125,8 @@
       template:custom.template==='1', // a template: opening it always gives a fresh copy
       worksheet:custom.worksheet==='1', // a filled-in PDF worksheet
       pages:Math.min(60,Math.max(1,Math.floor(Number(custom.pages))||1)),
+      // Pages in a multi-page whiteboard (left out for a one-page file, so one-page rows look as they always did).
+      ...(Math.floor(Number(custom.boardPages))>1?{boardPages:Math.min(MAX_BOARD_PAGES,Math.floor(Number(custom.boardPages)))}:{}),
       sheetId:validId(custom.sheetId)?custom.sheetId:'', // set on a student's PDF copy of a class worksheet
       fromTeacher:custom.fromTeacher==='1'||/^From your teacher/.test(cleanName(custom.displayName)), // sent by the teacher
       important:custom.important==='1', // the teacher marked it important
@@ -136,10 +140,14 @@
   function cleanZoom(value){const zoom=Number(value);return Number.isFinite(zoom)?Math.min(5,Math.max(0.25,zoom)):1}
 
   // Never trust a saved file: it must be the right kind of whiteboard and a sensible size before it is opened.
+  const MAX_BOARD_PAGES=20;
   function parseBoard(text,kind,maxBytes){
     if(typeof text!=='string'||!text||text.length>maxBytes)return null;
     let data;try{data=JSON.parse(text)}catch(_){return null}
-    return data&&typeof data==='object'&&!Array.isArray(data)&&data.version===1&&data.kind===kind?data:null;
+    if(!data||typeof data!=='object'||Array.isArray(data)||data.kind!==kind)return null;
+    // Version 1 is one page; version 2 holds a list of pages (board-pages-core.js).
+    if(data.version===1)return data;
+    return data.version===2&&Array.isArray(data.pages)&&data.pages.length>=1&&data.pages.length<=MAX_BOARD_PAGES?data:null;
   }
 
   // ---------- Class folders (the teacher makes them; students choose one when saving) ----------
