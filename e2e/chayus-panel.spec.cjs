@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   origin = 'http://127.0.0.1:' + server.address().port;
 });
-test.afterAll(() => server.close());
+test.afterAll(() => server && server.close());
 
 // Replace getUserMedia with a tone we control. Records every call and every track stop.
 async function fakeMic(page, mode) {
@@ -81,14 +81,19 @@ for (const cls of ['et', 'wt']) {
       await fakeMic(page, 'ok');
       await page.goto(`${origin}/davening_student_app_${cls}/index.html`);
       await expect(page.locator('#chayusLevelName')).toHaveText('Level 0 · Getting started');
+      // The celebration hides itself after a few seconds (on the page's clock), so record it when it appears.
+      await page.evaluate(() => {
+        window.__celebrations = [];
+        new MutationObserver(() => { const box = document.getElementById('chayusCelebrate'); if (!box.hidden) window.__celebrations.push(box.innerText.replace(/s+/g, ' ')); })
+          .observe(document.getElementById('chayusCelebrate'), { attributes: true, childList: true });
+      });
       await page.getByRole('button', { name: /Turn on My Chayus Meter/ }).click();
       await expect(page.locator('#chayusStatus')).toContainText('Microphone on');
       await page.clock.runFor(20000);
       await expect(page.locator('#chayusLevelNext')).toContainText('until Level 1 · Spark');
       await page.clock.runFor(60000);
       await expect(page.locator('#chayusLevelName')).toHaveText('Level 1 · Spark');
-      await expect(page.locator('#chayusCelebrate')).toBeVisible();
-      await expect(page.locator('#chayusCelebrate')).toContainText('Level 1: Spark');
+      expect((await page.evaluate(() => window.__celebrations)).join(' | ')).toContain('Level 1: Spark');
       await expect(page.locator('#chayusPoints')).toHaveText('1 / 10 points today');
       const reports = await page.evaluate(() => window.__reports);
       expect(reports.length).toBeGreaterThan(0);
