@@ -1811,6 +1811,13 @@ exports.studentRewardsAutoAward = onRequest(
             hebrewText:String(body.hebrewText||''),sefer:String(body.sefer||'')});
           return res.status(200).json(result);
         }
+        if(action==="posuk-student-delete"){
+          // A student deletes their own recording, only while the teacher has not graded it (discard refuses otherwise).
+          const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
+          if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+          const result=await posukReview.discard({byStudent:true,studentId:practice.studentId,submissionId:String(body.submissionId||'')});
+          return res.status(200).json(result);
+        }
         const teacher=await requireTeacher(req);
         if(!teacher.ok) return res.status(401).json({error:teacher.error});
         if(action==="posuk-grade"){
