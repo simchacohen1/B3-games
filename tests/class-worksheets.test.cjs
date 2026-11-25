@@ -139,7 +139,7 @@ test('student activity pages load the worksheet-aware saved-work code; the small
   const share=read('class-pointer-prototype/activity-share.js');
   assert.match(share,/saved-work-core\.js\?v=20261124-pages1/);assert.match(share,/saved-work\.js\?v=20261124-groups1/);
   const pages=['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html'];
-  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261124-groups1/,page);
+  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261125-status1/,page);
   const saved=read('class-pointer-prototype/saved-work.js');
   assert.match(saved,/file\.worksheet\n?\s*\?\[button\('Continue in My files'/);
   assert.match(saved,/if\(file\.worksheet\)\{[\s\S]*?startsWith\(file\.id\+'-p'\)[\s\S]*?\.delete\(\)/,'page pictures are removed with the worksheet');
