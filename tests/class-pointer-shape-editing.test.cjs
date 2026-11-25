@@ -129,9 +129,9 @@ test('words are opened for editing only with Text or a second click in Select; o
 });
 
 test('the changed scripts get new cache versions',()=>{
- assert.match(html,new RegExp('"classroom-core\\.js\\?v=hlshapes2"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=20261123-tiles2"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261124-pages1"/,'pdf-mode');
+ assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261125-wb1"'),'classroom-core');
+ assert.match(html,/"classroom\.js\?v=20261125-wb1"/,'classroom');
+ assert.match(html,/"pdf-mode\.js\?v=20261125-wb1"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -197,7 +197,7 @@ test('a block of words is edited and removed as one piece',()=>{
 test('the bar under the lesson is as wide as its buttons, so Edit latest text is not pushed off the screen',()=>{
  const css=read('class-pointer-prototype/classroom.css');
  assert.match(css,/#pdfNav\{position:absolute;z-index:6;left:50%;bottom:12px;transform:translateX\(-50%\);width:max-content;display:flex;flex-wrap:wrap;[^}]*max-width:calc\(100% - 24px\)/);
- assert.match(html,/classroom\.css\?v=20261116-wbplus1/);
+ assert.match(html,/classroom\.css\?v=20261125-wb1/);
 });
 
 test('words are drawn in the font they are measured in, so a wrapped line stays on the board',()=>{
