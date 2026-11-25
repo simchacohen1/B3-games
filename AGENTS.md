@@ -47,6 +47,17 @@ If GitHub is unavailable, say that the overlap check could not be completed.
   branch with current main, so staging always matches live plus the new change.
   Never deploy an old branch to staging.
 - Keep staging-only settings (Storage rules, CORS, test accounts) in place.
+- Every session that deploys for testing must use its own Firebase Hosting
+  preview channel on `fun-torah-tools-staging`, named after its branch (for
+  example `firebase hosting:channel:deploy <branch-name> --project fun-torah-tools-staging`,
+  with the branch name lowercased and `/` replaced by `-`). Never deploy to the main
+  staging address (the live channel of `fun-torah-tools-staging`), so sessions never
+  overwrite each other.
+- Build the preview from the branch after bringing it up to date with current
+  `origin/main`, then give the owner the preview link once it is deployed.
+- When the branch is merged or closed, delete its channel
+  (`firebase hosting:channel:delete <channel> --project fun-torah-tools-staging`).
+  Delete only your own session's channel, never another session's or the live one.
 
 ## Workspace and disk space
 
