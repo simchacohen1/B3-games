@@ -1061,7 +1061,7 @@ async function moveClassWithPeople(id,to){
  if(!confirm("Move "+ids.map(cname).join(" and ")+" to "+schoolData[to].name+" together with "+plan.students.length+" "+(plan.students.length===1?"student":"students")+" and "+plan.teachers.length+" "+(plan.teachers.length===1?"teacher":"teachers")+"? Passcodes and tool settings stay the same."+(resets?" "+resets+" teacher"+(resets===1?"'s":"s'")+" saved Nigri login will be removed.":"")))return false;
  // Written one place at a time, people first and the classes last: if one fails, the next try finishes the job.
  for(const [path,value] of Object.entries(plan.updates))await db.ref(root+"/"+path).set(value);
- q("status").textContent=ids.map(cname).join(" and ")+" moved to "+schoolData[to].name+" with "+plan.students.length+" students and "+plan.teachers.length+" teachers ✓";
+ q("status").textContent=ids.map(cname).join(" and ")+" moved to "+schoolData[to].name+" with "+plan.students.length+" "+(plan.students.length===1?"student":"students")+" and "+plan.teachers.length+" "+(plan.teachers.length===1?"teacher":"teachers")+" ✓";
  return true;
 }
 document.addEventListener("change",async e=>{
