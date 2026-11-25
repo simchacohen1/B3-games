@@ -58,6 +58,7 @@ const PAGES = {
   'comment-log/b3-comment-log.html': ['Comment Log', 'log'],
   'daily-checklist/index.html': ['Checklist', 'checklist'],
   'daily-checklist/teacher.html': ['Checklist Teacher', 'checklist' + T],
+  'chayus-meter/index.html': ['Chayus Meter', 'davening'],
   'davening_student_app_et/index.html': ['Davening ET', 'davening'],
   'davening_student_app_wt/index.html': ['Davening WT', 'davening'],
   'game-show/player.html': ['Game Show', 'quiz'],

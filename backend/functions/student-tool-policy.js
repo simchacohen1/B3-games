@@ -3,6 +3,8 @@
   const aliases=tool=>{
     if(['gallery','tag','class-gallery'].includes(tool))return ['gallery','tag','class-gallery'];
     if(['rashi','rashi-letters'].includes(tool))return ['rashi','rashi-letters'];
+    // The Chayus Meter tile follows the class's Davening setting: no separate grant, no Davening player for students.
+    if(tool==='chayus-meter')return ['chayus-meter','davening'];
     return [tool];
   };
   function granted(cls,tool){return aliases(tool).some(id=>cls?.toolGrants?.[id]===true);}

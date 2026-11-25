@@ -193,3 +193,25 @@ test('a constant hum is tuned out instead of counting as davening forever', () =
   assert.equal(m.live().voiceHeard, false);
   assert.ok(m.finish().soundActivityPercent < 50);
 });
+
+test('the student Chayus page has the meter but no Davening player, audio or controls, and respects the Davening lock', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'chayus-meter', 'index.html'), 'utf8');
+  assert.ok(html.includes('../chayus-meter/core.js') && html.includes('../chayus-meter/panel.js'));
+  assert.ok(html.indexOf('chayus-meter/core.js') < html.indexOf('chayus-meter/panel.js'));
+  assert.match(html, /student-lock\.js[^>]*data-feature="davening"/);
+  for (const banned of ['<audio', '<video', 'playBtn', 'davening_student_app', 'class-pointer', 'firebase']) {
+    assert.equal(html.includes(banned), false, `index.html must not contain ${banned}`);
+  }
+  // The home tile exists, opens that page, and follows the class's Davening setting (grant, per-student block, lock).
+  const registry = fs.readFileSync(path.join(root, 'shared', 'home-tool-registry.js'), 'utf8');
+  assert.match(registry, /id:"chayus-meter",title:"Chayus Meter"[^}]*href:"chayus-meter\/index\.html"/);
+  const policy = require('../backend/functions/student-tool-policy.js');
+  assert.equal(policy.granted({ toolGrants: { davening: true } }, 'chayus-meter'), true);
+  assert.equal(policy.granted({ toolGrants: {} }, 'chayus-meter'), false);
+  assert.equal(policy.allowed({ members: { s1: { toolAccess: { davening: false } } } }, 's1', 'chayus-meter'), false);
+  // The student does not get the player: Davening itself is still not a student activity.
+  assert.equal(policy.studentActivities.includes('davening'), false);
+});
