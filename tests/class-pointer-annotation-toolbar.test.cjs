@@ -52,7 +52,7 @@ test('student side accepts shapes and text from the teacher, checked, with teach
 
 test('student whiteboard is a toolbar surface whose marks are ordinary board lines',()=>{
   const s=read('class-pointer-prototype/student-boards.js');
-  assert.match(s,/const boardSurface=\{id:'board',idPrefix:'s',defaultTool:'pen'/);
+  assert.match(s,/const boardSurface=\{id:'board',idPrefix:'s',defaultTool:'select'/);
   assert.match(s,/FA\.setReason\('whiteboard',boardOpen\(\)\)/);
   assert.match(s,/const ITEM_TOOLS=\['highlight','rect','ellipse','triangle','line','arrow','text'\]/);
   assert.match(s,/act\(\{type:'board-add',stroke\}\)/);

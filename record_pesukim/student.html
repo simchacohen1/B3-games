@@ -1271,6 +1271,11 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
   .tool-test-me #combinedPanel, .tool-test-me #bonusNotices,
   .tool-test-me #comprehensionPanel .step-chip, .tool-test-me a[href="progress.html"]{ display:none !important; }
   .combined-state{ margin:10px 0; padding:12px 14px; border-radius:14px; font-weight:700; line-height:1.4; }
+  .combined-unsent{ margin:10px 0; padding:14px 16px; border-radius:14px; background:#fff1e0; border:3px solid #e8590c; color:#7a2e00; font-weight:800; font-size:1.05rem; line-height:1.45; }
+  .combined-unsent small{ display:block; font-weight:600; font-size:.88rem; margin-top:4px; }
+  .combined-unsent.cannot-send{ background:#f1f3f5; border-color:#868e96; color:#343a40; }
+  #combinedSubmitBtn.needs-send{ animation:combinedNudge 1.4s ease-in-out infinite; box-shadow:0 0 0 3px #e8590c; }
+  @keyframes combinedNudge{ 0%,100%{ box-shadow:0 0 0 3px #e8590c; } 50%{ box-shadow:0 0 0 8px rgba(232,89,12,.35); } }
   .combined-state.pending{ background:#eef4ff; border:2px solid #9db8e8; color:#1f3d73; }
   .combined-state.gold{ background:#fff7dc; border:2px solid var(--gold); color:#6b4a00; }
   .combined-state.retry{ background:#fff0ec; border:2px solid #e8a797; color:#7a2a17; }
@@ -1385,6 +1390,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
           <h3>🎙️ Read &amp; Translate</h3>
         </div>
         <div id="combinedStateBox" class="combined-state hidden"></div>
+        <div id="combinedUnsentBox" class="combined-unsent hidden" role="status"></div>
         <div id="combinedOpenBox" class="combined-open is-practice hidden" role="status"></div>
         <div class="record-stage" id="combinedRecordStage">
           <div class="record-row">
@@ -3602,7 +3608,69 @@ function applyManualCorrections(text, perekNum, posukNum){
   return text;
 }
 
+
+/* ---------- Teacher's recorded translation ("Need help? Hear it") ----------
+   One recording per posuk per class, made by the teacher. No recording = no button. */
+let teacherHelpToken = 0, teacherHelpAudio = null, teacherHelpClassId;
+function stopTeacherHelpAudio(){ if(teacherHelpAudio){ try{ teacherHelpAudio.pause(); }catch(_e){} teacherHelpAudio = null; } }
+function clearTeacherHelp(){
+  teacherHelpToken++;
+  stopTeacherHelpAudio();
+  document.querySelectorAll('.teacher-help-wrap').forEach(el => el.remove());
+}
+async function studentClassIdForHelp(){
+  if(teacherHelpClassId !== undefined) return teacherHelpClassId;
+  try{
+    const user = firebase.auth().currentUser;
+    const tok = user ? await user.getIdTokenResult() : null;
+    teacherHelpClassId = (tok && tok.claims && tok.claims.b3ClassId) || '';
+  }catch(_e){ teacherHelpClassId = ''; }
+  return teacherHelpClassId;
+}
+function addTeacherHelpButton(host, audioUrl){
+  const wrap = document.createElement('div');
+  wrap.className = 'teacher-help-wrap';
+  wrap.style.cssText = 'margin:6px 0;text-align:left;direction:ltr;';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn small teacher-help-btn';
+  const idle = '🎧 Need help? Hear it';
+  btn.textContent = idle;
+  btn.onclick = () => {
+    if(teacherHelpAudio && teacherHelpAudio._btn === btn){ stopTeacherHelpAudio(); btn.textContent = idle; return; }
+    stopTeacherHelpAudio();
+    document.querySelectorAll('.teacher-help-btn').forEach(b => { b.textContent = idle; });
+    const a = new Audio(audioUrl); a._btn = btn; teacherHelpAudio = a;
+    btn.textContent = '⏹ Stop';
+    a.onended = () => { btn.textContent = idle; if(teacherHelpAudio === a) teacherHelpAudio = null; };
+    a.onerror = () => { btn.textContent = idle; };
+    a.play().catch(() => { btn.textContent = idle; });
+  };
+  wrap.appendChild(btn);
+  host.appendChild(wrap);
+}
+async function loadTeacherTranslationHelp(){
+  clearTeacherHelp();
+  if(teacherPreview) return;
+  const token = teacherHelpToken;
+  const classId = await studentClassIdForHelp();
+  if(!classId || token !== teacherHelpToken) return;
+  const sefer = currentSefer, perek = currentPerekNum;
+  (currentSelectionParts || []).forEach(part => {
+    db.ref('posukPractice/translationAudio/' + classId + '/' + sefer + '_' + perek + '_' + part.posukNum).once('value').then(snap => {
+      const v = snap.val();
+      if(token !== teacherHelpToken || !v || typeof v.audio !== 'string' || v.audio.indexOf('data:audio/') !== 0) return;
+      const host = currentIsRange
+        ? document.querySelector('#posukText .range-posuk[data-posuk="' + part.posukNum + '"]')
+        : document.getElementById('scrollBox');
+      if(!host) return;
+      if(!currentIsRange){ const w = document.createElement('div'); host.insertAdjacentElement('afterend', w); w.className = 'teacher-help-wrap'; addTeacherHelpButton(w, v.audio); }
+      else addTeacherHelpButton(host, v.audio);
+    }).catch(() => {});
+  });
+}
+
 function resetScroll(){
+  clearTeacherHelp();
   document.getElementById('scrollPlaceholder').classList.remove('hidden');
   document.getElementById('posukText').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
@@ -3644,7 +3712,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   const textEl = document.getElementById('posukText');
   if(isRange){
     textEl.innerHTML = currentSelectionParts.map(p =>
-      '<div class="range-posuk"><span class="range-posuk-num">' + hebrewNumeral(p.posukNum) + '</span><span class="range-posuk-text">' + safeHebrewHtml(p.text) + '</span></div>'
+      '<div class="range-posuk" data-posuk="' + p.posukNum + '"><span class="range-posuk-num">' + hebrewNumeral(p.posukNum) + '</span><span class="range-posuk-text">' + safeHebrewHtml(p.text) + '</span></div>'
     ).join('');
   }else{
     textEl.innerHTML = safeHebrewHtml(text);
@@ -3655,6 +3723,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   collapseSelectionPicker();
   updateNavArrows();
   resetRecordingUI();
+  loadTeacherTranslationHelp();
   if(window.POSUK_TOOL_MODE === 'practice') loadCombinedState();
   else loadHistory();
 }
@@ -6909,6 +6978,27 @@ let combinedRecorder = null, combinedStream = null, combinedChunks = [], combine
 let combinedBusy = false, combinedLoadToken = 0, combinedUploaded = null, combinedLocked = false;
 
 function combinedEl(id){ return document.getElementById(id); }
+// A recording that is waiting to be sent: either just recorded here, or saved earlier and loaded back.
+function hasCombinedRecording(){ return !!(combinedBlob || combinedUploaded); }
+// Makes it very clear that a saved recording still has to be sent to the teacher.
+function updateCombinedUnsent(){
+  const box = combinedEl('combinedUnsentBox'), btn = combinedEl('combinedSubmitBtn');
+  if(!box) return;
+  const show = hasCombinedRecording() && !combinedLocked && !teacherPreview;
+  btn.classList.toggle('needs-send', show && combinedSendOpen && !btn.classList.contains('hidden'));
+  if(!show){ box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const saved = !!combinedUploaded;
+  box.classList.remove('hidden');
+  if(combinedSendOpen){
+    box.className = 'combined-unsent';
+    box.innerHTML = '⚠️ NOT SENT YET! Your teacher does NOT have this recording.' +
+      '<small>' + (saved ? 'It is saved, so you can come back to it later. ' : 'It is not saved yet. Wait a moment, then ') + 'Tap “📤 Send to my teacher” below to submit it.</small>';
+  }else{
+    box.className = 'combined-unsent cannot-send';
+    box.innerHTML = '🎧 Saved, but not sent. Your teacher has not opened this posuk for sending yet.' +
+      '<small>You can listen and practice. It cannot be sent until your teacher opens it.</small>';
+  }
+}
 function combinedEscape(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function combinedDate(t){ return t ? new Date(Number(t)).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }) : ''; }
 // Same expansion as backend/functions/posuk-review-core.cjs.
@@ -6964,7 +7054,8 @@ function applyCombinedOpenUi(info, problem){
   }
   tag.classList.toggle('hidden', combinedSendOpen || combinedLocked);
   if(!combinedSendOpen) sendBtn.classList.add('hidden');
-  else if(combinedBlob && !combinedLocked) sendBtn.classList.remove('hidden');
+  else if(hasCombinedRecording() && !combinedLocked) sendBtn.classList.remove('hidden');
+  updateCombinedUnsent();
 }
 
 function stopCombinedStream(){
@@ -6987,6 +7078,62 @@ function resetCombinedRecording(){
   combinedEl('combinedDeleteBtn').classList.add('hidden');
   combinedEl('combinedSubmitBtn').classList.add('hidden');
   combinedEl('combinedStatus').textContent = 'Not recorded yet';
+  updateCombinedUnsent();
+}
+
+// Saves a finished recording right away (storage + the student's attempt list) so it is not lost if the student
+// leaves, reloads or picks another posuk. It is NOT sent to the teacher: that still needs the Send button.
+async function saveCombinedDraft(blob, mime, ext, elapsed, key){
+  if(teacherPreview || !studentId || !key) return;
+  const status = combinedEl('combinedStatus');
+  try{
+    const ref = db.ref('posukPractice/attempts/' + studentId + '/' + key).push();
+    const path = 'posukPractice/' + studentId + '/' + key + '_combined_' + ref.key + '.' + ext;
+    await storage.ref(path).put(blob, { contentType: (mime || 'audio/webm').split(';')[0] });
+    await ref.set({
+      timestamp: Date.now(), sefer: currentSefer, parsha: currentParshaName || null,
+      perek: currentPerekNum, posukStart: currentPosukNum, posukEnd: currentPosukEndNum || currentPosukNum,
+      isRange: currentIsRange, posukText: currentPosukText,
+      combinedAudioStoragePath: path, combinedAudioMimeType: mime || null,
+      combinedDurationMs: elapsed || null, combinedSubmitted: false
+    });
+    if(combinedBlob !== blob || key !== currentPosukKey) return;   // the student already moved on; the draft is saved for later
+    combinedUploaded = { key, id: ref.key, ref };
+    status.textContent = '✓ Recorded and saved (' + Math.round(elapsed / 1000) + ' sec). It is NOT SENT to your teacher yet.';
+    updateCombinedUnsent();
+  }catch(err){
+    console.warn('Could not save the recording draft', err);
+    if(combinedBlob === blob) status.textContent = '⚠️ Recorded, but not saved yet. Stay on this page, then send it or try again.';
+  }
+}
+// The student threw this saved recording away (Record again / a newer recording replaces it). The record is kept, just hidden.
+function discardCombinedDraft(draft){
+  if(draft && draft.ref) draft.ref.update({ combinedDiscarded: true, combinedDiscardedAt: Date.now() }).catch(() => {});
+}
+// Brings back a recording that was saved earlier but never sent, so the student can listen and send it.
+async function restoreCombinedDraft(key, subs, token){
+  if(teacherPreview || !studentId || hasCombinedRecording() || combinedRecorder) return;
+  let tries;
+  try{ tries = (await db.ref('posukPractice/attempts/' + studentId + '/' + key).once('value')).val() || {}; }
+  catch(err){ console.warn('Could not look for a saved recording', err); return; }
+  const drafts = Object.entries(tries).filter(([id, a]) => a && a.combinedAudioStoragePath && a.combinedSubmitted !== true && !a.combinedDiscarded
+      && !(subs && subs[id]))
+    .sort((x, y) => (Number(y[1].timestamp) || 0) - (Number(x[1].timestamp) || 0));
+  if(!drafts.length) return;
+  const [id, a] = drafts[0];
+  let url;
+  try{ url = await storage.ref(a.combinedAudioStoragePath).getDownloadURL(); }
+  catch(err){ console.warn('Saved recording not available', err); return; }
+  if(token !== combinedLoadToken || key !== currentPosukKey || hasCombinedRecording() || combinedRecorder || combinedLocked) return;
+  combinedUploaded = { key, id, ref: db.ref('posukPractice/attempts/' + studentId + '/' + key + '/' + id) };
+  combinedMime = a.combinedAudioMimeType || ''; combinedDurationMs = Number(a.combinedDurationMs) || 0;
+  combinedExt = mimeTypeToExtension(combinedMime || 'audio/webm');
+  const audio = combinedEl('combinedAudioPlayback');
+  audio.src = url; audio.classList.remove('hidden');
+  combinedEl('combinedDeleteBtn').classList.remove('hidden');
+  if(combinedSendOpen) combinedEl('combinedSubmitBtn').classList.remove('hidden');
+  combinedEl('combinedStatus').textContent = '✓ Your saved recording from ' + combinedDate(a.timestamp) + ' is back. It is NOT SENT to your teacher yet.';
+  updateCombinedUnsent();
 }
 
 async function toggleCombinedRecording(){
@@ -7024,13 +7171,16 @@ async function toggleCombinedRecording(){
         combinedEl('combinedStatus').textContent = 'That recording was too short — please try again.';
         return;
       }
+      discardCombinedDraft(combinedUploaded);   // a newer recording replaces an older saved one
       combinedBlob = blob; combinedMime = mime; combinedExt = mimeTypeToExtension(mime); combinedDurationMs = elapsed; combinedUploaded = null;
+      saveCombinedDraft(blob, mime, combinedExt, elapsed, currentPosukKey);
       const audio = combinedEl('combinedAudioPlayback');
       audio.src = URL.createObjectURL(blob); audio.classList.remove('hidden');
       combinedEl('combinedDeleteBtn').classList.remove('hidden');
       if(combinedSendOpen) combinedEl('combinedSubmitBtn').classList.remove('hidden');
+      updateCombinedUnsent();
       combinedEl('combinedStatus').textContent = combinedSendOpen
-        ? '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Listen, then send it to your teacher.'
+        ? '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Saving… It is NOT SENT to your teacher yet: listen, then tap Send.'
         : '✓ Recorded (' + Math.round(elapsed / 1000) + ' sec). Listen and practice. This posuk is practice only, so it cannot be sent.';
     };
     rec.start();
@@ -7044,7 +7194,7 @@ async function toggleCombinedRecording(){
 }
 
 async function submitCombinedRecording(){
-  if(!combinedBlob || combinedBusy || combinedLocked || !currentPosukKey || !combinedSendOpen) return;
+  if(!hasCombinedRecording() || combinedBusy || combinedLocked || !currentPosukKey || !combinedSendOpen) return;
   const msg = combinedEl('combinedMsg'), btn = combinedEl('combinedSubmitBtn');
   if(teacherPreview){ msg.textContent = 'Preview only — nothing is sent to the teacher and no points change.'; return; }
   if(!STUDENT_REWARDS_AUTO_AWARD_URL){ msg.textContent = 'Sending recordings to the teacher is not available on this site.'; return; }
@@ -7054,6 +7204,7 @@ async function submitCombinedRecording(){
   msg.textContent = '📤 Sending…';
   try{
     if(!combinedUploaded || combinedUploaded.key !== key){
+      if(!combinedBlob) throw new Error('The saved recording could not be found. Please record again.');
       const ref = db.ref('posukPractice/attempts/' + studentId + '/' + key).push();
       const path = 'posukPractice/' + studentId + '/' + key + '_combined_' + ref.key + '.' + combinedExt;
       await storage.ref(path).put(combinedBlob, { contentType: (combinedMime || 'audio/webm').split(';')[0] });
@@ -7090,6 +7241,7 @@ async function submitCombinedRecording(){
 
 function setCombinedLocked(locked){
   combinedLocked = !!locked;
+  updateCombinedUnsent();
   combinedEl('combinedRecordStage').classList.toggle('hidden', combinedLocked);
   combinedEl('combinedRecordBtn').disabled = combinedLocked;
   if(combinedLocked){ combinedEl('combinedSubmitBtn').classList.add('hidden'); combinedEl('combinedPracticeOnlyTag').classList.add('hidden'); }
@@ -7161,7 +7313,7 @@ async function loadCombinedState(keepMessage){
   if(token !== combinedLoadToken || key !== currentPosukKey) return;
   const keys = combinedKeysFor(key), now = Date.now();
   const state = combinedSelectionState(reviews, keys, now);
-  const mine = Object.values(subs).filter(x => x && Array.isArray(x.posukKeys) && x.posukKeys.some(k => keys.includes(k)))
+  const mine = Object.values(subs).filter(x => x && x.status !== 'deleted' && Array.isArray(x.posukKeys) && x.posukKeys.some(k => keys.includes(k)))
     .sort((a, b) => (Number(b.submittedAt) || 0) - (Number(a.submittedAt) || 0));
   if(state.kind === 'pending'){
     box.className = 'combined-state pending';
@@ -7188,6 +7340,7 @@ async function loadCombinedState(keepMessage){
   }
   if(box.className.indexOf('hidden') < 0) box.classList.remove('hidden');
   applyCombinedOpenUi(openInfo, openProblem);
+  if(state.kind === 'open') await restoreCombinedDraft(key, subs, token);
   if(mine.length){
     const firstMarked = mine.slice(0, 10).findIndex(x => combinedMarksHtml(x, false));
     hist.innerHTML = '<h4>📈 My recordings for this posuk</h4>' + mine.slice(0, 10).map((x, n) =>
@@ -7196,8 +7349,10 @@ async function loadCombinedState(keepMessage){
         '<strong>' + combinedEscape(combinedStatusLabel(x)) + '</strong>' +
         (x.teacherNote && x.status !== 'pending' ? '<span>💬 ' + combinedEscape(x.teacherNote) + '</span>' : '') +
         '<button class="btn small" type="button" data-listen="1">▶️ Listen</button>' +
+        (x.status === 'pending' && x.id ? '<button class="btn small combined-delete-sub" type="button" data-delete-sub="' + combinedEscape(x.id) + '">🗑️ Delete</button>' : '') +
         combinedMarksHtml(x, n === firstMarked) +
       '</div>').join('');
+    hist.querySelectorAll('[data-delete-sub]').forEach(b => b.onclick = () => deleteSubmittedRecording(b.dataset.deleteSub, b));
     hist.querySelectorAll('[data-listen]').forEach(b => b.onclick = async () => {
       const row = b.closest('.combined-history-row');
       try{
@@ -7206,6 +7361,34 @@ async function loadCombinedState(keepMessage){
         b.replaceWith(a); a.play().catch(() => {});
       }catch(err){ console.warn(err); b.textContent = 'Recording not available'; b.disabled = true; }
     });
+  }
+}
+
+// The student deletes a recording the teacher has not graded yet. The server decides: it refuses once graded.
+async function deleteSubmittedRecording(submissionId, btn){
+  const msg = combinedEl('combinedMsg');
+  if(teacherPreview || !submissionId || combinedBusy) return;
+  if(!confirm('Are you sure you want to delete this recording? Your teacher will not see it, your ' + COMBINED_SUBMIT_COST + ' points will be given back, and you can record this posuk again.')) return;
+  combinedBusy = true; if(btn) btn.disabled = true;
+  const key = currentPosukKey;
+  msg.textContent = 'Deleting…';
+  try{
+    const user = window.firebase && firebase.auth && firebase.auth().currentUser;
+    if(!user) throw new Error('Please sign in again.');
+    const idToken = await user.getIdToken();
+    const response = await fetch(STUDENT_REWARDS_AUTO_AWARD_URL, {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + idToken },
+      body: JSON.stringify({ action:'posuk-student-delete', submissionId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok || !data.ok) throw new Error(data.error || ('The service returned ' + response.status));
+    msg.textContent = '🗑️ Recording deleted.' + (data.refunded ? ' ' + data.refunded + ' points were given back.' : '') + ' You can record this posuk again.';
+  }catch(err){
+    console.error('Posuk Practice delete failed', err);
+    msg.textContent = '⚠️ ' + (err.message || 'Could not delete. Please try again.');
+  }finally{
+    combinedBusy = false; if(btn) btn.disabled = false;
+    if(key === currentPosukKey) await loadCombinedState(true);
   }
 }
 
@@ -7231,7 +7414,11 @@ async function loadBonusNotices(){
 }
 
 combinedEl('combinedRecordBtn').onclick = toggleCombinedRecording;
-combinedEl('combinedDeleteBtn').onclick = () => { resetCombinedRecording(); combinedEl('combinedMsg').textContent = ''; };
+combinedEl('combinedDeleteBtn').onclick = () => {
+  if(combinedUploaded && !confirm('Throw away this saved recording and record again? It has NOT been sent to your teacher.')) return;
+  discardCombinedDraft(combinedUploaded);
+  resetCombinedRecording(); combinedEl('combinedMsg').textContent = '';
+};
 combinedEl('combinedSubmitBtn').onclick = submitCombinedRecording;
 </script>
 <script src="../assignment-center/homework-mode.js?v=20261108-hw649"></script>
@@ -7290,7 +7477,7 @@ combinedEl('combinedSubmitBtn').onclick = submitCombinedRecording;
   },500);
 })();
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261125-multi1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261125-wb2"></script>
 </body>
 </html>
 

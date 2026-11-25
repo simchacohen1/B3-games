@@ -256,13 +256,22 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
   // The teacher deletes a waiting recording without grading it. The record is
   // kept (status "deleted"), nothing is awarded, the posuk is not locked, and
   // the 5-point submit charge is always refunded.
-  async function discard({ teacherEmail, scope, studentId, submissionId }){
+  // byStudent: the student deleting their own recording (same rule: only while it is still waiting for the teacher).
+  async function discard({ teacherEmail, scope, studentId, submissionId, byStudent = false }){
     const t = now();
-    const { ref } = await loadForTeacher({ scope, studentId, submissionId });
+    let ref;
+    if(byStudent){
+      if(!validKey(studentId)) fail('Student sign-in required.', 401);
+      if(!validKey(submissionId)) fail('Missing submission.');
+      ref = submissionRef(studentId, submissionId);
+      if(!(await ref.get()).val()) fail('Recording not found.', 404);
+    }else{
+      ({ ref } = await loadForTeacher({ scope, studentId, submissionId }));
+    }
     const tx = await ref.transaction(cur => {
       if(cur === null) return null;
       if(cur.status !== 'pending') return;
-      return { ...cur, status: 'deleted', deletedAt: t, deletedBy: String(teacherEmail || '').slice(0, 200), pointsAwarded: 0 };
+      return { ...cur, status: 'deleted', deletedAt: t, deletedBy: byStudent ? 'student' : String(teacherEmail || '').slice(0, 200), pointsAwarded: 0 };
     });
     if(!tx.committed){
       const live = (await ref.get()).val() || {};
@@ -290,7 +299,7 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
       const rewardStudentId = sub.rewardStudentId || (resolveRewardStudentId ? await resolveRewardStudentId(studentId) : null);
       refund = rewardStudentId
         ? await postPoints({ requestId: `posukrefund_${studentId}_${submissionId}`.slice(0, 220), rewardStudentId, studentId,
-            source: SOURCES.refund, amount: SUBMIT_COST, reason: `Posuk Practice recording deleted by teacher, 5 points refunded — ${refLabel(sub)}`,
+            source: SOURCES.refund, amount: SUBMIT_COST, reason: `Posuk Practice recording deleted by ${byStudent ? 'student' : 'teacher'}, 5 points refunded — ${refLabel(sub)}`,
             record: { submissionId, selectionKey: sub.selectionKey, perek: sub.perek || null, posuk: sub.startPosuk || null } })
         : { ok: false, error: 'No Student Rewards profile.' };
       await ref.update({ refundPosted: !!refund.ok });
