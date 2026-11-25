@@ -11,6 +11,10 @@
   'use strict';
   const DEFAULT_FEEDBACK_MS = 150000;
   const DEFAULT_CALIBRATION_MS = 3000;
+  // Lowest room-sound estimate and lowest "voice heard" bar (as a 0..1 signal level). Small on purpose: a quiet
+  // davening voice on a laptop microphone is only about 1 to 3 percent of full scale.
+  const MIN_FLOOR = 0.002;
+  const MIN_THRESHOLD = 0.011;
   const MAX_SAMPLE_GAP_MS = 600;
   // The on-screen meter follows how steadily a voice is heard over roughly the
   // last quarter minute. It is fed a yes/no "voice heard" signal, never volume.
@@ -97,18 +101,20 @@
         // Keep the quietest moment heard. A boy who is already davening when he
         // turns the meter on must not teach it that his voice is room noise.
         calibrationFloor = Math.min(calibrationFloor, level);
-        noiseFloor = clamp(calibrationFloor, 0.005, 0.055);
+        noiseFloor = clamp(calibrationFloor, MIN_FLOOR, 0.055);
         return null;
       }
       // Count sound activity, never relative loudness. Shouting earns no bonus.
-      const threshold = clamp(noiseFloor * 2.1 + 0.012, 0.028, 0.14);
+      // The bar sits just above THIS microphone's own room sound (measured in the first seconds), so a quiet voice on a
+      // quiet mic counts and a noisy room needs a clearer voice. It never depends on how loud the boy is.
+      const threshold = clamp(noiseFloor * 2.2 + 0.004, MIN_THRESHOLD, 0.14);
       const isActive = level >= threshold;
       // Room noise estimate: drops quickly in the short gaps between words and
       // rises only very slowly, so steady davening is not mistaken for noise
       // while a constant hum (a fan, a heater) is gradually tuned out.
       noiseFloor = clamp(level < noiseFloor
         ? 0.7 * noiseFloor + 0.3 * level
-        : noiseFloor + (level - noiseFloor) * 0.0015, 0.005, 0.06);
+        : noiseFloor + (level - noiseFloor) * 0.0015, MIN_FLOOR, 0.06);
       // Display-only state. A quiet voice and a loud voice move it identically.
       lastActive = isActive;
       steadiness += ((isActive ? 1 : 0) - steadiness) * (1 - Math.exp(-elapsed / STEADINESS_WINDOW_MS));
