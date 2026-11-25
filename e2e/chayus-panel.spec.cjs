@@ -84,7 +84,7 @@ for (const cls of ['et', 'wt']) {
       // The celebration hides itself after a few seconds (on the page's clock), so record it when it appears.
       await page.evaluate(() => {
         window.__celebrations = [];
-        new MutationObserver(() => { const box = document.getElementById('chayusCelebrate'); if (!box.hidden) window.__celebrations.push(box.innerText.replace(/s+/g, ' ')); })
+        new MutationObserver(() => { const box = document.getElementById('chayusCelebrate'); if (!box.hidden) window.__celebrations.push(box.innerText.replace(/\s+/g, ' ')); })
           .observe(document.getElementById('chayusCelebrate'), { attributes: true, childList: true });
       });
       await page.getByRole('button', { name: /Turn on My Chayus Meter/ }).click();
