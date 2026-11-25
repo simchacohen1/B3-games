@@ -21,6 +21,40 @@
     const script=document.createElement('script');script.src=url;script.onload=resolve;script.onerror=reject;
     document.head.appendChild(script);
   });
+  // ---------- Class connection status (shown to the student, and logged for support) ----------
+  // Every step that used to fail silently now says what is wrong: "Connected to class" or "Can't connect – <reason>".
+  // Good news fades after a few seconds; a problem stays on screen. Not shown in the sharing tab.
+  let linkPill=null,linkTimer=null,linkKey='';
+  function classLink(kind,text){
+    try{
+      const key=kind+'|'+text;
+      window.ClassPointerLinkStatus={kind,text,at:Date.now()};
+      if(key===linkKey)return;
+      linkKey=key;
+      (kind==='bad'?console.warn:console.info)('[Class Pointer] '+text);
+      if(persistentShareWindow||typeof document.body?.appendChild!=='function')return;
+      if(!linkPill){
+        linkPill=document.createElement('div');linkPill.id='fttClassLinkStatus';linkPill.setAttribute('role','status');linkPill.setAttribute('aria-live','polite');
+        linkPill.style.cssText='position:fixed;right:14px;top:14px;z-index:2147483638;max-width:min(360px,calc(100vw - 28px));padding:8px 14px;border-radius:12px;font:700 14px/1.35 system-ui,sans-serif;color:#fff;box-shadow:0 4px 18px #0004;pointer-events:none';
+        document.body.appendChild(linkPill);
+      }
+      clearTimeout(linkTimer);linkTimer=null;
+      linkPill.textContent=text;
+      linkPill.style.background=kind==='ok'?'#15803d':kind==='bad'?'#b91c1c':'#475569';
+      linkPill.style.display='block';
+      if(kind!=='bad')linkTimer=setTimeout(()=>{if(linkPill)linkPill.style.display='none'},kind==='ok'?8000:12000);
+    }catch{/* a status line must never break the page */}
+  }
+  // Plain-language reason for a refused request to the class server.
+  function classLinkWhy(status,serverText){
+    const said=String(serverText||'').slice(0,160);
+    if(status===401)return 'the class server did not accept your passcode (error 401). Sign out and sign in again. If this keeps happening, tell your teacher the code: JOIN-401.';
+    if(status===429)return 'too many tries. Wait a few minutes, then reload.';
+    if(status===404)return 'the class connection service was not found (wrong or old link).';
+    if(status>=500)return 'the class server is busy or down. It will try again.';
+    if(status===403)return said||'you are not allowed in this class right now.';
+    return said||'the class server refused the request ('+(status||'no answer')+').';
+  }
   try{
     // The homepage may load before a boy signs in. Start listening as soon as
     // the confirmed sign-in completes, without requiring a page refresh.
@@ -68,14 +102,16 @@
         new Promise(resolve=>setTimeout(resolve,8000))
       ]);
     }
-    const auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})});
-    if(!auth.ok||!(await auth.json()).ok)return;
+    let auth;
+    try{auth=await fetch(studentAuth,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'verify',studentId:id,pin})})}
+    catch{classLink('bad','Can’t connect – no internet or the school server can’t be reached.');return}
+    if(!auth.ok||!(await auth.json()).ok){classLink('bad','Can’t connect – your sign-in was not accepted. Sign out and sign in again.');return}
     // Use the same class resolver as the existing student dashboard.
     // It respects a selected class and never revives a removed membership.
     if(!window.FunTorahStudentClass)await load(new URL('student-class.js',root).href);
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
     let classId=scope.classId;
-    if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||''))return;
+    if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||'')){classLink('bad','Can’t connect – you are not in a class that uses Class Pointer (class: '+(classId||'none')+').');return}
     function sameStudent(){return sessionStorage.getItem('b3Games_studentId')===id &&
       (sessionStorage.getItem('b3Games_studentClass')||classId)===classId}
     // Mount the existing student whiteboard on real browser pages. Synthetic
@@ -911,24 +947,26 @@
         if(typeof own.on!=='function'||typeof own.connect!=='function'){try{own.destroy?.()}catch{}return}
         presencePeer=own;
         own.on('call',incoming=>{if(presencePeer!==own){try{incoming.close()}catch{}return}incomingLesson(incoming)});
-        await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})});
+        classLink('wait','Connecting to your teacher’s class…');
+        try{await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('timeout')),15000);own.once('open',()=>{clearTimeout(t);resolve()});own.once('error',e=>{clearTimeout(t);reject(e)})})}
+        catch(e){if(presencePeer===own)classLink('bad','Can’t connect – the classroom connection service could not be reached ('+(e?.type||e?.message||'error')+'). The school network may block it (0.peerjs.com, port 443). Trying again.');throw e}
         if(presencePeer!==own||latestSession?.roomId!==room)return;
         // The teacher's room may not be registered yet (student page opened as the lesson starts):
         // retry with backoff instead of giving up until a reload.
-        own.on('error',()=>{if(presencePeer!==own)return;retryPresence()});
+        own.on('error',e=>{if(presencePeer!==own)return;classLink('bad',e?.type==='peer-unavailable'?'Can’t connect – your teacher’s lesson is not reachable yet. Trying again.':'Can’t connect – classroom connection problem ('+(e?.type||'error')+'). Trying again.');retryPresence()});
         own.on('disconnected',()=>{if(presencePeer===own&&!own.destroyed){try{own.reconnect()}catch{}}});
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'joinIssue',room,classId,studentId:id,pin,peerId:own.id}),signal:AbortSignal.timeout(15000)});
         const ticket=await response.json().catch(()=>({}));
         if(presencePeer!==own)return;
-        // Not in this class or signed out: stop quietly. Server trouble: try again later.
-        if(!response.ok||!ticket.ok){if(response.status>=400&&response.status<500){stopPresence();return}throw Error('ticket')}
+        // Not in this class or signed out: stop (but say why). Server trouble: try again later.
+        if(!response.ok||!ticket.ok){classLink('bad','Can’t connect – '+classLinkWhy(response.status,ticket.error));if(response.status>=400&&response.status<500&&response.status!==429){stopPresence();return}throw Error('ticket')}
         const conn=own.connect(room,{reliable:true});presenceConn=conn;
         conn.on('open',()=>{if(presenceConn===conn){conn.send({type:'join',presence:true,ticket:ticket.token,activity:activityName(),name:ticket.studentName});startHeartbeat(conn)}});
         conn.on('data',message=>{
           if(presenceConn!==conn||!sameStudent()||!message||typeof message!=='object')return;
           if(message.type==='pong'){if(Number.isFinite(message.t)){rtt=Math.max(0,Date.now()-message.t);lastPong=Date.now()}return}
           if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
-          if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;return}
+          if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;classLink('ok','Connected to class (lesson …'+String(room).slice(-4)+')'+(latestSession?.studentScreenSharing===true?' – screen sharing is ON':''));return}
           if(typeof message.type==='string'&&message.type.startsWith('board-')){
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
             return;
@@ -943,12 +981,12 @@
           if(message.type==='lesson-presentation'){if(!persistentShareWindow)announceLesson(message);return}
           // The teacher pressed Stop viewing on this student's screen: end the share in his sharing tab.
           if(message.type==='share-stop'){if(admitted&&holderState?.open)tell({type:'stop'});return}
-          if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}if(holderState?.open)tell({type:'stop'});stopPresence();showRemovedNotice();return}
+          if(message.type==='removed'){try{sessionStorage.setItem('classPointerRemovedRoom',room)}catch{}if(holderState?.open)tell({type:'stop'});stopPresence();classLink('bad','Can’t connect – your teacher removed you from this lesson.');showRemovedNotice();return}
           // Already connected in the lesson or another window, or the lesson ended: check again later.
-          if(['elsewhere','replaced','full'].includes(message.type)){stopPresence();schedulePresence(60000);return}
-          if(message.type==='ended'){stopPresence()}
+          if(['elsewhere','replaced','full'].includes(message.type)){classLink('bad',message.type==='full'?'Can’t connect – the class is full right now. Trying again soon.':'Can’t connect – you are already connected to this class in another window or tab.');stopPresence();schedulePresence(60000);return}
+          if(message.type==='ended'){classLink('wait','Your teacher ended the lesson.');stopPresence()}
         });
-        const lost=()=>{if(presenceConn===conn){presenceConn=null;retryPresence()}};
+        const lost=()=>{if(presenceConn===conn){presenceConn=null;if(!admitted)classLink('bad','Can’t connect – your teacher’s page did not accept the connection (your teacher may have refreshed). Trying again.');retryPresence()}};
         conn.on('close',lost);conn.on('error',lost);
       }catch{if(latestSession?.roomId===room)retryPresence()}
     }
@@ -1038,7 +1076,7 @@
       // (In the sharing tab the Resume button stays while this is checked, so it never blinks out on a refresh.)
       if(!stream&&!holderState?.open){if(persistentShareWindow)setHolderDisplay(resumeNeeded?'flex':'none');else holder.style.display='none'}else if(stream){permission=keep;permissionReady=true}
       // unsure: no clear answer came back (no internet, time-out, busy or broken server).
-      let unsure=false;
+      let unsure=false,failedStatus=0,failedText='';
       try{
         let response,result;
         try{
@@ -1055,6 +1093,7 @@
           permission={};permissionReady=true;
         }else{
           unsure=response.status===429||response.status>=500;
+          failedStatus=response.status;failedText=result?.error;
           throw Error(result?.error||'Could not check your sharing permissions.');
         }
       }catch{
@@ -1062,7 +1101,8 @@
           if(enabledOnly){permission={};permissionReady=true}
           // A share that is running keeps its last known permission; the check is simply tried again.
           else if(unsure&&(stream||holderState?.sharing)){permission=keep;permissionReady=true}
-          else{permission={};permissionReady=false;status(unsure?'Checking with your teacher. One moment…':'Could not check sharing permissions. Ask your teacher to resend.');}
+          else{permission={};permissionReady=false;status(unsure?'Checking with your teacher. One moment…':'Could not check sharing permissions. Ask your teacher to resend.');
+            if(!unsure)classLink('bad','Screen sharing is ON but you can’t share – '+classLinkWhy(failedStatus,failedText));}
           if(unsure&&!enabledOnly)retryPermission(key);
         }
       }
@@ -1144,10 +1184,13 @@
       const next=current(lastRows);
       watchGrace(next);
       latestSession=next;
+      if(!next)classLink('wait',lastRows&&Object.keys(lastRows).length?'No open lesson right now (the last one is old or ended). Waiting for your teacher.':'Waiting for your teacher to open Class Pointer for your class ('+classId+').');
+      else if(!admitted)classLink('wait','Found your teacher’s lesson. Connecting…');
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
     }
-    function onSessionsError(){
+    function onSessionsError(error){
+      classLink('bad','Can’t connect – your class’s lesson list could not be read ('+(error?.code||error?.message||'database refused')+'). Please sign in again. Retrying.');
       stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop();
       // The database cancelled this listener. Without listening again this boy would have no
       // Share My Screen button for the rest of the day, so try again, slowly.
