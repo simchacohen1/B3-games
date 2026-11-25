@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chayus Meter — Teacher Summary Preview</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f6fc;color:#18365f;font-family:system-ui,Arial,sans-serif}.wrap{max-width:960px;margin:auto;padding:30px 18px}
+header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px}
+h1{font-size:clamp(2rem,6vw,3.2rem);margin:20px 0 4px}p{line-height:1.5}.intro{color:#536a87}
+.preview{border-radius:24px;background:#fff;padding:22px;margin-top:22px;box-shadow:0 12px 36px #18365f1c}
+.label{color:#895c05;background:#fff2cc;font-size:.89rem;padding:8px 14px;border-radius:20px;font-weight:800}
+table{width:100%;border-collapse:collapse;margin-top:12px;text-align:left}th,td{padding:13px 10px;border-bottom:1px solid #e1e9f5;vertical-align:middle}th{font-size:.84rem;text-transform:uppercase;letter-spacing:.035em;color:#536a87}
+.person{font-weight:850}.none{color:#697c93}.number{font-weight:900;color:#086a66}.pill{display:inline-block;background:#e7f8f4;border-radius:20px;padding:5px 9px;font-size:.9rem}
+.note{background:#fff8e8;border-left:4px solid #e0b348;padding:14px 16px;border-radius:0 12px 12px 0}
+@media(max-width:600px){th:nth-child(2),td:nth-child(2){display:none}th,td{padding:11px 5px}}
+</style>
+<script src="core.js" defer></script>
+<script defer>
+document.addEventListener('DOMContentLoaded', () => {
+  // Fictional data only. Never show this as a real completed class session.
+  const exampleReports = [
+    {studentId:'fictional-01',studentName:'Ari Example',metrics:{measuredSeconds:1180,activeSeconds:720}},
+    {studentId:'fictional-02',studentName:'Benny Example',metrics:{measuredSeconds:1110,activeSeconds:520}},
+    {studentId:'fictional-03',studentName:'Chaim Example',metrics:null}
+  ];
+  const rows = window.ChayusMeter.teacherRows(exampleReports);
+  const tbody = document.getElementById('reportRows');
+  rows.forEach(item => {
+    const tr = document.createElement('tr');
+    const name = document.createElement('td'); name.className = 'person'; name.textContent = item.studentName;
+    const minutes = document.createElement('td'); minutes.textContent = item.hasData ? item.measuredMinutes + ' minutes' : '—';
+    const activity = document.createElement('td'); activity.className = item.hasData ? 'number' : 'none';
+    activity.textContent = item.hasData ? item.soundActivityPercent + '% sound activity' : 'No data';
+    const status = document.createElement('td'); status.textContent = item.status;
+    tr.append(name, minutes, activity, status);
+    tbody.appendChild(tr);
+  });
+});
+</script>
+</head>
+<body><main class="wrap">
+<header><strong>Fun Torah Tools · Davening</strong><span class="label">Fictional teacher preview — not live</span></header>
+<h1>🌟 Chayus Meter Summary</h1>
+<p class="intro">A separate teacher-review report for each davening session. This is what the summary could look like when linked to authenticated ET/WT classes.</p>
+<section class="preview">
+  <h2>Sample class session</h2>
+  <p class="intro">Three fictional student examples only. No real student data is connected.</p>
+  <table><thead><tr><th>Boy</th><th>Measured time</th><th>Sound activity</th><th>Status</th></tr></thead><tbody id="reportRows"></tbody></table>
+  <p class="note"><strong>Teacher decides points.</strong> These percentages are microphone activity, not grades, kavana, correct pronunciation, or proof of participation. No sound was recorded and no points are awarded automatically. A missing microphone must not count as poor davening.</p>
+</section>
+<p class="intro">Before this becomes a live report, the student identity, class assignment, session boundaries, teacher access, and data delivery must be validated by the backend and tested with fictional student accounts. The Chazzan feature is independent.</p>
+</main></body></html>
