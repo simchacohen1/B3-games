@@ -37,7 +37,7 @@ test('the classroom loads the updated PeerJS reconnection handling', () => {
   assert.match(html, /classroom[.]js[?]v=20261125-wb1/);
   // The teacher's screen tiles and the "student stopped" message changed with the sharing tab (#700).
   assert.match(html, /activity-screen-teacher[.]js[?]v=20261120-sharetab3/);
-  assert.match(html, /student-boards[.]js[?]v=20261125-wb1/);
+  assert.match(html, /student-boards[.]js[?]v=20261125-wb2/);
 });
 test('student pages refresh the shared gate for locked-classroom presentation controls',()=>{
   for(const page of [...pages,'halacha/index.html','class-pointer-prototype/student-view.html']) {

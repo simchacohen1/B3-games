@@ -166,3 +166,16 @@ test('old saved whiteboards (pictures kept apart from the marks) still open: the
   const old=Clip.cleanLessonBoard({version:1,kind:'lesson-whiteboard',pictures:[{data:IMG,x:.1,y:.1,w:.3,h:.3}],strokes:[]},C.cleanStroke);
   assert.equal(old.pictures.length,1,'the old file is still accepted as before');
 });
+
+test('sending a whiteboard to the class: the preview is the one yes, so no second popup silently stops the send',()=>{
+  // Before: if any student had a mark (even a stray tap), a second native popup asked again. A popup that was closed or blocked
+  // left every student on the OLD board, with the new picture and words never arriving.
+  assert.match(boards,/if\(item\.kind==='image'\)await sendImageFile\(item\.file,\{subject:item\.subject,important,confirmed:true\}\)/);
+  assert.match(boards,/else if\(item\.kind==='pages'\)await sendPagesFiles\(item\.files,\{subject:item\.subject,important,confirmed:true\}\)/);
+  assert.match(boards,/hasWork&&opts\.confirmed!==true&&!confirm\(/);
+  assert.match(boards,/hasStudentWork\(\)&&info\.confirmed!==true&&!confirm\(/);
+  // The warning is shown in the preview, before the green button.
+  assert.match(boards,/if\(hasStudentWork\(\)\)\{const warn=el\('p',null,'.{1,3} Some students have marks on their boards\. Sending replaces their boards with this one\.'\)/);
+  // A declined question is never silent.
+  assert.equal((boards.match(/Nothing was sent\. Students still have their marks\./g)||[]).length,2);
+});
