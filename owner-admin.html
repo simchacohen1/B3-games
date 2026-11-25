@@ -12,7 +12,7 @@
 <script src="school-scope.js?v=20261107"></script>
 <script src="teacher-signin.js?v=20261122-one-signin"></script>
 <script src="owner-teacher-view.js?v=20261109-726"></script>
-<script src="student-scope.js?v=20261108"></script>
+<script src="student-scope.js?v=20261125"></script>
 <script src="owner-classes.js?v=20261118"></script>
 <script src="bulk-roster.js?v=20261123-706b"></script>
 <script src="class-roster-tools.js?v=20261123-roster"></script>
@@ -1012,7 +1012,7 @@ q("exportEverything").onclick=async()=>{
 };
 
 // ---- Classes: which school each class belongs to ------------------------
-function classSchoolPicker(classId,cls){const cur=cls&&cls.schoolId||"",known=!!schoolData[cur];return '<select class="schoolpick'+(known?'':' noschool')+'" data-class-school="'+safe(classId)+'" aria-label="School for '+safe(cls&&cls.name||classId)+'">'+(known?'':'<option value="" selected>No school</option>')+schoolOptions(cur)+'</select>'}
+function classSchoolPicker(classId,cls){const cur=cls&&cls.schoolId||"",known=!!schoolData[cur],others=Object.keys(schoolData).filter(id=>id!==cur).sort((a,b)=>schoolData[a].name.localeCompare(schoolData[b].name));return '<select class="schoolpick'+(known?'':' noschool')+'" data-class-school="'+safe(classId)+'" aria-label="Move '+safe(cls&&cls.name||classId)+' to another school"><option value="" selected>'+(known?'Move to another school':'No school: choose one')+'</option>'+others.map(id=>'<option value="'+safe(id)+'">'+safe(schoolData[id].name)+'</option>').join("")+'</select>'}
 function renderClassSchoolMove(){
  const ids=B3StudentScope.classesWithoutSchool(classData);
  q("classSchoolMove").innerHTML=ids.length&&Object.keys(schoolData).length?'<div class="notice" style="background:#fffbeb;border-color:#fde68a"><b>'+ids.length+' '+(ids.length===1?'class has':'classes have')+' no school yet.</b> Students can only be given classes in their own school.<div class="chips">'+ids.map(id=>'<span class="chip" style="padding-right:14px">'+safe(classData[id].name||id)+'</span>').join("")+'</div><div class="formrow" style="margin-top:10px"><select id="classSchoolMoveTo" aria-label="School">'+schoolOptions("","Choose school")+'</select><button type="button" id="classSchoolMoveGo">Put them in this school</button></div></div><div class="listlabel">Classes with no school</div>'+ids.map(id=>'<div class="entry row"><span><b>'+safe(classData[id].name||id)+'</b></span><span class="rowbtns">'+classSchoolPicker(id,classData[id])+'</span></div>').join(""):"";
@@ -1027,13 +1027,50 @@ async function moveClassesWithoutSchool(){
  const updates={};ids.forEach(id=>{updates["b3Games/workspaces/"+WS+"/classes/"+id+"/schoolId"]=to});
  await db.ref().update(updates);q("status").textContent="Classes moved into "+schoolData[to].name+" ✓";await load();
 }
+// Moves a class together with its students and teachers. If they are also in classes that stay behind, those classes must travel too:
+// the owner is asked, and if that is not wanted nothing is written (nobody can be in two schools).
+async function moveClassWithPeople(id,to){
+ const root="b3Games/workspaces/"+WS,cls=classData[id],now=firebase.database.ServerValue.TIMESTAMP;
+ const invites=(await db.ref(root+"/teacherInvites").once("value")).val()||{},records=await B3StudentScope.loadRecords(db,WS);
+ const fresh=Object.assign({},classData);
+ const load1=async c=>{const v=(await db.ref(root+"/classes/"+c).once("value")).val();if(v)fresh[c]=v;return v};
+ await load1(id);
+ const memberships={},seen=new Set();
+ const needMemberships=async()=>{
+  await Promise.all(Object.keys(fresh).flatMap(c=>Object.keys(fresh[c].members||{})).filter(sid=>!seen.has(sid)).map(async sid=>{
+   seen.add(sid);const m=(await db.ref("b3Games/students/"+sid+"/memberships").once("value")).val()||{};
+   memberships[sid]=Object.values(m).filter(x=>x&&x.active!==false&&x.workspaceId===WS&&x.classId).map(x=>x.classId);
+  }));
+  const need=new Set();Object.values(memberships).forEach(l=>l.forEach(c=>need.add(c)));Object.values(invites).forEach(v=>Object.keys(v&&v.classIds||{}).forEach(c=>need.add(c)));
+  await Promise.all([...need].filter(c=>!fresh[c]).map(load1));
+ };
+ const cname=c=>fresh[c]&&fresh[c].name||c;
+ let ids=[id],plan;
+ for(let round=0;round<6;round++){
+  await needMemberships();
+  plan=B3StudentScope.planClassMove(ids,fresh,invites,records,memberships,to,now);
+  if(plan.ok)break;
+  const extra=[...new Set([].concat(plan.blockers.teachers,plan.blockers.students).flatMap(x=>x.classIds))].filter(c=>!ids.includes(c));
+  if(!extra.length)break;
+  const who=[].concat(plan.blockers.teachers.map(t=>t.name),plan.blockers.students.map(s=>rosterData[s.studentId]&&rosterData[s.studentId].name||s.studentId));
+  if(!confirm("Some people in "+ids.map(cname).join(", ")+" are also in "+extra.map(cname).join(", ")+" ("+who.slice(0,6).join(", ")+(who.length>6?", and "+(who.length-6)+" more":"")+"), and nobody can be in two schools. Move "+extra.map(cname).join(", ")+" to "+schoolData[to].name+" as well? Choose Cancel to leave everything as it is."))return false;
+  ids=ids.concat(extra);
+ }
+ if(!plan||!plan.ok){alert("Not moved. Too many linked classes to move safely together. Nothing was changed.");return false}
+ const resets=plan.teachers.filter(t=>invites[t].schoolId&&invites[t].schoolId!==to).length;
+ if(!confirm("Move "+ids.map(cname).join(" and ")+" to "+schoolData[to].name+" together with "+plan.students.length+" "+(plan.students.length===1?"student":"students")+" and "+plan.teachers.length+" "+(plan.teachers.length===1?"teacher":"teachers")+"? Passcodes and tool settings stay the same."+(resets?" "+resets+" teacher"+(resets===1?"'s":"s'")+" saved Nigri login will be removed.":"")))return false;
+ // Written one place at a time, people first and the classes last: if one fails, the next try finishes the job.
+ for(const [path,value] of Object.entries(plan.updates))await db.ref(root+"/"+path).set(value);
+ q("status").textContent=ids.map(cname).join(" and ")+" moved to "+schoolData[to].name+" with "+plan.students.length+" students and "+plan.teachers.length+" teachers ✓";
+ return true;
+}
 document.addEventListener("change",async e=>{
  const sel=e.target.closest("[data-class-school]");if(!sel)return;
- const id=sel.dataset.classSchool,cls=classData[id],to=sel.value;if(!cls||!schoolData[to])return;
- if(cls.schoolId&&schoolData[cls.schoolId]&&!confirm("Move the class "+(cls.name||id)+" from "+schoolData[cls.schoolId].name+" to "+schoolData[to].name+"? Students from the old school stay in it until you change them under Students.")){sel.value=cls.schoolId;return}
+ const id=sel.dataset.classSchool,cls=classData[id],to=sel.value;if(!cls||!schoolData[to]){sel.value="";return}
  sel.disabled=true;
- try{await db.ref("b3Games/workspaces/"+WS+"/classes/"+id+"/schoolId").set(to);q("status").textContent="Class school saved ✓";await load();}
- catch(err){console.error(err);sel.disabled=false;q("status").textContent="Could not save the class school. Try again.";}
+ try{await moveClassWithPeople(id,to);}
+ catch(err){console.error(err);q("status").textContent="Could not move the class. Nothing about it was lost; try again.";}
+ finally{await load();}
 });
 
 // ---- Students -------------------------------------------------------
