@@ -7,8 +7,9 @@
 (function () {
   'use strict';
   if (window.ChayusPoints) return;
-  const SDK = 'https://www.gstatic.com/firebasejs/10.7.1/';
   const here = document.currentScript && document.currentScript.src ? document.currentScript.src : '';
+  // The site's own copy of the Firebase SDK, so this works on staging (which blocks outside scripts) and live alike.
+  const SDK = here ? new URL('../vendor/firebase/12.15.0/', here).href : '../vendor/firebase/12.15.0/';
   const configUrl = here ? new URL('../firebase-config.js', here).href : '../firebase-config.js';
   let authPromise = null;
 
@@ -44,7 +45,8 @@
     });
   }
   function endpoint() {
-    const projectId = window.B3_FIREBASE_CONFIG && window.B3_FIREBASE_CONFIG.projectId;
+    const app = window.firebase && window.firebase.apps && window.firebase.apps[0];
+    const projectId = (app && app.options && app.options.projectId) || (window.B3_FIREBASE_CONFIG && window.B3_FIREBASE_CONFIG.projectId);
     if (!projectId) throw new Error('Firebase is not configured on this page.');
     return 'https://us-central1-' + projectId + '.cloudfunctions.net/studentRewardsAutoAward';
   }

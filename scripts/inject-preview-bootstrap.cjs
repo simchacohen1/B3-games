@@ -10,7 +10,8 @@ const PAGES = [
   'index.html', 'teacher-home.html', 'student-report/index.html', 'student-rewards/index.html',
   'weekly-quiz/index.html', 'chazara/index.html', 'shorashim/index.html', 'record_pesukim/student.html',
   'rashi-letters/student.html', 'yiddish/index.html', 'halacha/index.html', 'game-show/player.html',
-  'class-gallery/index.html', 'assignment-center/student.html', 'assignment-center/teacher.html'
+  'class-gallery/index.html', 'assignment-center/student.html', 'assignment-center/teacher.html',
+  'chayus-meter/index.html', 'davening_student_app_et/index.html', 'davening_student_app_wt/index.html'
 ];
 
 function inject(html) {
