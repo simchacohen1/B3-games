@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { loadCredentials, signInStudent, signInAdult } from './staging-common';
+import { loadCredentials, signInAdult } from './staging-common';
 
 // Teacher-recorded translation for Posuk Practice (feature test on a staging preview channel).
 // Run: FTT_POSUK_SITE=<channel url> FTT_STAGING_CREDENTIALS_FILE=<file> playwright test -c playwright.staging.config.ts posuk-translation
@@ -11,6 +11,28 @@ test.use({
   launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] },
 });
 
+// The staging student-sign-in function only allows the main staging origin (CORS), so on a preview channel
+// the test relays that one call from Node and adds the CORS headers. The app and function are untouched.
+async function signInStudent(page: Page, st: { name: string; passcode: string; classId?: string }, site: string) {
+  const origin = new URL(site).origin;
+  await page.route('**/funTorahStudentAuth*', async route => {
+    const cors = { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'POST, OPTIONS', vary: 'Origin' };
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const res = await route.fetch({ headers: { ...route.request().headers(), origin: 'https://fun-torah-tools-staging.web.app' } });
+    await route.fulfill({ response: res, headers: { ...res.headers(), ...cors } });
+  });
+  await page.goto(site + '/', { waitUntil: 'domcontentloaded' });
+  await page.locator('#studentNameInput').fill(st.name);
+  await page.locator('#classPinInput').fill(st.passcode);
+  await page.locator('#studentSignInBtn').click();
+  // Students in more than one class choose which one to enter.
+  const label = CLASS_LABEL[st.classId || ''];
+  const choice = label ? page.getByRole('button', { name: label }) : null;
+  if (choice) { try { await choice.click({ timeout: 15000 }); } catch (_e) { /* single-class student */ } }
+  await expect(page.locator('#studentBar')).toBeVisible({ timeout: 45000 });
+}
+
+const CLASS_LABEL: Record<string, string> = { 'TEST-ALEF': 'Test Class Alef', 'TEST-BEIS': 'Test Class Beis', 'CUSTOM-PRINCIPAL': 'Principal Test Class' };
 const KEY1 = 'Bereishis_1_1';
 const KEY2 = 'Bereishis_1_2';
 const path = (classId: string, key: string) => 'posukPractice/translationAudio/' + classId + '/' + key;
@@ -102,14 +124,19 @@ test.describe.serial('posuk translation recording', () => {
     await ctx.close();
   });
 
-  test('second student in same class hears it; other class cannot read it', async ({ browser }) => {
+  test('another session in same class hears it; other classes cannot read it', async ({ browser }) => {
     const c2 = await browser.newContext(); const p2 = await c2.newPage();
-    await signInStudent(p2, student('Test Student A2'), SITE);
+    await signInStudent(p2, student('Test Student A1'), SITE);
     expect(await readAs(p2, path('TEST-ALEF', KEY1))).toEqual({ ok: true, has: true });
     expect((await writeAs(p2, path('TEST-ALEF', KEY2))).ok).toBe(false); // students cannot write
     await openPosuk(p2, 1);
     await expect(p2.locator('.teacher-help-btn')).toBeVisible({ timeout: 40000 });
     await c2.close();
+    // same student, but signed in to a different class: must not be able to read this class's recording
+    const c4 = await browser.newContext(); const p4 = await c4.newPage();
+    await signInStudent(p4, { ...student('Test Student A1'), classId: 'CUSTOM-PRINCIPAL' }, SITE);
+    expect((await readAs(p4, path('TEST-ALEF', KEY1))).ok).toBe(false);
+    await c4.close();
     const c3 = await browser.newContext(); const p3 = await c3.newPage();
     await signInStudent(p3, student('Test Student B1'), SITE);
     expect((await readAs(p3, path('TEST-ALEF', KEY1))).ok).toBe(false);
