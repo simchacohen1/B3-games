@@ -318,7 +318,11 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   const posukTeacherReads:string[]=[];
   posukTeacherPage.on('request',request=>{ if(request.url().startsWith(`http://127.0.0.1:${DB_PORT}/`))posukTeacherReads.push(request.url()); });
   await posukTeacherPage.goto(`${origin}/record_pesukim/teacher.html?class=${CLASS_ID}`);
-  const gradeCard=posukTeacherPage.locator('.grade-card').filter({hasText:'Ari Example'});
+  // The marking list shows one row per recording; clicking a row opens the grade card right there.
+  const gradeRow=posukTeacherPage.locator('.gm-item').filter({hasText:'Ari Example'});
+  await expect(gradeRow).toBeVisible({timeout:20000});
+  await gradeRow.locator('.gm-row').click();
+  const gradeCard=gradeRow.locator('.grade-card');
   await expect(gradeCard).toBeVisible({timeout:20000});
   await expect(gradeCard).toContainText('Posuk 1');
   // The posuk is shown as tappable words (one button per word), each with a small T for "translated wrong".
