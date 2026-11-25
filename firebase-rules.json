@@ -166,6 +166,15 @@
           ".write": false
         }
       },
+      "translationAudio": {
+        "$classId": {
+          "$key": {
+            ".read": "(auth != null && auth.token.b3StudentId != null && auth.token.b3ClassId == $classId) || (auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true)",
+            ".write": "auth != null && auth.token.b3StudentId == null && ((auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false) || (auth != null && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/active').val() != false && root.child('b3Games/workspaces/b3-2026/teachers/' + auth.uid + '/classIds/' + $classId).val() == true))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['audio', 'mime', 'updatedAt']) && newData.child('audio').isString() && newData.child('audio').val().length < 900000 && newData.child('audio').val().beginsWith('data:audio/'))"
+          }
+        }
+      },
       "reviews": {
         ".read": "(auth != null && auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true) || (auth != null && root.child('b3Games/admins/' + auth.uid).exists() && root.child('b3Games/admins/' + auth.uid + '/active').val() != false)",
         "$studentId": {
