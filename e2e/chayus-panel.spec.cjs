@@ -125,3 +125,22 @@ for (const cls of ['et', 'wt']) {
     });
   });
 }
+
+test.describe('Student Chayus page (opened from Learning Island)', () => {
+  test('shows only the meter: no player, no audio, mic off until a click, then pause and off work', async ({ page }) => {
+    await fakeMic(page, 'ok');
+    await page.goto(`${origin}/chayus-meter/index.html`);
+    await expect(page.locator('.chayus-panel')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /My Chayus Meter/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Back to Learning Island/ })).toHaveAttribute('href', '../index.html');
+    expect(await page.locator('audio, video, #playBtn, .controls').count()).toBe(0);
+    expect(await page.evaluate(() => window.__mic.calls)).toBe(0);
+    await page.getByRole('button', { name: /Turn on My Chayus Meter/ }).click();
+    await expect(page.locator('#chayusStatus')).toContainText('Microphone on');
+    await page.getByRole('button', { name: /Pause/ }).click();
+    await expect(page.locator('#chayusStatus')).toContainText('Paused');
+    await page.getByRole('button', { name: 'Turn microphone off' }).click();
+    await expect(page.locator('#chayusStatus')).toContainText('no audio was saved or sent');
+    expect(await page.evaluate(() => window.__netCalls.filter(u => /chayus|davening|cloudfunctions/i.test(u)))).toEqual([]);
+  });
+});

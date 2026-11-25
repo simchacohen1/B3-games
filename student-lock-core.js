@@ -44,6 +44,7 @@
     { id: 'word-bank', label: 'Word Bank', icon: '🔤', group: 'learning' },
     { id: 'homework', label: 'Homework', icon: '🎒', group: 'learning' },
     { id: 'davening', label: 'Davening players', icon: '🙏', group: 'learning' },
+    { id: 'chayus-meter', label: 'Chayus Meter', icon: '🔥', group: 'learning' },
     { id: 'game-show', label: 'Game Show', icon: '🎤', group: 'games' },
     { id: 'multiplayer-center', label: 'Arcade (all multiplayer games)', icon: '🎲', group: 'games' },
     { id: 'class-pointer', label: 'Class Pointer (lessons, whiteboards, screen sharing)', icon: '👆', group: 'class' },
