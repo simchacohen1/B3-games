@@ -184,6 +184,18 @@
   .loading{ color: var(--ink-soft); text-align:center; padding:20px 0; }
 
   .tab-bar{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .who-recorded{ margin:0 0 14px; padding:10px 12px; border-radius:14px; background:#fffdf6; border:2px solid #e0d3ad; }
+  .who-recorded:empty{ display:none; }
+  .wr-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:8px; color:#5a4310; }
+  .wr-head span{ font-size:.85rem; font-weight:700; color:#7a6a3d; }
+  .wr-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .wr-chip{ font:inherit; font-size:.88rem; font-weight:700; padding:6px 12px; border-radius:999px; cursor:pointer; border:2px solid transparent; }
+  .wr-chip.done{ background:#d3f2d8; color:#14532d; border-color:#4caf6a; }
+  .wr-chip.none{ background:#eceae4; color:#6b6558; border-color:#d4d0c4; }
+  .wr-chip:hover,.wr-chip:focus-visible{ outline:2px solid #1f3d73; outline-offset:1px; }
+  .wr-check{ font-weight:900; }
+  .wr-n{ margin-left:4px; font-size:.78rem; opacity:.8; }
+  .wr-empty{ color:#7a6a3d; font-size:.88rem; }
   .tab-btn{
     font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.85rem;
     border: 2px solid var(--ink-soft); background:#fff; color: var(--ink-soft);
@@ -573,6 +585,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
       </div>
 
       <div class="main-panel">
+        <div id="whoRecordedStrip" class="who-recorded" aria-label="Who recorded today"></div>
         <div class="tab-bar">
           <button class="tab-btn" id="gradeTabBtn">🎙️ To Grade<span class="tab-count" id="gradeTabCount"></span></button>
           <button class="tab-btn active" id="overviewTabBtn">🏠 Overview<span class="tab-count" id="overviewDisputeCount"></span></button>
@@ -599,7 +612,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="../shared/submission-open-core.js?v=20261124"></script>
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
-<script src="grading-queue.js"></script><script src="posuk-word-marks-core.js?v=20261122"></script>
+<script src="grading-queue.js"></script><script src="who-recorded.js?v=20261125"></script><script src="posuk-word-marks-core.js?v=20261122"></script>
 
 <script>
 /* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
@@ -1428,6 +1441,20 @@ let studentDisputeCounts = {}; // id -> number of pending disputes (filled once 
 // student from the sidebar, Class Roster, Reports, and Class Stats. Activity
 // info (lastActive) is merged in on top where it exists; a student who's
 // approved but has never logged in still shows up, just with no activity yet.
+/* "Who recorded today": one chip per student of this class, live. Tap a chip to see that boy's recordings. */
+let whoRecorded = null;
+function mountWhoRecorded(){
+  if(whoRecorded){ whoRecorded.sync(); return; }
+  const el = document.getElementById('whoRecordedStrip');
+  if(!el || !window.B3WhoRecorded) return;
+  whoRecorded = B3WhoRecorded.mount({
+    db, el, path: B3PosukGradingQueue.submissionsPath,
+    students: () => studentsMap,
+    // A sent recording counts, unless the teacher or the boy deleted it.
+    isRecording: (s, from) => !!(s.id && s.status !== 'deleted' && (Number(s.submittedAt) || 0) >= from),
+    onPick: sid => { Object.assign(gradeView, { range:'all', sid, status:'all', openKey:'', backTo:'' }); setTab('grade'); }
+  });
+}
 async function loadStudents(){
   const listEl = document.getElementById('studentList');
   const countEl = document.getElementById('studentCount');
@@ -1454,6 +1481,7 @@ async function loadStudents(){
       studentsInfo[id] = activeVal[id] || { name: approvedName };
     });
     renderStudentList();
+    mountWhoRecorded();
 
     const searchInput = document.getElementById('studentSearchInput');
     if(searchInput && !searchInput._wired){
