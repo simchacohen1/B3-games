@@ -1,6 +1,7 @@
 'use strict';
-// Browser test for the pages-only Chayus Meter panel on the real ET and WT pages.
-// A generated tone stands in for the microphone. No account, server or network is used.
+// Browser test for the Chayus Meter panel on the real ET and WT pages.
+// A generated tone stands in for the microphone. No account or server is used: the signed-out tests have no
+// student, so nothing is sent; the level tests replace the points link with a recorder.
 const { test, expect } = require('@playwright/test');
 const http = require('node:http');
 const fs = require('node:fs');
@@ -26,7 +27,7 @@ test.beforeAll(async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   origin = 'http://127.0.0.1:' + server.address().port;
 });
-test.afterAll(() => server.close());
+test.afterAll(() => server && server.close());
 
 // Replace getUserMedia with a tone we control. Records every call and every track stop.
 async function fakeMic(page, mode) {
@@ -54,8 +55,57 @@ async function fakeMic(page, mode) {
   }, mode);
 }
 
+// Replaces the points link with a recorder that behaves like the server (levels at 1, 3, 5, ... counted minutes).
+async function fakePoints(page) {
+  await page.addInitScript(() => {
+    const minutes = [1, 3, 5, 7, 10, 14, 18, 22, 26, 30];
+    window.__reports = [];
+    let total = 0;
+    window.ChayusPoints = {
+      status: async () => ({ ok: true, countedSeconds: total, level: 0, points: 0 }),
+      report: async seconds => {
+        window.__reports.push(seconds);
+        total = Math.max(total, seconds);
+        const level = minutes.filter(m => total >= m * 60).length;
+        return { ok: true, countedSeconds: total, level, points: level };
+      }
+    };
+  });
+}
+
 for (const cls of ['et', 'wt']) {
   test.describe(`${cls.toUpperCase()} page`, () => {
+    test('levels: counted time moves the level, a celebration shows, and only numbers are reported', async ({ page }) => {
+      await page.clock.install();
+      await fakePoints(page);
+      await fakeMic(page, 'ok');
+      await page.goto(`${origin}/davening_student_app_${cls}/index.html`);
+      await expect(page.locator('#chayusLevelName')).toHaveText('Level 0 · Getting started');
+      // The celebration hides itself after a few seconds (on the page's clock), so record it when it appears.
+      await page.evaluate(() => {
+        window.__celebrations = [];
+        new MutationObserver(() => { const box = document.getElementById('chayusCelebrate'); if (!box.hidden) window.__celebrations.push(box.innerText.replace(/\s+/g, ' ')); })
+          .observe(document.getElementById('chayusCelebrate'), { attributes: true, childList: true });
+      });
+      await page.getByRole('button', { name: /Turn on My Chayus Meter/ }).click();
+      await expect(page.locator('#chayusStatus')).toContainText('Microphone on');
+      await page.clock.runFor(20000);
+      await expect(page.locator('#chayusLevelNext')).toContainText('until Level 1 · Spark');
+      await page.clock.runFor(60000);
+      await expect(page.locator('#chayusLevelName')).toHaveText('Level 1 · Spark');
+      expect((await page.evaluate(() => window.__celebrations)).join(' | ')).toContain('Level 1: Spark');
+      await expect(page.locator('#chayusPoints')).toHaveText('1 / 10 points today');
+      const reports = await page.evaluate(() => window.__reports);
+      expect(reports.length).toBeGreaterThan(0);
+      expect(reports.every(value => typeof value === 'number' && Number.isFinite(value))).toBe(true);
+      expect(Math.max(...reports)).toBeGreaterThanOrEqual(60);
+      // Pausing hands over the latest total, and turning the microphone off keeps the level on screen.
+      await page.getByRole('button', { name: /Pause/ }).click();
+      await page.getByRole('button', { name: 'Turn microphone off' }).click();
+      await expect(page.locator('#chayusLevelName')).toHaveText('Level 1 · Spark');
+      expect(await page.locator('.chayus-panel').innerText()).not.toMatch(/d+s*%/);
+    });
+
     test('nothing starts by itself; permission is asked only on a click', async ({ page }) => {
       await fakeMic(page, 'ok');
       await page.goto(`${origin}/davening_student_app_${cls}/index.html`);
