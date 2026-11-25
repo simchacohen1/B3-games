@@ -193,3 +193,75 @@ test('a constant hum is tuned out instead of counting as davening forever', () =
   assert.equal(m.live().voiceHeard, false);
   assert.ok(m.finish().soundActivityPercent < 50);
 });
+
+test('the student Chayus page has the meter but no Davening player, audio or controls, and respects the Davening lock', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'chayus-meter', 'index.html'), 'utf8');
+  assert.ok(html.includes('../chayus-meter/core.js') && html.includes('../chayus-meter/panel.js'));
+  assert.ok(html.indexOf('chayus-meter/core.js') < html.indexOf('chayus-meter/panel.js'));
+  assert.match(html, /student-lock\.js[^>]*data-feature="chayus-meter"/);
+  for (const banned of ['<audio', '<video', 'playBtn', 'davening_student_app', 'class-pointer', 'firebase']) {
+    assert.equal(html.includes(banned), false, `index.html must not contain ${banned}`);
+  }
+  // The home tile exists and opens that page. It has its own class permission, its own per-student block and its own lock.
+  const registry = fs.readFileSync(path.join(root, 'shared', 'home-tool-registry.js'), 'utf8');
+  assert.match(registry, /id:"chayus-meter",title:"Chayus Meter"[^}]*href:"chayus-meter\/index\.html"/);
+  const policy = require('../backend/functions/student-tool-policy.js');
+  assert.equal(policy.granted({ toolGrants: { 'chayus-meter': true } }, 'chayus-meter'), true);
+  assert.equal(policy.granted({ toolGrants: { davening: true } }, 'chayus-meter'), false, 'Davening Player does not open it');
+  assert.equal(policy.allowed({ members: { s1: { toolAccess: { 'chayus-meter': false } } } }, 's1', 'chayus-meter'), false);
+  assert.ok(policy.studentActivities.includes('chayus-meter'));
+  // The student does not get the player: Davening itself is still not a student activity.
+  assert.equal(policy.studentActivities.includes('davening'), false);
+  assert.ok(require('../backend/functions/class-access-core.cjs').CLASS_TOOL_GRANTS.includes('chayus-meter'));
+  assert.ok(require('../student-lock-core.js').FEATURES.some(x => x.id === 'chayus-meter'));
+});
+
+// A quiet davening voice on a laptop microphone is only about 1 to 3 percent of full scale.
+function quietSession(voiceLevel, roomLevel = 0.003) {
+  const m = createMeter(); // default 3 second room-sound measurement
+  m.start(0);
+  const seen = [];
+  for (let t = 200; t <= 3000; t += 200) m.sample(roomLevel * (1 + (t / 200 % 3) * 0.1), t);
+  for (let t = 3200; t <= 63000; t += 200) {
+    // words with short breaths, like real davening: every fifth moment is a gap
+    m.sample((t / 200) % 5 === 0 ? roomLevel : voiceLevel, t);
+    seen.push(m.live().steadiness);
+  }
+  return { data: m.finish(), live: m.live(), seen };
+}
+
+test('a normal quiet davening voice registers on a quiet microphone', () => {
+  const quiet = quietSession(0.016);
+  assert.ok(quiet.data.soundActivityPercent >= 75, `heard only ${quiet.data.soundActivityPercent}%`);
+  assert.equal(quiet.live.voiceHeard === true || quiet.live.steadiness > 0.6, true);
+  assert.ok(quiet.live.steadiness > 0.6, `steadiness ${quiet.live.steadiness}`);
+});
+
+test('a very quiet voice still registers, and shouting looks exactly the same as a quiet voice', () => {
+  const veryQuiet = quietSession(0.013);
+  assert.ok(veryQuiet.data.soundActivityPercent >= 75, `heard only ${veryQuiet.data.soundActivityPercent}%`);
+  const shout = quietSession(0.9);
+  assert.deepEqual(quietSession(0.016).seen, shout.seen, 'the meter picture is identical for quiet and shouting');
+  assert.equal(shout.data.soundActivityPercent, quietSession(0.016).data.soundActivityPercent);
+});
+
+test('room sound alone never counts as davening, however sensitive the meter is', () => {
+  const roomOnly = quietSession(0.003);
+  assert.ok(roomOnly.data.soundActivityPercent < 10, `room sound counted as ${roomOnly.data.soundActivityPercent}%`);
+  assert.equal(roomOnly.live.voiceHeard, false);
+  // A steady low sound from the speakers from the very first moment is learned as background, not heard as a voice.
+  const speaker = createMeter();
+  speaker.start(0);
+  for (let t = 200; t <= 120000; t += 200) speaker.sample(0.015, t);
+  assert.ok(speaker.finish().soundActivityPercent < 30);
+});
+
+test('a noisier room needs a clearer voice: the bar follows each microphone', () => {
+  const noisyRoomQuietVoice = quietSession(0.03, 0.02);
+  assert.ok(noisyRoomQuietVoice.data.soundActivityPercent < 40);
+  const noisyRoomClearVoice = quietSession(0.2, 0.02);
+  assert.ok(noisyRoomClearVoice.data.soundActivityPercent >= 75);
+});

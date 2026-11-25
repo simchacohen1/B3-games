@@ -14,6 +14,7 @@ const STUDENT_PAGES = {
   "class-pointer-prototype/student-share-window.html": "class-pointer",
   "class-pointer-prototype/student-view.html": "class-pointer",
   "daily-checklist/index.html": "daily-checklist",
+  "chayus-meter/index.html": "chayus-meter",
   "davening_student_app_et/index.html": "davening",
   "davening_student_app_wt/index.html": "davening",
   "game-show/player.html": "game-show",
