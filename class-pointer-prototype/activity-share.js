@@ -111,9 +111,10 @@
     if(!window.FunTorahStudentClass)await load(new URL('student-class.js',root).href);
     const scope=await window.FunTorahStudentClass.resolve(firebase.database(),id);
     let classId=scope.classId;
+    let classIdSet=new Set([classId]);
     if(scope.workspaceId!==ws||!/^[A-Za-z0-9_-]{1,100}$/.test(classId||'')){classLink('bad','Can’t connect – you are not in a class that uses Class Pointer (class: '+(classId||'none')+').');return}
     function sameStudent(){return sessionStorage.getItem('b3Games_studentId')===id &&
-      (sessionStorage.getItem('b3Games_studentClass')||classId)===classId}
+      (!sessionStorage.getItem('b3Games_studentClass')||classIdSet.has(sessionStorage.getItem('b3Games_studentClass')))}
     // Mount the existing student whiteboard on real browser pages. Synthetic
     // auth-only tests use deliberately minimal DOM mocks without append().
     // The dedicated sharing tab only holds the screen capture: the whiteboard,
@@ -148,7 +149,46 @@
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261124-pages1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261124-groups1',root).href).catch(()=>{});
     }
-    let sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
+    // ---------- A student in more than one class joins whichever of his classes has a live lesson ----------
+    // His class list is NOT changed: this page only listens to the lesson list of every class he is an active member
+    // of, and follows the newest live lesson among them. classId then names that lesson's class, so every later request
+    // (join ticket, permissions, sharing ticket) is made for the class that is actually teaching.
+    async function activeClassIds(studentId,primary){
+      const out=[primary];
+      try{
+        const memberships=(await firebase.database().ref('b3Games/students/'+studentId+'/memberships').once('value')).val()||{};
+        for(const m of Object.values(memberships))
+          if(m&&m.active!==false&&m.workspaceId===ws&&/^[A-Za-z0-9_-]{1,100}$/.test(m.classId||'')&&!out.includes(m.classId))out.push(m.classId);
+      }catch{/* keep the one class we already know */}
+      return out;
+    }
+    function makeSessionsSource(classIdList){
+      const refs=classIdList.map(c=>[c,firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+c+'/classPointerSessions')]);
+      const rowsBy={},failed=new Set(),subs=[];
+      const combined=()=>{
+        const out={};
+        for(const [c,rows] of Object.entries(rowsBy))for(const [key,row] of Object.entries(rows||{}))if(row&&typeof row==='object')out[key]={...row,__classId:c};
+        return out;
+      };
+      return {
+        on(_event,callback,errorCallback){
+          this.off();
+          for(const [c,ref] of refs){
+            const onValue=snapshot=>{rowsBy[c]=snapshot.val()||{};failed.delete(c);return callback({val:()=>combined()})};
+            const onError=error=>{
+              rowsBy[c]={};failed.add(c);
+              // One class refusing (for example Class Pointer is not turned on there) must not hide a lesson in another.
+              if(failed.size<refs.length)return callback({val:()=>combined()});
+              errorCallback(error);
+            };
+            ref.on('value',onValue,onError);subs.push([ref,onValue]);
+          }
+        },
+        off(){for(const [ref,fn] of subs.splice(0))try{ref.off('value',fn)}catch{}}
+      };
+    }
+    const startClassIds=await activeClassIds(id,classId);classIdSet=new Set(startClassIds);
+    let sessions=makeSessionsSource(startClassIds);
     const holder=document.createElement('div');
     holder.id='fttActivityScreenShare';
     holder.style.cssText='position:fixed;right:14px;bottom:14px;z-index:2147483640;display:none;align-items:center;gap:8px;padding:8px;border-radius:14px;background:#f8fbff;border:2px solid #2563eb;box-shadow:0 5px 24px #15284666;font:700 15px system-ui,sans-serif';
@@ -1038,7 +1078,8 @@
         // He may have switched again while this was checking.
         if(sessionStorage.getItem('b3Games_studentId')!==nextId)return;
         failedAttempt='';id=nextId;pin=nextPin;classId=nextScope.classId;
-        sessions=firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+classId+'/classPointerSessions');
+        const nextIds=await activeClassIds(nextId,classId);classIdSet=new Set(nextIds);
+        sessions=makeSessionsSource(nextIds);
         sessions.on('value',onSessions,onSessionsError);
       }catch(error){console.warn('Class Pointer could not switch student',error)}
       finally{switching=false}
@@ -1161,7 +1202,7 @@
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
         &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000&&!teacherGone(v))
-        .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
+        .sort((a,b)=>b[1].createdAt-a[1].createdAt||(a[0]<b[0]?1:-1))[0]?.[1]||null;
     }
     // No database event arrives when the grace period runs out, so look again at that moment.
     function watchGrace(next){
@@ -1182,6 +1223,8 @@
       resubscribeDelay=0;
       lastRows=snapshot.val();
       const next=current(lastRows);
+      // The lesson that is live right now decides which of his classes this page is working in.
+      if(next&&next.__classId&&next.__classId!==classId)classId=next.__classId;
       watchGrace(next);
       latestSession=next;
       if(!next)classLink('wait',lastRows&&Object.keys(lastRows).length?'No open lesson right now (the last one is old or ended). Waiting for your teacher.':'Waiting for your teacher to open Class Pointer for your class ('+classId+').');
@@ -1189,8 +1232,22 @@
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
     }
+    // The database refuses a student who is signed in for another class, or whose class does not have Class Pointer turned on.
+    // Say which, instead of showing a scary error to every student of a class that simply does not use Class Pointer.
+    function explainRefusal(error,forClass){
+      const code=error?.code||error?.message||'database refused';
+      if(!/permission_denied/i.test(String(code))){classLink('bad','Can’t connect – your class’s lesson list could not be read ('+code+'). Retrying.');return}
+      const generic=()=>{if(forClass===classId)classLink('bad','Can’t connect – the lesson list is blocked for your sign-in (PERMISSION_DENIED). Either Class Pointer is not turned on for your class ('+forClass+'), or you are signed in for a different class. Sign out and sign in again, or tell your teacher.')};
+      try{
+        firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+forClass+'/toolGrants/class-pointer').once('value').then(snapshot=>{
+          if(forClass!==classId)return;
+          if(snapshot.val()!==true&&!['et','wt'].includes(forClass))classLink('wait','Class Pointer is not turned on for your class ('+forClass+'), so there is no class lesson to join.');
+          else generic();
+        },generic);
+      }catch{generic()}
+    }
     function onSessionsError(error){
-      classLink('bad','Can’t connect – your class’s lesson list could not be read ('+(error?.code||error?.message||'database refused')+'). Please sign in again. Retrying.');
+      explainRefusal(error,classId);
       stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop();
       // The database cancelled this listener. Without listening again this boy would have no
       // Share My Screen button for the rest of the day, so try again, slowly.
