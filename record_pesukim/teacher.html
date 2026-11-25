@@ -3126,13 +3126,17 @@ async function renderTranslationList(classId, perekValue){
   const pk = parseChumashPerek(perekValue);
   if(!pk){ listEl.innerHTML = '<div class="empty-msg">Choose a perek.</div>'; return; }
   listEl.innerHTML = '<div class="loading">Loading…</div>';
-  const [range, heb, snap] = await Promise.all([
+  const [range, heb] = await Promise.all([
     getPerekRange(pk.perek, pk.sefer),
-    fetchPerekHebrew(pk.sefer, pk.perek),
-    db.ref('posukPractice/translationAudio/' + classId).once('value').catch(err => { console.error(err); return null; })
+    fetchPerekHebrew(pk.sefer, pk.perek)
   ]);
   if(document.getElementById('trPerek').value !== perekValue) return;
-  const saved = (snap && snap.val()) || {};
+  const saved = {};
+  await Promise.all(Array.from({ length: Math.max(0, range.max - range.min + 1) }, (_, i) => range.min + i).map(n => {
+    const key = trKey(pk.sefer, pk.perek, n);
+    return db.ref('posukPractice/translationAudio/' + classId + '/' + key).once('value').then(sn => { if(sn.exists()) saved[key] = sn.val(); }).catch(err => console.error(err));
+  }));
+  if(document.getElementById('trPerek').value !== perekValue) return;
   listEl.innerHTML = '';
   for(let n = range.min; n <= range.max; n++){
     const key = trKey(pk.sefer, pk.perek, n);
