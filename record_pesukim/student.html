@@ -181,6 +181,34 @@
     margin-bottom:8px;
   }
   #seferSelect{direction:ltr;min-width:190px;}
+  /* Button picker (sefer / perek / posuk). The old dropdowns stay in the page, hidden, as the state layer. */
+  .content-picker .selectors{position:absolute !important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0;padding:0;border:0;opacity:0;pointer-events:none;}
+  .content-picker-title,.scroll .placeholder,.msg,.mode-card,.range-dispute-note{direction:ltr;unicode-bidi:isolate;}
+  bdi[lang="he"]{font-family:'Noto Serif Hebrew','Noto Sans Hebrew',serif;font-size:1.12em;font-weight:700;}
+  .pk{display:grid;gap:14px;direction:ltr;}
+  .pk-step.hidden{display:none !important;}
+  .pk-label{font-size:.9rem;font-weight:800;color:var(--ink-soft);margin:0 0 8px;text-align:center;unicode-bidi:isolate;}
+  .pk-grid{display:grid;gap:8px;direction:rtl;}
+  .pk-sefer{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));}
+  .pk-num{grid-template-columns:repeat(auto-fill,minmax(54px,1fr));}
+  .pk-btn{appearance:none;-webkit-appearance:none;font-family:'Quicksand',sans-serif;cursor:pointer;touch-action:manipulation;
+    min-height:48px;padding:6px 4px;border-radius:12px;border:2px solid rgba(36,52,74,.28);background:#fff;color:var(--tent-navy);
+    font-weight:800;font-size:1.15rem;line-height:1.15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    box-shadow:0 2px 0 rgba(36,52,74,.15);transition:transform .08s,background .12s;-webkit-tap-highlight-color:transparent;}
+  .pk-btn:active{transform:translateY(1px);}
+  .pk-btn small{font-size:.68rem;font-weight:700;color:var(--ink-soft);direction:ltr;}
+  .pk-sefer .pk-btn{min-height:60px;font-size:1.3rem;}
+  .pk-btn:focus-visible{outline:3px solid var(--gold);outline-offset:2px;}
+  .pk-btn.active{background:var(--tent-navy);border-color:var(--tent-navy);color:#fff;box-shadow:0 2px 6px rgba(31,46,61,.3);}
+  .pk-btn.active small{color:rgba(255,255,255,.8);}
+  .pk-btn.inrange{background:rgba(201,162,39,.28);border-color:var(--gold);}
+  .pk-btn.dim{opacity:.4;}
+  @media (max-width:620px){
+    .pk-sefer{grid-template-columns:repeat(2,1fr);}
+    .pk-num{grid-template-columns:repeat(5,1fr);gap:6px;}
+    .pk-btn{font-size:1.05rem;min-height:46px;}
+  }
+  @media (max-width:340px){ .pk-num{grid-template-columns:repeat(4,1fr);} }
   .selectors{
     display:flex;
     justify-content:center;
@@ -1267,7 +1295,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
 </style>
 <script src="../paid-api.js?v=20261008-cost-controls"></script>
 <script defer src="../gallery-share.js?v=20261022-pointer2"></script>
-<script defer src="../student-lock.js?v=20261120-locks1" data-feature="posuk-practice-scroll" data-feature-quiz="chumash-quiz"></script>
+<script defer src="../student-lock.js?v=20261125-ctx1" data-feature="posuk-practice-scroll" data-feature-quiz="chumash-quiz"></script>
 </head>
 <body>
 <div class="wrap">
@@ -1299,8 +1327,8 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
       <div class="mode-card">
         <div class="mode-label">How much do you want to practice?</div>
         <div class="mode-toggle" role="group" aria-label="Choose one posuk or several pesukim">
-          <button type="button" class="mode-choice active" id="modeSingleBtn" data-mode="single">① One פסוק</button>
-          <button type="button" class="mode-choice" id="modeRangeBtn" data-mode="range">①–③ Several פסוקים</button>
+          <button type="button" class="mode-choice active" id="modeSingleBtn" data-mode="single">① One <bdi dir="rtl" lang="he">פסוק</bdi></button>
+          <button type="button" class="mode-choice" id="modeRangeBtn" data-mode="range">①–③ Several <bdi dir="rtl" lang="he">פסוקים</bdi></button>
         </div>
         <select id="selectionModeSelect" aria-hidden="true" tabindex="-1">
           <option value="single">One פסוק</option>
@@ -1308,8 +1336,13 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
         </select>
       </div>
       <div class="content-picker">
-        <div class="content-picker-title" id="contentPickerTitle">Choose what to practice</div>
-        <div class="selectors" id="selectorsRow">
+        <div class="content-picker-title" id="contentPickerTitle" dir="ltr">Choose what to practice</div>
+        <div class="pk" id="pk">
+          <div class="pk-step"><div class="pk-label">Choose a <bdi dir="rtl" lang="he">ספר</bdi></div><div class="pk-grid pk-sefer" id="pkSefer" role="group" aria-label="Choose a sefer"></div></div>
+          <div class="pk-step hidden" id="pkPerekStep"><div class="pk-label">Choose a <bdi dir="rtl" lang="he">פרק</bdi></div><div class="pk-grid pk-num" id="pkPerek" role="group" aria-label="Choose a perek"></div></div>
+          <div class="pk-step hidden" id="pkPosukStep"><div class="pk-label" id="pkPosukLabel"></div><div class="pk-grid pk-num" id="pkPosuk" role="group" aria-label="Choose a posuk"></div></div>
+        </div>
+        <div class="selectors" id="selectorsRow" aria-hidden="true">
           <select id="endPosukSelect" class="hidden" disabled><option value="">עד פסוק</option></select>
           <select id="posukSelect" disabled><option value="">פסוק</option></select>
           <select id="perekSelect"><option value="">פרק</option></select>
@@ -1328,7 +1361,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
     </div>
 
     <div class="scroll" id="scrollBox">
-      <div class="placeholder" id="scrollPlaceholder">Choose a פרק and פסוק to begin 📖</div>
+      <div class="placeholder" id="scrollPlaceholder" dir="ltr">Choose a <bdi dir="rtl" lang="he">פרק</bdi> and <bdi dir="rtl" lang="he">פסוק</bdi> to begin 📖</div>
       <div class="posuk-text hidden" id="posukText"></div>
     </div>
     <div class="msg" id="fetchMsg"></div>
@@ -2866,12 +2899,13 @@ function syncModeButtons(){
   modeRangeBtn.classList.toggle('active', range);
   selectorsRow.classList.toggle('range-active', range);
   document.getElementById('rangeDisputeNote').classList.toggle('hidden', !range);
-  document.getElementById('contentPickerTitle').textContent = range
-    ? 'Choose a פרק, first פסוק, and last פסוק'
-    : 'Choose a פרק and פסוק';
-  document.getElementById('scrollPlaceholder').textContent = range
-    ? 'Choose a פרק and פסוק range to begin 📖'
-    : 'Choose a פרק and פסוק to begin 📖';
+  const he = w => '<bdi dir="rtl" lang="he">' + w + '</bdi>';
+  document.getElementById('contentPickerTitle').innerHTML = range
+    ? 'Choose a ' + he('פרק') + ', first ' + he('פסוק') + ', and last ' + he('פסוק')
+    : 'Choose a ' + he('פרק') + ' and ' + he('פסוק');
+  document.getElementById('scrollPlaceholder').innerHTML = range
+    ? 'Choose a ' + he('פרק') + ' and ' + he('פסוק') + ' range to begin 📖'
+    : 'Choose a ' + he('פרק') + ' and ' + he('פסוק') + ' to begin 📖';
 }
 
 function expandSelectionPicker(){
@@ -2952,7 +2986,7 @@ selectionModeSelect.onchange = async () => {
     // If a single posuk is already open, begin the range at that same posuk
     // but wait for the student to choose the ending posuk explicitly.
     resetScroll();
-    document.getElementById('fetchMsg').textContent = posukSelect.value ? 'Choose the last פסוק in the range.' : '';
+    setMsgHe(document.getElementById('fetchMsg'), posukSelect.value ? 'Choose the last פסוק in the range.' : '');
   }else{
     endPosukSelect.value = '';
     if(posukSelect.value) await loadSelectedPesukim();
@@ -3011,11 +3045,11 @@ async function loadSelectedPesukim(){
   }
   if(rangeModeOn() && !endPosuk){
     resetScroll();
-    document.getElementById('fetchMsg').textContent = 'Choose the last פסוק in the range.';
+    setMsgHe(document.getElementById('fetchMsg'), 'Choose the last פסוק in the range.');
     return;
   }
   if(endPosuk < startPosuk){
-    document.getElementById('fetchMsg').textContent = 'The last פסוק must come after the first one.';
+    setMsgHe(document.getElementById('fetchMsg'), 'The last פסוק must come after the first one.');
     return;
   }
   const startParsha = resolveParsha(perekNum, startPosuk);
@@ -3071,7 +3105,7 @@ posukSelect.onchange = async () => {
   if(rangeModeOn()){
     populateEndPosukOptions();
     resetScroll();
-    document.getElementById('fetchMsg').textContent = posukSelect.value ? 'Choose the last פסוק in the range.' : '';
+    setMsgHe(document.getElementById('fetchMsg'), posukSelect.value ? 'Choose the last פסוק in the range.' : '');
     return;
   }
   await loadSelectedPesukim();
@@ -3080,6 +3114,127 @@ posukSelect.onchange = async () => {
 endPosukSelect.onchange = async () => {
   if(rangeModeOn()) await loadSelectedPesukim();
 };
+
+/* ---------- Button picker (sefer -> perek -> posuk) ----------
+   The <select>s above remain the single source of truth (class limits,
+   deep links, prev/next arrows all drive them). These big buttons just
+   read from and write to them. */
+window.setMsgHe = function(el, text){
+  const safe = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  el.innerHTML = safe.replace(/[\u05D0-\u05EA]+/g, m => '<bdi dir="rtl" lang="he">' + m + '</bdi>');
+  el.setAttribute('dir', 'ltr');
+};
+(function(){
+  const pkSefer = document.getElementById('pkSefer');
+  const pkPerek = document.getElementById('pkPerek');
+  const pkPosuk = document.getElementById('pkPosuk');
+  const pkPerekStep = document.getElementById('pkPerekStep');
+  const pkPosukStep = document.getElementById('pkPosukStep');
+  const pkPosukLabel = document.getElementById('pkPosukLabel');
+  let seferTapped = false;
+  const he = w => '<bdi dir="rtl" lang="he">' + w + '</bdi>';
+  const vals = sel => Array.from(sel.options).filter(o => o.value !== '').map(o => o.value);
+
+  function fill(box, items, makeBtn){
+    const sig = items.map(i => i.key).join('|');
+    if(box._sig !== sig){
+      box._sig = sig;
+      box.innerHTML = '';
+      items.forEach(i => { const b = makeBtn(i); b._v = i.v; box.appendChild(b); });
+    }
+  }
+  function btn(label, sub, onTap){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pk-btn';
+    const span = document.createElement('span'); span.textContent = label; span.setAttribute('lang','he');
+    b.appendChild(span);
+    if(sub){ const sm = document.createElement('small'); sm.textContent = sub; b.appendChild(sm); }
+    b.onclick = onTap;
+    return b;
+  }
+  function mark(box, isActive, isRange, isDim){
+    Array.from(box.children).forEach(b => {
+      const a = isActive(b._v), r = isRange ? isRange(b._v) : false, d = isDim ? isDim(b._v) : false;
+      b.classList.toggle('active', a);
+      b.classList.toggle('inrange', !a && r);
+      b.classList.toggle('dim', !a && !r && d);
+      b.setAttribute('aria-pressed', a ? 'true' : 'false');
+    });
+  }
+
+  function render(){
+    const seferChosen = seferTapped || !!perekSelect.value;
+    const seferItems = vals(seferSelect).map(v => ({key:v, v, label:SEFORIM[v].hebrew, sub:v}));
+    fill(pkSefer, seferItems, i => btn(i.label, i.sub, () => onSefer(i.v)));
+    mark(pkSefer, v => seferChosen && v === seferSelect.value);
+
+    pkPerekStep.classList.toggle('hidden', !seferChosen);
+    const perekItems = vals(perekSelect).map(v => ({key:selectedSefer + ':' + v, v, label:hebrewNumeral(parseInt(v))}));
+    fill(pkPerek, perekItems, i => btn(i.label, '', () => onPerek(i.v)));
+    mark(pkPerek, v => v === perekSelect.value);
+
+    const showPosuk = seferChosen && !!perekSelect.value && !posukSelect.disabled;
+    pkPosukStep.classList.toggle('hidden', !showPosuk);
+    const posukItems = vals(posukSelect).map(v => ({key:selectedSefer + ':' + perekSelect.value + ':' + v, v, label:hebrewNumeral(parseInt(v))}));
+    fill(pkPosuk, posukItems, i => btn(i.label, '', () => onPosuk(i.v)));
+    const range = rangeModeOn(), st = parseInt(posukSelect.value), en = parseInt(endPosukSelect.value);
+    if(!range){
+      pkPosukLabel.innerHTML = 'Choose a ' + he('פסוק');
+      mark(pkPosuk, v => v === posukSelect.value);
+    }else{
+      const ends = st ? vals(endPosukSelect).map(Number) : [];
+      pkPosukLabel.innerHTML = !st ? 'Tap the first ' + he('פסוק')
+        : (!en ? 'Now tap the last ' + he('פסוק') : 'Tap any ' + he('פסוק') + ' to start over');
+      mark(pkPosuk,
+        v => { const n = +v; return st && (n === st || (en && n === en)); },
+        v => { const n = +v; return st && en && n > st && n < en; },
+        v => { const n = +v; return st && !en && n > st && !ends.includes(n); });
+    }
+  }
+  window.renderPickerButtons = render;
+
+  function reveal(el){ try{ el.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){} }
+  function onSefer(v){
+    if(seferTapped && v === seferSelect.value) { render(); return; }
+    seferTapped = true;
+    seferSelect.value = v;
+    seferSelect.onchange();
+    render();
+    reveal(pkPerekStep);
+  }
+  async function onPerek(v){
+    perekSelect.value = v;
+    const p = perekSelect.onchange();
+    render();
+    await p;
+    render();
+    reveal(pkPosukStep);
+  }
+  async function onPosuk(v){
+    const n = +v;
+    if(!rangeModeOn()){
+      posukSelect.value = v; await posukSelect.onchange(); render(); return;
+    }
+    const st = parseInt(posukSelect.value), en = parseInt(endPosukSelect.value);
+    if(st && !en && vals(endPosukSelect).map(Number).includes(n)){
+      endPosukSelect.value = v; render(); await endPosukSelect.onchange(); render(); return;
+    }
+    posukSelect.value = v; endPosukSelect.value = '';
+    await posukSelect.onchange(); render();
+  }
+
+  // Keep buttons in sync with every programmatic change to the dropdowns.
+  [seferSelect, perekSelect, posukSelect, endPosukSelect, selectionModeSelect].forEach(sel => {
+    const orig = sel.onchange;
+    if(typeof orig !== 'function') return;
+    sel.onchange = async function(...a){ try{ return await orig.apply(this, a); } finally { render(); } };
+  });
+  let queued = false;
+  const queue = () => { if(queued) return; queued = true; requestAnimationFrame(() => { queued = false; render(); }); };
+  const mo = new MutationObserver(queue);
+  [seferSelect, perekSelect, posukSelect, endPosukSelect].forEach(sel => mo.observe(sel, {childList:true, attributes:true, attributeFilter:['disabled']}));
+  render();
+})();
 
 /* ---------- Posuk navigation arrows ----------
    Always-visible previous/next arrows so a student can move through
@@ -7135,7 +7290,7 @@ combinedEl('combinedSubmitBtn').onclick = submitCombinedRecording;
   },500);
 })();
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261124-groups1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261125-multi1"></script>
 </body>
 </html>
 

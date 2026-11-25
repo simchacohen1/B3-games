@@ -28,7 +28,7 @@ body.presentation header,.presentation .list{display:none}.presentation main{pad
 @media(max-width:620px){main{padding:10px}.card{padding:24px 12px;border-radius:20px}.controls .big{min-width:150px}.controls .side{min-width:105px;font-size:17px}.audio-progress{grid-template-columns:50px 1fr 50px}.grid{grid-template-columns:1fr 1fr}.track-btn{font-size:18px}}
 </style>
 <script defer src="../gallery-share.js?v=20261022-pointer2"></script>
-<script defer src="../student-lock.js?v=20261120-locks1" data-feature="davening"></script>
+<script defer src="../student-lock.js?v=20261125-ctx1" data-feature="davening"></script>
 </head>
 <body>
 <div class="app">
@@ -168,7 +168,9 @@ document.addEventListener('keydown',e=>{if(['INPUT','SELECT'].includes(document.
 const volume=document.getElementById('volume'),volLabel=document.getElementById('volLabel');function applyVolume(){audio.volume=Number(volume.value)/100;volLabel.textContent=volume.value+'%';try{localStorage.setItem('daveningVolume_ET',volume.value)}catch(e){}}try{const sv=localStorage.getItem('daveningVolume_ET');if(sv!==null)volume.value=sv}catch(e){}volume.oninput=applyVolume;applyVolume();
 index=firstIncludedIndex();load(index,false);
 </script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261124-groups1"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261125-multi1"></script>
+<script defer src="../chayus-meter/core.js?v=20261125-chayus2"></script>
+<script defer src="../chayus-meter/panel.js?v=20261125-chayus2"></script>
 <script async src="../teacher-global-bootstrap.js?v=20261020"></script>
 </body>
 </html>

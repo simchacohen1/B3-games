@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head><script src="/domain-redirect.js"></script>
+<meta charset="utf-8">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Chayus Meter · SOLS</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicons/davening.svg">
+<style>
+:root{--bg:#f4f6fb;--text:#152033;--muted:#667085;--accent:#315efb}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+.top{max-width:980px;margin:0 auto;padding:18px 12px 10px}
+.back{display:inline-block;margin-bottom:12px;color:var(--accent);font-weight:700;text-decoration:none}
+.back:hover,.back:focus{text-decoration:underline}
+h1{margin:0 0 6px;font-size:30px;color:#15315b}
+.intro{margin:0;color:var(--muted);line-height:1.5}
+@media(max-width:620px){h1{font-size:25px}}
+</style>
+<script defer src="../student-lock.js?v=20261125-ctx1" data-feature="chayus-meter"></script>
+</head>
+<body>
+<!-- Student-only Chayus Meter page. It has no Davening player, no controls and no audio.
+     The meter itself (panel.js) is shown just below <main>. Sound stays on this computer. -->
+<main class="top">
+  <a class="back" href="../index.html">← Back to Learning Island</a>
+  <h1>🔥 My Chayus Meter</h1>
+  <p class="intro">Turn it on while you daven. It shows how steadily you are davening, never how loud. Your voice stays on this computer.</p>
+</main>
+<script defer src="../chayus-meter/core.js?v=20261125-chayus2"></script>
+<script defer src="../chayus-meter/panel.js?v=20261125-chayus2"></script>
+</body>
+</html>
