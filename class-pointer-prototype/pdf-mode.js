@@ -36,6 +36,9 @@
   }
   function navWord(){return webMode?(docLabel==='whiteboard'?'Whiteboard':'Webpage'):'PDF'}
 
+  // boardUid: which whiteboard this is. docId changes whenever the board is republished (a picture or page added), boardUid only
+  // when a new whiteboard is opened, so the automatic save keeps one file for one board.
+  let boardUid=null;
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
   // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
   let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
@@ -1136,7 +1139,7 @@
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
       await loadWebDoc(data);if(opening!==committed)return;
-      bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
+      bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();if(board)boardUid=docId;
       boardSize=board?{w:width,h:height}:null;
       if(board&&Pages){wbPages=[newWbPage()];wbAt=0}
       // The whole board at a glance; a captured tab keeps fitting the width.
@@ -2126,7 +2129,7 @@
     pastePicture,openUpload,uploadFiles,arrange,boardPictureCount:()=>boardPictures.length+pictureEdits.length+pictureCount(),
     pagesInfo,exportPagePngs,showPage,addPage,newSlides,
     // Which whiteboard is open (a new one is a new id), so the automatic save never writes one board over another.
-    boardId:()=>isBoardOpen()?docId:null,
+    boardId:()=>isBoardOpen()?boardUid:null,
     exportWhiteboard,importWhiteboard,exportPng,boardRatio,
     presentationStream:()=>boardPresentation
   };

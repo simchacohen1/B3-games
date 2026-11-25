@@ -184,7 +184,10 @@ test('a new board gets a new id (so auto-save starts a new file): New Slides, a 
   assert.match(boards,/if\(message\.send\)boardSerial\+\+;/);
   assert.match(boards,/function importBoard\(data\)\{\s*if\(!boardOpen\(\)\|\|!data\|\|data\.kind!=='student-board'\)return false;\s*boardSerial\+\+;/);
   assert.match(boards,/clearMine\(\);boardSerial\+\+;redraw\(\);/);
-  assert.match(pdf,/boardId:\(\)=>isBoardOpen\(\)\?docId:null/);
+  // The teacher's board id is set only when a whiteboard is opened. docId also changes when a page or picture is added,
+  // which must NOT start a new file.
+  assert.match(pdf,/boardId:\(\)=>isBoardOpen\(\)\?boardUid:null/);
+  assert.match(pdf,/if\(board\)boardUid=docId;/);
 });
 
 // ---------- auto-save, against the same fake Firebase page as the saved-work tests ----------
