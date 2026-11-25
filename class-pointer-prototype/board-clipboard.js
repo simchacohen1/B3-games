@@ -134,7 +134,7 @@
     const maxLines=Math.max(1,Math.floor(1/lineHeight+1e-9)),cut=lines.length>maxLines;
     if(cut)lines.length=maxLines;
     const widths=lines.map(line=>Math.min(maxWidth,measure(line.text))),full=Math.max(0,...widths),total=lines.length*lineHeight;
-    const width=boxW?Math.max(full,boxW):full,rtl=isRtl(text);
+    const width=boxW?Math.max(full,boxW):full,rtl=isRtl(text),align=['left','center','right'].includes(opts.align)?opts.align:'';
     let left,top;
     if(opts.center){left=clamp(opts.center.x-width/2,margin,1-margin-width);top=opts.top!=null?clamp(opts.top,0,1-total):clamp(opts.center.y-total/2,margin,1-margin-total)}
     else{
@@ -143,12 +143,17 @@
     }
     const strokes=lines.map((line,index)=>{
       // Hebrew lines start at the right edge of the block; the first point is where the line starts.
-      const reach=Math.max(.02,widths[index]),y=top+index*lineHeight,start=rtl?left+width:left;
+      const reach=Math.max(.02,widths[index]),y=top+index*lineHeight;
+      // Left, center or right inside the box. Without a choice a line starts at its natural edge (left; Hebrew: right).
+      // For Hebrew the first point is the line's right end.
+      let start=rtl?left+width:left;
+      if(align){const free=Math.max(0,width-reach);start=rtl?left+width-(align==='right'?0:align==='center'?free/2:free):left+(align==='left'?0:align==='center'?free/2:free)}
       const out={tool:'text',color:opts.color||'#ffcc00',size:round(size),text:line.text,
         points:[{x:round(clamp(start,0,1)),y:round(clamp(y,0,1))},{x:round(clamp(rtl?start-reach:start+reach,0,1)),y:round(clamp(y+Math.max(.02,lineHeight),0,1))}]};
       if(opts.block)out.block=opts.block;
       if(line.soft)out.soft=true;
       if(opts.bold)out.bold=true;
+      if(align)out.align=align;
       if(opts.font&&opts.font!=='sans')out.font=opts.font;
       if(boxW)out.boxW=round(width);
       return out;
@@ -218,6 +223,8 @@
   };
   function friendly(message){const error=new Error(message);error.friendly=true;return error}
 
+  // An item copied on a whiteboard (a picture, shape or words) puts a marker in the clipboard's html, so pasting it puts back the item itself.
+  const itemMarker=html=>{const m=/data-ftt-board-clip="([a-z0-9]{4,40})"/.exec(String(html||''));return m?{kind:'item',id:m[1]}:null};
   // What a Ctrl+V paste carries. Must be read right away, while the paste is happening.
   function fromData(transfer){
     if(!transfer)return null;
@@ -225,7 +232,7 @@
     for(const item of Array.from(transfer.items||[]))if(item.kind==='file'&&IMAGE_TYPE.test(item.type)){image=item.getAsFile();if(image)break}
     if(!image)image=Array.from(transfer.files||[]).find(file=>IMAGE_TYPE.test(file.type))||null;
     try{text=transfer.getData('text/plain')||'';html=transfer.getData('text/html')||''}catch{}
-    return pick({image,text,html});
+    return itemMarker(html)||pick({image,text,html});
   }
   // What the clipboard holds now (for the 📋 Paste button). The browser may ask the person, or refuse.
   async function fromClipboard(){
@@ -245,7 +252,7 @@
       if(error&&(error.name==='DataError'||error.name==='NotFoundError'))return null;
       throw friendly(MSG.blocked);
     }
-    return pick({image,text,html});
+    return itemMarker(html)||pick({image,text,html});
   }
   // source: a picture file (Blob) or a data: URL.
   function loadImage(source){
@@ -316,6 +323,11 @@
       }
     }catch{throw friendly(MSG.copyBlocked)}
   }
+  // Several kinds of one copied thing at once: {'text/plain':Blob,'text/html':Blob,'image/png':Blob}.
+  async function writeParts(parts){
+    if(!navigator.clipboard||!navigator.clipboard.write||typeof ClipboardItem!=='function')throw friendly(MSG.copyBlocked);
+    try{await navigator.clipboard.write([new ClipboardItem(parts)])}catch{throw friendly(MSG.copyBlocked)}
+  }
   async function copyText(text){
     try{await navigator.clipboard.writeText(text)}catch{throw friendly(MSG.copyBlocked)}
   }
@@ -340,7 +352,7 @@
     finally{busy=false}
   }
   async function deliver(target,payload){
-    if(!payload){target.say?.(MSG.empty);return}
+    if(!payload){if(target.pasteEmpty&&target.pasteEmpty())return;target.say?.(MSG.empty);return}
     await target.paste(payload);
   }
   const pasteInto=target=>run(target,async()=>deliver(target,await fromClipboard()));
@@ -359,6 +371,13 @@
     void copyFrom(target);
   },true);
 
-  root.ClassPointerClipboard={...api,KEY,MSG,fromData,fromClipboard,loadImage,encodeImage,textImage,canvasBlob,pngOf,copyImage,copyText,register,current,pasteInto,copyFrom};
+  document.addEventListener('cut',event=>{
+    if(typing(event.target)||String(window.getSelection?.()||''))return;
+    const target=current();if(!target||!target.cut)return;
+    event.preventDefault();event.stopImmediatePropagation();
+    void run(target,()=>target.cut());
+  },true);
+
+  root.ClassPointerClipboard={...api,KEY,MSG,fromData,fromClipboard,loadImage,encodeImage,textImage,canvasBlob,pngOf,copyImage,copyText,writeParts,register,current,pasteInto,copyFrom};
   document.dispatchEvent(new Event('class-pointer-clipboard-ready'));
 })(typeof window==='undefined'?{}:window);

@@ -773,7 +773,7 @@
     // My whiteboard as a surface for the shared drawing toolbar. Its marks are ordinary board lines, so the teacher
     // sees them live in my tile, and my own Undo / Clear / Eraser work on them too.
     const boardOpen=()=>on&&mode==='boards'&&!blocked;
-    const boardSurface={id:'board',idPrefix:'s',defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+    const boardSurface={id:'board',idPrefix:'s',defaultTool:'select',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
       getItems:()=>board.strokes.filter(item=>item.by==='student'&&ownItem(item)),
@@ -1181,6 +1181,8 @@
       tick.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:700';
       tick.append(box,el('span',null,'⭐ Mark as important (every student\'s copy arrives starred)'));
       previewBody.append(tick);
+      // Anything a student has drawn (even a stray tap) is replaced by the new board. Say so here, before the green button.
+      if(hasStudentWork()){const warn=el('p',null,'⚠ Some students have marks on their boards. Sending replaces their boards with this one.');warn.style.cssText='margin:10px 0;padding:8px 10px;border-radius:10px;background:#fff4d6;color:#7a4b00;font-weight:700';previewBody.append(warn)}
     }
     if(value.note)previewBody.append(el('p',null,value.note));
     pastePreview.hidden=false;pastePreview.style.display='flex';confirmPaste.focus();
@@ -1191,8 +1193,9 @@
     const item=pendingPaste;if(!item)return;
     const important=!!previewBody.querySelector('#boardsImportant')?.checked;
     closePreview();
-    if(item.kind==='image')await sendImageFile(item.file,{subject:item.subject,important});
-    else if(item.kind==='pages')await sendPagesFiles(item.files,{subject:item.subject,important});
+    // The preview already told the teacher that students' marks are replaced, and the green button was the yes: no second question.
+    if(item.kind==='image')await sendImageFile(item.file,{subject:item.subject,important,confirmed:true});
+    else if(item.kind==='pages')await sendPagesFiles(item.files,{subject:item.subject,important,confirmed:true});
     else{wordInput.value=item.text;sendActivity({kind:'word',text:item.text,instruction:instructionInput.value})}
   }
   // The gallery of all boards: Ctrl+V and the 📋 Paste to All Boards button both end in the same preview, and
@@ -1390,7 +1393,7 @@
     try{
       const data=await pictureData(file);
       if(!data)throw Error('Picture is too large to send to the class. Try a simpler or smaller image.');
-      sendActivity({kind:'image',data,id:newSendId(),subject:extra.subject,important:extra.important===true});
+      sendActivity({kind:'image',data,id:newSendId(),subject:extra.subject,important:extra.important===true},{confirmed:extra.confirmed===true});
     }catch(e){B.fail(e.message||'Could not load that picture.')}
     finally{sendImage.disabled=false;updateActivityLabel()}
   }
@@ -1722,7 +1725,7 @@
       if(bg&&Pages.validId(page.id)&&!seen.has(page.id)){seen.add(page.id);clean.push({id:page.id,bg})}
     }
     if(!clean.length||clean.length!==given.length){B.status('Those pages could not be sent. Try again.');return false}
-    if(hasStudentWork()&&!confirm('This will erase the students\' current marks and pages and start the new pages. Continue?'))return false;
+    if(hasStudentWork()&&info.confirmed!==true&&!confirm('This will erase the students\' current marks and pages and start the new pages. Continue?')){B.status('Nothing was sent. Students still have their marks.');return false}
     const subject=String(info.subject||'').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
     const id=/^[A-Za-z0-9_-]{8,48}$/.test(String(info.id||''))?String(info.id):newSendId();
     boards.clear();chooseActivity(null,dirtyAll);
@@ -1746,16 +1749,16 @@
         if(!bg)throw Error('A page is too detailed to send. Remove a big picture from it, or send fewer pages.');
         pages.push({id:Pages.newId(),bg});
       }
-      return await sendPages(pages,{id:newSendId(),subject:extra.subject,important:extra.important===true});
+      return await sendPages(pages,{id:newSendId(),subject:extra.subject,important:extra.important===true,confirmed:extra.confirmed===true});
     }catch(e){B.fail(e.message||'Could not prepare the pages.');return false}
     finally{sendImage.disabled=false;updateActivityLabel()}
   }
-  function sendActivity(next){
+  function sendActivity(next,opts={}){
     if(!on||mode!=='boards')return;
     const item=cleanActivity(next);
     if(next&&!item){B.fail('Please enter a word or choose a valid picture.');return}
     const hasWork=hasStudentWork();
-    if(hasWork&&!confirm('This will erase the students\' current marks and start a new activity. Continue?'))return;
+    if(hasWork&&opts.confirmed!==true&&!confirm('This will erase the students\' current marks and start a new activity. Continue?')){B.status('Nothing was sent. Students still have their marks.');return}
     classPages=null;boards.clear();chooseActivity(item,dirtyAll);
     for(const m of admitted())sendMode(m);
     dirtyAll();updateActivityLabel();
@@ -1882,7 +1885,7 @@
   // refreshes. A shared screen gets the same tools from screen-annotate.js.
   const FA=window.FTTAnnotate;
   const boardOpen=()=>{const m=focusMember();return on&&!suspended&&!view.hidden&&mode==='boards'&&!focus.hidden&&!!m&&!isBlocked(m)};
-  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'select',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
     tools:['select','highlight','text','shape','eraser','pen'],hideUnused:true,
     toolLabels:{select:['🖱️','Select','Click any mark on this board, the student’s or yours, to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
     keys:{h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},

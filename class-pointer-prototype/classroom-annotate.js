@@ -79,7 +79,7 @@
   const studentMay=()=>!!(B.allowed?.()||B.writingAllowed?.('highlight')||B.writingAllowed?.('pen'));
   const lessonOn=()=>teacher?!!B.lessonKind?.():studentMay();
   const lesson={id:'classroom',
-    get defaultTool(){return teacher&&B.lessonKind?.()==='whiteboard'?'pen':'pointer'},
+    get defaultTool(){return teacher&&B.lessonKind?.()==='whiteboard'?(canSelect()?'select':'pen'):'pointer'},
     get tools(){return tools()},
     get variants(){return{pointer:kinds(POINTERS),highlight:kinds(HIGHLIGHTS),shape:kinds(lessonShapes())}},
     // On the lesson the Pointer is also the mouse: click, type and scroll as usual while the class sees a dot where you point.
@@ -210,6 +210,8 @@
       // (every student gets their own editable copy).
       {id:'quick-save',icon:'💾',label:'Save',title:'Save this whiteboard in My files',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
       {id:'quick-files',icon:'📂',label:'My files',title:'Open your saved whiteboards',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.open?.()},
+      // Upload: pictures (jpg, png, gif, webp) and PDFs go on the whiteboard (a PDF: one page on each slide).
+      {id:'quick-upload',icon:'⬆️',label:'Upload',title:'Upload pictures (jpg, png, gif, webp) or a PDF onto the whiteboard',hidden:!(B.lessonKind?.()==='whiteboard'&&window.ClassPointerPdf?.openUpload),onClick:()=>window.ClassPointerPdf?.openUpload?.()},
       {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy',hidden:!window.FTTSavedWork?.sendCurrent&&!window.PointerPdfLibrary?.openForSend,items:sendItems},
       // Groups: students who share one board (shown while the student whiteboards are on screen).
       {id:'groups',icon:'\u{1F9D1}\u200D\u{1F91D}\u200D\u{1F9D1}',label:'Groups',title:'Groups: put the students in small groups. Each group shares one board',hidden:!window.ClassPointerBoards?.groups?.available?.(),pressed:!!window.ClassPointerBoards?.groups?.active?.(),items:groupItems},
@@ -222,7 +224,7 @@
   // Everything the buttons and menus show, as one string: the toolbar is redrawn only when it changes.
   function signature(){
     const panel=window.ClassPointerStudentsPanel;
-    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.PointerPdfLibrary?.openForSend,!!window.ClassPointerBoards?.groups?.available?.(),!!window.ClassPointerBoards?.groups?.active?.(),
+    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.ClassPointerPdf?.openUpload,!!window.PointerPdfLibrary?.openForSend,!!window.ClassPointerBoards?.groups?.available?.(),!!window.ClassPointerBoards?.groups?.active?.(),
       SOURCES.map(s=>$(s[0])?usable(s[0]):'-').join(),VIEW.map(v=>$(v[0])?usable(v[0]):'-').join(),$('viewZoomLabel')?.textContent||'',$('viewMove')?.getAttribute('aria-pressed')||''].join('|');
   }
 
@@ -243,8 +245,8 @@
     setTimeout(()=>window.dispatchEvent(new Event('resize')),60);
   }
 
-  // Back on My screen: a whiteboard goes back to the pen (a drawing there must draw), anything else to the pointer.
-  document.addEventListener('class-pointer-workspace',event=>{if(event.detail==='teach')FA.select(teacher&&B.lessonKind?.()==='whiteboard'?'pen':'pointer')});
+  // Back on My screen: a whiteboard goes back to the pointer/Select arrow (the default tool when a whiteboard opens), anything else to the pointer.
+  document.addEventListener('class-pointer-workspace',event=>{if(event.detail==='teach')FA.select(teacher&&B.lessonKind?.()==='whiteboard'?(canSelect()?'select':'pen'):'pointer')});
 
   // While a lesson is open the message line sits in the free room of the tabs row (one line; hover shows all of
   // it), so the lesson gets its row. Without a lesson it goes back to where it was.
@@ -265,7 +267,7 @@
       lastKind=kind;
       // The toolbar opens by itself for every kind of lesson and shrinks to the pencil when the lesson ends.
       FA.setReason('lesson',!!kind);
-      if(kind==='whiteboard')FA.select('pen',{color:black});
+      if(kind==='whiteboard')FA.select(canSelect()?'select':'pen',{color:black});
       // A webpage starts on the arrow, so it can be scrolled and its links clicked right away.
       else if(kind==='webpage')FA.select('select');
       FA.setReason('sharing',kind==='screen');

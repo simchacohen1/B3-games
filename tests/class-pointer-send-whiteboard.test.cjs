@@ -93,14 +93,14 @@ test('student-boards sends only after the teacher confirms, through the existing
   assert.doesNotMatch(body,/sendActivity\(|sendImageFile\(|commitPaste\(/,'sends nothing by itself');
   // The preview's own button is what sends, and it keeps the size and type checks and the erase confirmation.
   assert.match(boardsSource,/const confirmPaste=button\('✓ Send to all boards'[^\n]*commitPaste\(\)/);
-  assert.match(boardsSource,/if\(item\.kind==='image'\)await sendImageFile\(item\.file,\{subject:item\.subject,important\}\)/);
-  assert.match(boardsSource,/if\(hasWork&&!confirm\('This will erase the students\\' current marks and start a new activity\. Continue\?'\)\)return;/);
+  assert.match(boardsSource,/if\(item\.kind==='image'\)await sendImageFile\(item\.file,\{subject:item\.subject,important,confirmed:true\}\)/);
+  assert.match(boardsSource,/hasWork&&opts\.confirmed!==true&&!confirm\('This will erase the students\\' current marks and start a new activity\. Continue\?'\)/);
 });
 
 test('the toolbar Send menu offers This whiteboard (and a PDF); More no longer carries Send; the classroom loads the new scripts',()=>{
   assert.match(annotate,/\{icon:'📝',label:'This whiteboard',disabled:!window\.FTTSavedWork\?\.sendCurrent,onClick:\(\)=>window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}/);
-  assert.match(html,/student-boards[.]js[?]v=20261124-groups1/);
-  assert.match(html,/classroom-annotate[.]js[?]v=20261124-groups1/);
+  assert.match(html,/student-boards[.]js[?]v=20261125-wb2/);
+  assert.match(html,/classroom-annotate[.]js[?]v=20261125-wb1/);
   assert.match(html,/saved-work[.]js[?]v=20261124-groups1/);
 });
 
