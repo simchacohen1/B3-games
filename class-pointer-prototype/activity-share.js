@@ -1225,6 +1225,8 @@
       const next=current(lastRows);
       // The lesson that is live right now decides which of his classes this page is working in.
       if(next&&next.__classId&&next.__classId!==classId)classId=next.__classId;
+      // Tell the lock check which class is teaching now: that class's locks govern his tools (not another class's).
+      try{const liveClass=next?(next.__classId||classId):'';if((window.ClassPointerLiveClass||'')!==liveClass){window.ClassPointerLiveClass=liveClass;window.dispatchEvent(new Event('b3:live-class'))}}catch{}
       watchGrace(next);
       latestSession=next;
       if(!next)classLink('wait',lastRows&&Object.keys(lastRows).length?'No open lesson right now (the last one is old or ended). Waiting for your teacher.':'Waiting for your teacher to open Class Pointer for your class ('+classId+').');
