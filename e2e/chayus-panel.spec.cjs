@@ -131,7 +131,7 @@ test.describe('Student Chayus page (opened from Learning Island)', () => {
     await fakeMic(page, 'ok');
     await page.goto(`${origin}/chayus-meter/index.html`);
     await expect(page.locator('.chayus-panel')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /My Chayus Meter/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /My Chayus Meter/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /Back to Learning Island/ })).toHaveAttribute('href', '../index.html');
     expect(await page.locator('audio, video, #playBtn, .controls').count()).toBe(0);
     expect(await page.evaluate(() => window.__mic.calls)).toBe(0);
