@@ -182,6 +182,46 @@ test('Delete: refunds the 5 points, no lock, only while ungraded', async () => {
   await assert.rejects(s.review.discard({ scope: teacherScope, studentId: SID, submissionId: 'a2' }), /already graded/);
 });
 
+test('Student delete: own ungraded recording only; refunds 5, frees the posuk, refused once graded', async () => {
+  const s = setup({ balance: 5 });
+  await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
+  assert.equal(s.balance(), 0);
+  const d = await s.review.discard({ byStudent: true, studentId: SID, submissionId: 'a1' });
+  assert.equal(d.refunded, 5); assert.equal(s.balance(), 5);
+  const row = s.db.root.posukPractice.submissions[SID].a1;
+  assert.equal(row.status, 'deleted'); assert.equal(row.deletedBy, 'student');
+  assert.equal(s.db.root.posukPractice.reviews && s.db.root.posukPractice.reviews[SID], undefined);
+  await assert.rejects(s.review.discard({ byStudent: true, studentId: SID, submissionId: 'a1' }), /already deleted/);
+  await assert.rejects(grade(s, 'a1', 5), /deleted/);
+  // The student can record and send this posuk again.
+  await sendAttempt(s, 'a2');
+  assert.equal(s.db.root.posukPractice.submissions[SID].a2.status, 'pending');
+  // Once graded the server refuses, whatever the page shows.
+  await grade(s, 'a2', 3);
+  const balance = s.balance();
+  await assert.rejects(s.review.discard({ byStudent: true, studentId: SID, submissionId: 'a2' }), /already graded/);
+  assert.equal(s.db.root.posukPractice.submissions[SID].a2.status, 'scored');
+  assert.equal(s.balance(), balance);
+  await assert.rejects(s.review.discard({ byStudent: true, studentId: SID, submissionId: 'nope' }), /not found/);
+  await assert.rejects(s.review.discard({ byStudent: true, studentId: '../x', submissionId: 'a2' }), /sign-in/);
+});
+
+test('Student delete: the endpoint takes the student from the sign-in token, never from the request', () => {
+  const norm = p => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+  for(const file of ['backend/functions/student-rewards-auto-award.js', 'backend/functions-staging/student-rewards-auto-award.js']){
+    const src = norm(file);
+    const block = src.match(/action==="posuk-student-delete"\)\{[\s\S]*?\n        \}/)[0];
+    assert.match(block, /requirePracticeStudent\(req/);
+    assert.match(block, /byStudent:true,studentId:practice\.studentId/);
+    assert.doesNotMatch(block, /body\.studentId/);
+    assert.ok(src.indexOf('action==="posuk-student-delete"') < src.indexOf('requireTeacher(req)', src.indexOf('action==="posuk-submit"')));
+  }
+  const page = norm('record_pesukim/student.html');
+  assert.match(page, /x\.status === 'pending' && x\.id \? '<button[^']*data-delete-sub/);
+  assert.match(page, /x\.status !== 'deleted' && Array\.isArray\(x\.posukKeys\)/);
+  assert.match(page, /confirm\('Are you sure you want to delete this recording\?/);
+});
+
 test('old cached pages (gold + mistakes) still grade', async () => {
   const s = setup({ balance: 0 });
   await s.review.submit({ studentId: SID, selectionKey: s.key, attemptId: 'a1' });
