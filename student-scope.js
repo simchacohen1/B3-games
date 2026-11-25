@@ -126,6 +126,77 @@
     }).sort();
   }
 
+
+  /* Move one class (or several that must travel together) to another school WITH their people,
+   * so a class never ends up in a school its students and teachers are not in.
+   *   classIdOrIds: the class to move, or an array of classes moved together
+   *   classes:      classId -> class record (needs schoolId, members, teacherIds)
+   *   invites:      inviteId -> teacherInvites record (schoolId, classIds, claimedUid, accountType)
+   *   records:      studentId -> owner student record ({schoolId, classIds})
+   *   memberships:  studentId -> [classId, ...] the student's real (authoritative) classes
+   * Returns { ok, classIds, blockers, students, teachers, updates }.
+   * A person who is also in a class that STAYS in another school is a blocker: nobody is
+   * split between two schools, and nothing is planned until the owner sorts that out.
+   * updates are paths relative to the workspace root, to be written one at a time in order
+   * (people first, the classes last, so a failed move can simply be run again). A moved
+   * teacher's saved Nigri login is marked for removal (nigriLoginResetAt) when they had a school. */
+  function planClassMove(classIdOrIds, classes, invites, records, memberships, toSchoolId, now) {
+    const ids = (Array.isArray(classIdOrIds) ? classIdOrIds : [classIdOrIds]).filter(function (c, i, a) { return a.indexOf(c) === i; });
+    const empty = { ok: false, classIds: ids, blockers: { teachers: [], students: [] }, students: [], teachers: [], updates: {} };
+    if (!ids.length || !validKey(toSchoolId) || !ids.every(function (c) { return validKey(c) && (classes || {})[c]; })) return empty;
+    const moving = {}; ids.forEach(function (c) { moving[c] = true; });
+    const schoolOf = function (cid) { const c = (classes || {})[cid]; return c && c.schoolId; };
+    // A class that is not loaded or has no school cannot be proven to stay elsewhere, so it does not block;
+    // a class known to be in a different school does.
+    const staysElsewhere = function (cid) { return !moving[cid] && !!schoolOf(cid) && schoolOf(cid) !== toSchoolId; };
+    const teacherUids = {};
+    ids.forEach(function (c) { Object.keys(classes[c].teacherIds || {}).forEach(function (u) { if (classes[c].teacherIds[u] === true) teacherUids[u] = true; }); });
+    const teachers = [], blockT = [];
+    Object.keys(invites || {}).sort().forEach(function (iid) {
+      const inv = invites[iid];
+      if (!inv || typeof inv !== 'object' || inv.accountType === 'principal' || inv.role === 'principal') return;
+      const onClass = ids.some(function (c) { return (inv.classIds || {})[c] === true; }) || (inv.claimedUid && teacherUids[inv.claimedUid]);
+      if (!onClass) return;
+      const others = Object.keys(inv.classIds || {}).filter(function (c) { return inv.classIds[c] === true && staysElsewhere(c); });
+      if (others.length) blockT.push({ inviteId: iid, name: String(inv.name || inv.email || iid), classIds: others.sort() });
+      else teachers.push(iid);
+    });
+    const memberOf = {};
+    ids.forEach(function (c) {
+      Object.keys(classes[c].members || {}).forEach(function (sid) {
+        if (validKey(sid) && classes[c].members[sid] && classes[c].members[sid].active !== false) (memberOf[sid] = memberOf[sid] || {})[c] = true;
+      });
+    });
+    const students = [], blockS = [];
+    Object.keys(memberOf).sort().forEach(function (sid) {
+      const rec = (records || {})[sid] || {};
+      const all = {};
+      Object.keys(rec.classIds || {}).forEach(function (c) { if (rec.classIds[c] === true) all[c] = true; });
+      ((memberships || {})[sid] || []).forEach(function (c) { all[c] = true; });
+      const others = Object.keys(all).filter(staysElsewhere);
+      if (others.length) blockS.push({ studentId: sid, classIds: others.sort() }); else students.push(sid);
+    });
+    const out = { ok: !blockT.length && !blockS.length, classIds: ids, blockers: { teachers: blockT, students: blockS }, students: students, teachers: teachers, updates: {} };
+    if (!out.ok) return out;
+    teachers.forEach(function (iid) {
+      const inv = invites[iid], base = 'teacherInvites/' + iid;
+      if (inv.schoolId === toSchoolId) return;
+      out.updates[base + '/schoolId'] = toSchoolId;
+      if (inv.schoolId) out.updates[base + '/nigriLoginResetAt'] = now;
+    });
+    students.forEach(function (sid) {
+      const rec = (records || {})[sid] || {}, base = 'students/' + sid;
+      const keep = {};
+      Object.keys(rec.classIds || {}).forEach(function (c) { if (rec.classIds[c] === true && !staysElsewhere(c)) keep[c] = true; });
+      Object.keys(memberOf[sid]).forEach(function (c) { keep[c] = true; });
+      out.updates[base + '/schoolId'] = toSchoolId;
+      out.updates[base + '/classIds'] = keep;
+      out.updates[base + '/updatedAt'] = now;
+    });
+    ids.forEach(function (c) { out.updates['classes/' + c + '/schoolId'] = toSchoolId; });
+    return out;
+  }
+
   // People and things still in a school (a school cannot be deleted while any remain).
   function countSchoolUse(schoolId, classData, records) {
     let classes = 0, students = 0;
@@ -197,6 +268,7 @@
     planSchoolChange: planSchoolChange,
     planImport: planImport,
     classesWithoutSchool: classesWithoutSchool,
+    planClassMove: planClassMove,
     countSchoolUse: countSchoolUse,
     loadRecords: loadRecords,
     saveSchool: saveSchool,

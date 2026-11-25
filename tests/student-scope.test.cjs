@@ -88,3 +88,67 @@ test('owner panel and sign-in wiring', () => {
   assert.match(home, /choices:studentClassChoices\.slice\(\)\}/);
   assert.match(home, /<div id="classPick"/);
 });
+
+// ---- moving a class brings its people ---------------------------------------
+const moveClasses = () => ({
+  g6: { name: 'G6 CT', schoolId: 'negri', teacherIds: { uT: true }, members: { a: { active: true }, b: { active: true }, gone: { active: false } } },
+  g7: { name: 'G7', schoolId: 'negri', teacherIds: { uT: true }, members: { c: { active: true } } },
+  stay: { name: 'Stays', schoolId: 'negri', teacherIds: { uS: true }, members: { d: { active: true } } }
+});
+const moveInvites = () => ({
+  t1: { name: 'Chani', claimedUid: 'uT', schoolId: 'negri', classIds: { g6: true } },
+  t2: { name: 'Other', claimedUid: 'uS', schoolId: 'negri', classIds: { stay: true } },
+  p1: { name: 'Principal', accountType: 'principal', schoolId: 'negri', classIds: { g6: true } }
+});
+const moveRecords = () => ({ a: { schoolId: 'negri', classIds: { g6: true } }, b: { schoolId: 'negri', classIds: { g6: true } }, c: { schoolId: 'negri', classIds: { g7: true } } });
+
+test('moving a class moves its active students and its teachers, class last, and resets the Nigri login', () => {
+  const p = S.planClassMove('g6', moveClasses(), moveInvites(), moveRecords(), {}, 'girls', 99);
+  assert.equal(p.ok, true);
+  assert.deepEqual(p.students, ['a', 'b']);
+  assert.deepEqual(p.teachers, ['t1']);
+  assert.equal(p.updates['teacherInvites/t1/schoolId'], 'girls');
+  assert.equal(p.updates['teacherInvites/t1/nigriLoginResetAt'], 99);
+  assert.equal(p.updates['students/a/schoolId'], 'girls');
+  assert.deepEqual(p.updates['students/a/classIds'], { g6: true });
+  assert.equal(p.updates['teacherInvites/p1/schoolId'], undefined);
+  assert.equal(p.updates['students/gone/schoolId'], undefined);
+  const keys = Object.keys(p.updates);
+  assert.equal(keys[keys.length - 1], 'classes/g6/schoolId');
+});
+
+test('classes that share a teacher move together; moving only one is blocked and names the other', () => {
+  const inv = moveInvites(); inv.t1.classIds = { g6: true, g7: true };
+  const one = S.planClassMove('g6', moveClasses(), inv, moveRecords(), {}, 'girls', 7);
+  assert.equal(one.ok, false);
+  assert.deepEqual(one.blockers.teachers[0].classIds, ['g7']);
+  const both = S.planClassMove(['g6', 'g7'], moveClasses(), inv, moveRecords(), {}, 'girls', 7);
+  assert.equal(both.ok, true);
+  assert.deepEqual(both.students, ['a', 'b', 'c']);
+  assert.deepEqual(both.teachers, ['t1']);
+  assert.equal(both.updates['classes/g7/schoolId'], 'girls');
+  assert.equal(Object.keys(both.updates).filter(k => k.startsWith('teacherInvites/t1/')).length, 2);
+});
+
+test('a teacher also on a class that stays blocks the move and writes nothing', () => {
+  const classes = moveClasses(); classes.stay.teacherIds.uT = true;
+  const inv = moveInvites(); inv.t1.classIds.stay = true;
+  const p = S.planClassMove('g6', classes, inv, moveRecords(), {}, 'girls', 1);
+  assert.equal(p.ok, false);
+  assert.deepEqual(p.blockers.teachers.map(t => [t.inviteId, t.classIds]), [['t1', ['stay']]]);
+  assert.deepEqual(p.updates, {});
+});
+
+test('a student also in a class that stays (by real membership) blocks the move', () => {
+  const p = S.planClassMove('g6', moveClasses(), moveInvites(), moveRecords(), { a: ['g6', 'stay'] }, 'girls', 1);
+  assert.equal(p.ok, false);
+  assert.deepEqual(p.blockers.students, [{ studentId: 'a', classIds: ['stay'] }]);
+});
+
+test('a student with no owner record gets one, and a class already in the target school adds no reset', () => {
+  const c = moveClasses(); c.g6.schoolId = 'girls';
+  const p = S.planClassMove('g6', c, moveInvites(), {}, {}, 'girls', 5);
+  assert.equal(p.ok, true);
+  assert.deepEqual(p.updates['students/a/classIds'], { g6: true });
+  assert.equal(p.updates['students/a/schoolId'], 'girls');
+});
