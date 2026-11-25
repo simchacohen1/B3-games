@@ -581,6 +581,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
           <button class="tab-btn" id="summaryTabBtn">📊 By Posuk</button>
           <button class="tab-btn" id="reportsTabBtn">🧾 Reports</button>
           <button class="tab-btn" id="chazaraRecordingsTabBtn">🎧 Chazara</button>
+          <button class="tab-btn" id="translationsTabBtn">🎙️ Translations</button>
           <button class="tab-btn tab-right" id="accessTabBtn">🔑 Access</button>
         </div>
         <div id="mainContent"><div class="loading">Loading…</div></div>
@@ -1155,7 +1156,7 @@ async function requestTeacherMilestoneAward(studentId, source, evidencePosukKey)
 
 const TAB_BUTTONS = {
   grade: 'gradeTabBtn', overview: 'overviewTabBtn', student: 'studentTabBtn', roster: 'rosterTabBtn', summary: 'summaryTabBtn',
-  reports: 'reportsTabBtn', chazaraRecordings: 'chazaraRecordingsTabBtn', access: 'accessTabBtn'
+  reports: 'reportsTabBtn', chazaraRecordings: 'chazaraRecordingsTabBtn', translations: 'translationsTabBtn', access: 'accessTabBtn'
 };
 Object.entries(TAB_BUTTONS).forEach(([tab, btnId]) => {
   document.getElementById(btnId).onclick = () => setTab(tab);
@@ -1206,6 +1207,9 @@ function setTab(tab){
   }else if(tab === 'chazaraRecordings'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadChazaraRecordings();
+  }else if(tab === 'translations'){
+    [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
+    loadTranslationsTab();
   }else if(tab === 'access'){
     [...document.querySelectorAll('.student-item')].forEach(e => e.classList.remove('active'));
     loadAccessTab();
@@ -3078,6 +3082,131 @@ async function loadClassPesukimTab(classId){
     console.error(err);
     mainEl.innerHTML='<div class="empty-msg">Could not load this class’s pesukim.</div>';
   }
+}
+
+
+/* ---------- Translation recordings (teacher voice, one per posuk, per class) ----------
+   Stored at posukPractice/translationAudio/<classId>/<sefer>_<perek>_<posuk> so every
+   student in that class hears the same one. Audio is a small data: URL (<~90s, low bitrate). */
+const TR_MAX_SECONDS = 90;
+const trKey = (sefer, perek, posuk) => sefer + '_' + perek + '_' + posuk;
+async function fetchPerekHebrew(sefer, perek){
+  try{
+    const res = await fetch('https://www.sefaria.org/api/texts/' + sefariaBook(sefer) + '.' + perek + '?context=0&pad=0');
+    const data = await res.json();
+    return (data.he || []).map(t => String(Array.isArray(t) ? t.join(' ') : t || '').replace(/<[^>]*>/g, '').replace(/&[a-z]+;/gi, ' ').replace(/[\u0591-\u05AF]/g, '').trim());
+  }catch(_e){ return []; }
+}
+function blobToDataUrl(blob){
+  return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(blob); });
+}
+let trActive = null; // { recorder, stream, timer, posuk }
+function trStopActive(){
+  if(!trActive) return;
+  try{ clearTimeout(trActive.timer); if(trActive.recorder.state !== 'inactive') trActive.recorder.stop(); }catch(_e){}
+}
+
+async function loadTranslationsTab(){
+  const mainEl = document.getElementById('mainContent');
+  const classId = requestedTeacherClass;
+  if(!classId){ mainEl.innerHTML = '<div class="empty-msg">Open this tool from a class first.</div>'; return; }
+  const selectStyle = "padding:8px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;";
+  mainEl.innerHTML = '<h2>🎙️ Translation recordings</h2>' +
+    '<p style="color:var(--ink-soft);margin-top:-4px;">Record your own translation of a posuk. Students in this class who get stuck can tap “Need help? Hear it”. Posukim without a recording show no button.</p>' +
+    '<div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select id="trPerek" style="' + selectStyle + '"></select></div>' +
+    '<div id="trList"><div class="empty-msg">Choose a perek.</div></div>';
+  const perekSel = document.getElementById('trPerek');
+  fillChumashPerekOptions(perekSel);
+  perekSel.onchange = () => renderTranslationList(classId, perekSel.value);
+}
+
+async function renderTranslationList(classId, perekValue){
+  trStopActive();
+  const listEl = document.getElementById('trList');
+  const pk = parseChumashPerek(perekValue);
+  if(!pk){ listEl.innerHTML = '<div class="empty-msg">Choose a perek.</div>'; return; }
+  listEl.innerHTML = '<div class="loading">Loading…</div>';
+  const [range, heb, snap] = await Promise.all([
+    getPerekRange(pk.perek, pk.sefer),
+    fetchPerekHebrew(pk.sefer, pk.perek),
+    db.ref('posukPractice/translationAudio/' + classId).once('value').catch(err => { console.error(err); return null; })
+  ]);
+  if(document.getElementById('trPerek').value !== perekValue) return;
+  const saved = (snap && snap.val()) || {};
+  listEl.innerHTML = '';
+  for(let n = range.min; n <= range.max; n++){
+    const key = trKey(pk.sefer, pk.perek, n);
+    const row = document.createElement('div');
+    row.className = 'tr-row';
+    row.dataset.posuk = String(n);
+    row.style.cssText = 'background:#fff;border:2px solid #eadfc2;border-radius:12px;padding:10px 12px;margin-bottom:8px;';
+    const text = heb[n - 1] || '';
+    row.innerHTML = '<div style="display:flex;gap:10px;align-items:baseline;"><strong>' + n + '</strong><span dir="rtl" lang="he" style="font-size:1.15rem;flex:1;">' + escapeHtml(text) + '</span></div>' +
+      '<div class="tr-controls" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div>';
+    listEl.appendChild(row);
+    renderTranslationControls(row, classId, key, saved[key] || null);
+  }
+}
+
+function renderTranslationControls(row, classId, key, rec){
+  const box = row.querySelector('.tr-controls');
+  box.innerHTML = '';
+  const msg = document.createElement('span');
+  msg.className = 'tr-msg';
+  msg.style.cssText = 'font-size:.85rem;color:var(--ink-soft);';
+  const mk = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'btn small ' + (cls || ''); b.textContent = label; b.onclick = fn; box.appendChild(b); return b; };
+  const ref = db.ref('posukPractice/translationAudio/' + classId + '/' + key);
+
+  async function startRecording(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined'){ msg.textContent = 'Recording is not supported in this browser.'; return; }
+    trStopActive();
+    let stream;
+    try{ stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(_e){ msg.textContent = 'Could not use the microphone — please allow it.'; return; }
+    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t));
+    const recorder = new MediaRecorder(stream, Object.assign({ audioBitsPerSecond: 24000 }, type ? { mimeType: type } : {}));
+    const chunks = [];
+    recorder.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      clearTimeout(trActive && trActive.timer);
+      trActive = null;
+      box.innerHTML = '<span style="font-size:.85rem;">Saving…</span>';
+      try{
+        const blob = new Blob(chunks, { type: (recorder.mimeType || type || 'audio/webm').split(';')[0] });
+        const audio = await blobToDataUrl(blob);
+        if(audio.length >= 890000) throw new Error('too long');
+        const next = { audio, mime: blob.type, updatedAt: firebase.database.ServerValue.TIMESTAMP };
+        await ref.set(next);
+        renderTranslationControls(row, classId, key, next);
+      }catch(err){
+        console.error(err);
+        renderTranslationControls(row, classId, key, rec);
+        row.querySelector('.tr-msg').textContent = err.message === 'too long' ? 'That recording is too long — keep it under ~90 seconds.' : 'Could not save. Please try again.';
+      }
+    };
+    recorder.start();
+    trActive = { recorder, stream, posuk: key, timer: setTimeout(() => { try{ recorder.stop(); }catch(_e){} }, TR_MAX_SECONDS * 1000) };
+    box.innerHTML = '';
+    const stop = mk('⏹ Stop & save', 'gold', () => { try{ recorder.stop(); }catch(_e){} });
+    stop.dataset.role = 'stop';
+    const live = document.createElement('span'); live.textContent = '🔴 Recording…'; live.style.cssText = 'font-weight:700;color:#b00020;'; box.appendChild(live);
+  }
+
+  if(rec && rec.audio){
+    const player = document.createElement('audio');
+    player.controls = true; player.src = rec.audio; player.style.height = '34px';
+    box.appendChild(player);
+    mk('🎙️ Re-record', '', startRecording).dataset.role = 'rerecord';
+    mk('🗑️ Delete', '', async () => {
+      if(!confirm('Delete this translation recording?')) return;
+      try{ await ref.remove(); renderTranslationControls(row, classId, key, null); }
+      catch(err){ console.error(err); msg.textContent = 'Could not delete. Please try again.'; }
+    }).dataset.role = 'delete';
+  }else{
+    mk('🎙️ Record translation', 'gold', startRecording).dataset.role = 'record';
+  }
+  box.appendChild(msg);
 }
 
 async function loadAccessTab(){
