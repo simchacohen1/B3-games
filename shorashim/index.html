@@ -1159,6 +1159,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
+<link rel="stylesheet" href="shorashim-hubs.css?v=20261125-hubs1">
 <style id="shorashim-perek-menu-styles">
   .perek-choice-grid{margin:26px auto 0}
   .perek-choice{min-height:215px;align-items:center;justify-content:center;text-align:center;gap:12px;border:2px solid #c7d2fe}
@@ -1223,40 +1224,28 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
         </div>
 
         <section id="studentHome" class="screen active">
-          <div class="hero-grid">
-            <button class="feature-card review review-main" data-go="reviewScreen">
-              <span class="feature-icon">🔁</span>
-              <strong>Review Shorashim</strong>
-              <span>Review what you learned — and record your Chazara for points!</span>
+          <div class="hub-grid hub-two" aria-label="Main menu">
+            <button type="button" class="hub-card hub-new" data-go="shorashimPerekScreen" data-track="shorashim">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🌱</span><span class="hub-emoji">📖</span></span>
+              <strong>New Shorashim</strong>
+              <span class="hub-sub">Learn new Hebrew words with pictures and practice.</span>
+              <span class="hub-cta">Learn New Words ▶</span>
             </button>
-            <button class="feature-card learn" data-go="shorashimPerekScreen" data-track="shorashim">
-              <span class="feature-icon">✏️</span>
-              <strong>Learn New Shorashim</strong>
-              <span>Learn new roots and make picture clues.</span>
-            </button>
-            <button id="gamesHomeCard" class="feature-card games" data-go="gamesScreen">
-              <span class="feature-icon">🎮</span>
-              <strong>Games</strong>
-              <span id="gamesHomeMessage">Choose a practice game.</span>
-            </button>
-            <button class="feature-card gallery" data-go="galleryScreen">
-              <span class="feature-icon">🖼️</span>
-              <strong>My Card Gallery</strong>
-              <span>See the cards you created.</span>
-            </button>
-            <button class="feature-card affix" data-go="affixHomeScreen">
-              <span class="feature-icon">🧩</span>
-              <strong>Learn Prefixes & Suffixes</strong>
-              <span>Learn prefixes and suffixes with examples.</span>
+            <button type="button" class="hub-card hub-review" data-go="reviewHubScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span><span class="hub-emoji">🎮</span></span>
+              <strong>Review</strong>
+              <span class="hub-sub">Practice what you learned, record Chazara, or play games.</span>
+              <span class="hub-cta">Start Reviewing ▶</span>
             </button>
           </div>
-          <div class="stats-grid" id="studentStats"></div>
+          <!-- Kept (hidden) so existing code that fills it keeps working. -->
+          <div class="stats-grid hidden" id="studentStats" aria-hidden="true"></div>
         </section>
 
         <section id="shorashimPerekScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Learn new Shorashim</div><h2>Choose a Shorashim List</h2></div>
+            <div><div class="eyebrow">New Shorashim</div><h2>Choose a List</h2></div>
           </div>
           <div class="hero-grid two perek-choice-grid" aria-label="Choose Shorashim Perek">
             <!-- Filled from this class's own words: any perek, any list, any label the teacher chooses. -->
@@ -1268,12 +1257,25 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <span class="perek-progress">180 words</span>
             </button>
           </div>
-          <p class="perek-choice-hint">Choose a list. No words need to be learned in order.</p>
+          <p class="perek-choice-hint">Choose a list. You can learn the words in any order.</p>
+          <h3 class="hub-subhead">More ways to learn</h3>
+          <div class="hub-grid hub-two hub-small">
+            <button type="button" class="hub-card hub-cards" data-go="galleryScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🖼️</span></span>
+              <strong>My Cards</strong>
+              <span class="hub-sub">See and fix the cards you made.</span>
+            </button>
+            <button type="button" class="hub-card hub-affix" data-go="affixHomeScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🧩</span></span>
+              <strong>Learn Prefixes &amp; Suffixes</strong>
+              <span class="hub-sub">Small word parts, with examples.</span>
+            </button>
+          </div>
         </section>
 
         <section id="affixHomeScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
+            <button class="backBtn backStep ghost" data-back="shorashimPerekScreen">← Back</button><button class="backBtn ghost">← Home</button>
             <div><div class="eyebrow">Prefixes & suffixes</div><h2>Choose What to Learn</h2></div>
           </div>
           <div class="hero-grid two">
@@ -1288,7 +1290,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
         <section id="learnScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
+            <button class="backBtn backStep ghost" data-back="auto-learn">← Back</button><button class="backBtn ghost">← Home</button>
             <div>
               <div class="eyebrow">Learn and customize</div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
@@ -1444,13 +1446,46 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           </div>
         </section>
 
-        <section id="reviewScreen" class="screen">
+        <section id="reviewHubScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
+            <div><div class="eyebrow">Review</div><h2>How do you want to review?</h2></div>
+          </div>
+          <div class="hub-grid hub-two" aria-label="Review choices">
+            <button type="button" class="hub-card hub-record" data-review-mode="regular">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎙️</span></span>
+              <strong>Record Chazara</strong>
+              <span class="hub-sub">Pictures allowed</span>
+              <span class="hub-pts">2 points</span>
+            </button>
+            <button type="button" class="hub-card hub-nohints" data-review-mode="no-hints">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🏆</span></span>
+              <strong>No Hints Challenge</strong>
+              <span class="hub-sub">No pictures or drawings</span>
+              <span class="hub-pts">3 points</span>
+            </button>
+            <button type="button" class="hub-card hub-practice" data-review-mode="practice">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🔁</span></span>
+              <strong>Practice Only</strong>
+              <span class="hub-sub">No recording</span>
+              <span class="hub-pts none">No points</span>
+            </button>
+            <button type="button" class="hub-card hub-games" id="gamesHomeCard" data-go="gamesScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎮</span></span>
+              <strong>Games</strong>
+              <span class="hub-sub" id="gamesHomeMessage">Choose a practice game.</span>
+            </button>
+          </div>
+        </section>
+
+        <section id="reviewScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
             <div><div class="eyebrow">Daily Chazara</div><h2>Review Shorashim</h2></div>
             <div id="dailyReviewBadge" class="session-status"></div>
           </div>
 
+          <div id="reviewModeBanner" class="review-mode-banner" aria-live="polite"></div>
           <div class="review-choice-panel">
             <div class="review-choice-title">Choose how you want to review:</div>
             <div class="review-choice-grid">
@@ -1525,7 +1560,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
         <section id="gamesScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
+            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
             <div><div class="eyebrow">Play whenever you like</div><h2>Practice Games</h2></div>
           </div>
           <div id="gamesLockedPanel" class="card-panel center-panel hidden">
@@ -1545,7 +1580,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
         </section>
 
         <section id="galleryScreen" class="screen">
-          <div class="section-head"><button class="backBtn ghost">← Home</button><div><div class="eyebrow">Student creations</div><h2>My Card Gallery</h2></div></div>
+          <div class="section-head"><button class="backBtn backStep ghost" data-back="shorashimPerekScreen">← Back</button><button class="backBtn ghost">← Home</button><div><div class="eyebrow">Student creations</div><h2>My Card Gallery</h2></div></div>
           <div id="galleryGrid" class="gallery-grid"></div>
         </section>
       </section>
@@ -1610,7 +1645,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="../firebase-config.js?v=20261029-staging-config"></script>
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
   <script src="units.js?v=20261108-units-2"></script>
-  <script src="app.js?v=20261113-cost51"></script>
+  <script src="app.js?v=20261125-hubs1"></script>
   <script src="review-categories.js?v=20261106-units-1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>

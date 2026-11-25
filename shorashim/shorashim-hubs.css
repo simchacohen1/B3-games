@@ -1,0 +1,49 @@
+/* Shorashim simplified menus (home, New Shorashim, Review).
+ * Look-and-feel only; all behaviour stays in app.js. */
+.hub-grid{display:grid;gap:22px;margin:8px auto 0;max-width:1100px}
+.hub-grid.hub-two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hub-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;
+  min-height:300px;padding:28px 24px;border-radius:32px;border:4px solid #fff;cursor:pointer;
+  font-family:inherit;color:#14295c;box-shadow:0 14px 34px #1d3a7a22,inset 0 -6px 0 #0000000d;transition:transform .15s,box-shadow .15s}
+.hub-card:hover,.hub-card:focus-visible{transform:translateY(-4px) scale(1.01);box-shadow:0 20px 40px #1d3a7a33,inset 0 -6px 0 #0000000d}
+.hub-card:active{transform:translateY(1px)}
+.hub-card strong{font-size:clamp(28px,3.2vw,40px);line-height:1.1;font-weight:900}
+.hub-sub{font-size:clamp(17px,1.5vw,21px);font-weight:700;color:#3b4a73;max-width:30ch}
+.hub-art{display:flex;align-items:flex-end;justify-content:center;gap:10px;min-height:110px}
+.hub-emoji{font-size:64px;line-height:1;filter:drop-shadow(0 4px 4px #0002)}
+.hub-emoji.big{font-size:104px}
+.hub-cta{margin-top:6px;padding:14px 34px;border-radius:999px;background:#1f5fd6;color:#fff;font-size:24px;font-weight:900;box-shadow:0 5px 0 #153f93}
+.hub-review .hub-cta{background:#7a4fe0;box-shadow:0 5px 0 #53309f}
+.hub-pts{margin-top:4px;padding:8px 22px;border-radius:999px;background:#fff;font-size:22px;font-weight:900;color:#0b7a3e;box-shadow:0 3px 0 #0002}
+.hub-pts.none{color:#6b7280}
+.hub-new{background:linear-gradient(160deg,#dff1ff,#eaf8ff 55%,#fff)}
+.hub-review{background:linear-gradient(160deg,#ebe4ff,#f6f1ff 55%,#fff)}
+.hub-record{background:linear-gradient(160deg,#dbf7e1,#f3fff5)}
+.hub-nohints{background:linear-gradient(160deg,#ffe7c4,#fff6e6)}
+.hub-practice{background:linear-gradient(160deg,#dbeaff,#f2f7ff)}
+.hub-games{background:linear-gradient(160deg,#eadcff,#f8f3ff)}
+.hub-cards{background:linear-gradient(160deg,#ffe3ee,#fff5f9)}
+.hub-affix{background:linear-gradient(160deg,#d9f6f0,#f2fffc)}
+.hub-small .hub-card{min-height:190px;padding:18px}
+.hub-small .hub-emoji{font-size:48px}
+.hub-small .hub-art{min-height:60px}
+.hub-small .hub-card strong{font-size:clamp(22px,2.4vw,30px)}
+.hub-subhead{margin:34px auto 12px;max-width:1100px;font-size:24px;font-weight:900;color:#14295c}
+#reviewHubScreen .hub-card{min-height:210px;padding:18px}
+#reviewHubScreen .hub-art{min-height:80px}
+
+/* Review screen: when opened from the Review menu, the mode is already chosen. */
+.review-mode-banner{display:none}
+body.sh-hub-review .review-mode-banner{display:block;margin:0 0 14px;padding:14px 20px;border-radius:20px;background:#fff;
+  border:3px solid #cdbbff;font-size:22px;font-weight:900;color:#14295c;text-align:center}
+body.sh-hub-review .review-choice-title,body.sh-hub-review .review-choice-grid{display:none}
+
+/* Clear Back / Home pair */
+.backBtn.backStep{background:#fff !important;color:#14295c !important;border:3px solid #cfe0ff !important}
+.section-head .backBtn{font-size:18px;padding:12px 20px}
+
+/* Perek list buttons on the New Shorashim screen: bigger */
+#shorashimPerekScreen .perek-choice{min-height:190px}
+#shorashimPerekScreen .perek-choice strong{font-size:28px}
+
+@media(max-width:760px){.hub-grid.hub-two{grid-template-columns:1fr}.hub-card{min-height:220px}.hub-emoji.big{font-size:80px}}
