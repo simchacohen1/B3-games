@@ -50,9 +50,13 @@ function allowedGain(record, nowMs) {
 //   store.get(path)     -> value
 //   award({requestId, level, name, day}) -> {ok, newlyAwarded?, amount?}   (pays 1 point, idempotent by requestId)
 // reportedSeconds === null only reads today's state.
-async function report({ store, award, studentId, reportedSeconds = null, nowMs = Date.now() }) {
+async function report({ store, award, studentId, reportedSeconds = null, nowMs = Date.now(), enabled = true }) {
   if (!studentId) return { ok: false, status: 400, error: 'Missing student.' };
   const day = nyDay(nowMs);
+  // The owner's off-switch (studentRewards/settings/chayusPointsEnabled = false): nothing is recorded or paid.
+  if (enabled === false) {
+    return { ok: true, paused: true, day, countedSeconds: 0, level: 0, points: 0, maxPoints: MAX_POINTS_PER_DAY, newlyAwarded: [], acceptedGainSeconds: 0 };
+  }
   const path = `${SR}/chayusDaily/${safeId(studentId)}/${day}`;
   const reporting = reportedSeconds !== null && reportedSeconds !== undefined;
   const claimed = reporting ? Number(reportedSeconds) : 0;

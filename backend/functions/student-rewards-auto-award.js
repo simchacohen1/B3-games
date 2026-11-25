@@ -1253,8 +1253,10 @@ async function chayusMeter(req,res,body,action){
   if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
   const rewardStudentId=await chayusRewardStudentId(practice.studentId);
   if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
+  // Quick off-switch: set studentRewards/settings/chayusPointsEnabled to false in the database to stop all Chayus points.
+  const enabled=(await rtdb.ref(`${SR_ROOT}/settings/chayusPointsEnabled`).get()).val()!==false;
   const result=await chayusPoints.report({
-    store:chayusStore,studentId:practice.studentId,
+    enabled,store:chayusStore,studentId:practice.studentId,
     reportedSeconds:action==='chayus-report'?body.countedSeconds:null,
     award:({requestId,level,name,day})=>awardMilestoneImmediately({
       requestId,rewardStudentId,studentId:practice.studentId,source:chayusPoints.SOURCE,amount:1,

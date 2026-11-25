@@ -183,3 +183,25 @@ test('the server routes both Chayus actions through the student check, in live a
   const b = fs.readFileSync(path.join(__dirname, '..', 'backend', 'functions-staging', 'chayus-points-core.cjs'), 'utf8').replace(/\r\n/g, '\n');
   assert.equal(a, b, 'live and staging copies of chayus-points-core.cjs must match');
 });
+
+test('the owner off-switch pauses everything: nothing is recorded or paid, and the page is told', async () => {
+  const store = memoryStore(), paid = [];
+  const r = await core.report({ store, award: awarder(paid), studentId: 's1', reportedSeconds: 600, nowMs: T0 + 60 * S, enabled: false });
+  assert.equal(r.ok, true);
+  assert.equal(r.paused, true);
+  assert.equal(r.points, 0);
+  assert.equal(paid.length, 0);
+  assert.deepEqual(Object.keys(store.data), []);
+  // Turned back on, it works as before.
+  const on = await core.report({ store, award: awarder(paid), studentId: 's1', reportedSeconds: 100, nowMs: T0 + 90 * S, enabled: true });
+  assert.equal(on.paused, undefined);
+  assert.equal(on.points, 1);
+});
+
+test('both server copies read the off-switch setting before doing anything', () => {
+  for (const dir of ['functions', 'functions-staging']) {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'backend', dir, 'student-rewards-auto-award.js'), 'utf8');
+    assert.match(src, /settings\/chayusPointsEnabled/);
+    assert.match(src, /\)\.val\(\)!==false/);
+  }
+});

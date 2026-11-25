@@ -134,7 +134,8 @@
     const info = window.ChayusMeter.levelInfo(totalSeconds());
     const earned = server && Number.isFinite(server.points) ? server.points : null;
     levelName.textContent = info.level ? 'Level ' + info.level + ' · ' + info.name : 'Level 0 · ' + info.name;
-    levelPoints.textContent = signedOut ? 'Sign in from the home page to save your points'
+    levelPoints.textContent = server && server.paused ? 'Points are paused right now'
+      : signedOut ? 'Sign in from the home page to save your points'
       : earned === null ? info.level + ' / ' + info.maxLevel + ' levels today'
       : earned + ' / ' + info.maxLevel + ' points today';
     levelFill.style.width = Math.round(info.progressToNext * 100) + '%';
@@ -174,7 +175,7 @@
       const result = await points.report(seconds);
       if (result && result.ok) {
         lastReported = seconds; server = result;
-        if (meter) meter.adoptCountedSeconds(result.countedSeconds);
+        if (meter && !result.paused) meter.adoptCountedSeconds(result.countedSeconds);
       } else if (result && result.signedOut) {
         signedOut = true;
       }
@@ -185,7 +186,7 @@
     const result = await points.status();
     if (result && result.ok) {
       server = result;
-      if (meter) meter.adoptCountedSeconds(result.countedSeconds);
+      if (meter && !result.paused) meter.adoptCountedSeconds(result.countedSeconds);
     } else if (result && result.signedOut) signedOut = true;
     paintLevel();
   }
@@ -333,7 +334,8 @@
         paintMeter('on');
         paintLevel();
         const reached = meter.consumeLevelUp();
-        if (reached) { celebrate(reached); reportNow(true); }
+        if (reached && server && server.paused) { reportNow(true); }
+        else if (reached) { celebrate(reached); reportNow(true); }
         else if (message) showFeedback(message);
       }, 200);
       status.textContent = continued
