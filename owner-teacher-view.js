@@ -1,21 +1,20 @@
-/* Owner as a teacher (#726).
+/* Owner as a teacher (#726, reworked).
  *
- * The site owner also teaches classes. The owner's Google account always has
- * full owner access; that is decided elsewhere (database rules, the Firebase
- * functions and site-settings.js) and nothing here changes it.
+ * The site owner also teaches classes. There is no longer a switch between
+ * "Owner Admin" and "Teacher view": the owner signs in once, lands on their own
+ * Teacher Home, and every admin tool is in the owner-only sidebar there.
  *
- * "Teacher view" only NARROWS what the owner's own browser shows: while it is
- * on, pages treat the owner like a teacher of the classes the owner assigned
- * to their own email in Owner Admin (the ordinary teacher invitation at
- * b3Games/workspaces/<ws>/teacherInvites/<email key>). It can never widen
- * anyone's access:
- *   - it applies to the owner's verified Google email only;
- *   - the result is always role "teacher" with a subset of classes;
- *   - any doubt (no invitation, no class, a failed read) falls back to the
- *     normal owner view.
- * The choice is remembered per browser, so no sign-out is needed to switch.
+ * The owner's Google account always has full owner access on every page; that
+ * is decided elsewhere (database rules, the Firebase functions and
+ * site-settings.js) and nothing here widens or narrows it.
  *
- * Shared by site-settings.js, Owner Admin, the Homework teacher page and Node tests.
+ * This file only answers "which classes does the owner teach?": the ordinary
+ * teacher invitation for the owner's own email
+ * (b3Games/workspaces/<ws>/teacherInvites/<email key>). Teacher Home shows those
+ * classes. Any doubt (no invitation, no class, a failed read) means "none".
+ *
+ * Shared by site-settings.js, Teacher Home, Owner Admin, the Homework teacher
+ * page and Node tests.
  */
 (function (root) {
   'use strict';
@@ -31,18 +30,15 @@
     return Boolean(user && user.emailVerified === true && lower(user.email) === OWNER_EMAIL);
   }
 
+  // The old per-browser "Teacher view" choice no longer exists. The mode is always
+  // "owner" (full access); setMode only clears a leftover value from older visits.
   function storage() {
     try { return root.localStorage || null; } catch (e) { return null; }
   }
-  function getMode(store) {
-    try { return (store || storage()).getItem(MODE_KEY) === 'teacher' ? 'teacher' : 'owner'; } catch (e) { return 'owner'; }
-  }
+  function getMode() { return 'owner'; }
   function setMode(mode, store) {
-    try {
-      const s = store || storage();
-      if (mode === 'teacher') s.setItem(MODE_KEY, 'teacher'); else s.removeItem(MODE_KEY);
-    } catch (e) {}
-    return getMode(store);
+    try { (store || storage()).removeItem(MODE_KEY); } catch (e) {}
+    return 'owner';
   }
 
   // The classes the owner teaches: an active, ordinary teacher invitation for
@@ -73,11 +69,8 @@
     } catch (e) { return none; }
   }
 
-  // The access Teacher view gives right now, or null to keep the normal owner view.
-  async function resolve(db, workspaceId, user, store) {
-    if (getMode(store) !== 'teacher') return null;
-    return (await readTeaching(db, workspaceId, user)).access;
-  }
+  // Retained for older callers: nobody is narrowed any more, so this is always null.
+  async function resolve() { return null; }
 
   // Keep only the owner's own classes. `list` holds class ids or {id} rows.
   function narrow(list, classIds) {
@@ -92,75 +85,8 @@
     return Object.assign({}, data, { groups, unread });
   }
 
-  const SITE_BASE = (function () {
-    try { return new URL('.', root.document.currentScript.src).href; } catch (e) { return ''; }
-  })();
-  function go(mode, page, base) {
-    setMode(mode);
-    // Owner Admin can sit inside admin.html; switch the whole tab, not the frame.
-    let target = root;
-    try { if (root.top && root.top.location.origin === root.location.origin) target = root.top; } catch (e) {}
-    target.location.href = (base || SITE_BASE) + page;
-  }
-  function toOwnerAdmin(base) { go('owner', 'owner-admin.html', base); }
-  function toTeacherView(base) { go('teacher', 'teacher-home.html', base); }
-
-  // Small always-visible reminder, with the way back, on every page in Teacher view.
-  function mountBanner(base) {
-    const doc = root.document;
-    if (!doc || !doc.body || root.self !== root.top || doc.getElementById('b3OwnerTeacherView')) return;
-    const bar = doc.createElement('div');
-    bar.id = 'b3OwnerTeacherView';
-    bar.setAttribute('role', 'status');
-    bar.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483000;display:flex;align-items:center;gap:10px;' +
-      'background:#172033;color:#fff;border-radius:999px;padding:8px 10px 8px 16px;font:700 15px/1.2 system-ui,sans-serif;' +
-      'box-shadow:0 6px 20px rgba(0,0,0,.3)';
-    const label = doc.createElement('span');
-    label.textContent = '👨‍🏫 Teacher view: your own classes';
-    const button = doc.createElement('button');
-    button.type = 'button';
-    button.textContent = 'Owner Admin';
-    button.style.cssText = 'border:0;border-radius:999px;padding:8px 14px;background:#fff;color:#172033;font:inherit;cursor:pointer';
-    button.onclick = function () { toOwnerAdmin(base); };
-    bar.append(label, button);
-    doc.body.append(bar);
-  }
-  function unmountBanner() {
-    const bar = root.document && root.document.getElementById('b3OwnerTeacherView');
-    if (bar) bar.remove();
-  }
-
-  // The way INTO Teacher view on the pages the owner lands on (home page and Admin),
-  // so the switch is not only inside Owner Admin (#726 follow-up). Owner mode only,
-  // the verified owner only, and one small read of the owner's own invitation.
-  // With no class assigned yet it leads to Owner Admin, where the setup is explained.
-  let switchPending = false;
-  async function mountSwitch(db, workspaceId, user, base) {
-    const doc = root.document;
-    if (!doc || !doc.body || root.self !== root.top || !isOwnerUser(user) || getMode() !== 'owner') return;
-    if (switchPending || doc.getElementById('b3OwnerTeacherSwitch')) return;
-    switchPending = true;
-    let teaches = false;
-    try { teaches = (await readTeaching(db, workspaceId, user)).classIds.length > 0; } finally { switchPending = false; }
-    if (doc.getElementById('b3OwnerTeacherSwitch') || getMode() !== 'owner') return;
-    const button = doc.createElement('button');
-    button.id = 'b3OwnerTeacherSwitch';
-    button.type = 'button';
-    button.textContent = teaches ? '👨‍🏫 Switch to Teacher view' : '👨‍🏫 Set up Teacher view';
-    button.title = teaches ? 'Show only the classes you teach. You stay signed in.'
-      : 'Add your own email as a teacher in Owner Admin and assign your classes.';
-    button.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483000;border:0;border-radius:999px;padding:12px 18px;' +
-      'background:#2563eb;color:#fff;font:700 15px/1.2 system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)';
-    button.onclick = function () { if (teaches) toTeacherView(base); else toOwnerAdmin(base); };
-    doc.body.append(button);
-  }
-  function unmountSwitch() {
-    const button = root.document && root.document.getElementById('b3OwnerTeacherSwitch');
-    if (button) button.remove();
-  }
-
   const api = { OWNER_EMAIL, MODE_KEY, inviteKey, isOwnerUser, getMode, setMode, teachingClassIds, teacherAccess,
-    readTeaching, resolve, narrow, narrowInbox, toOwnerAdmin, toTeacherView, mountBanner, unmountBanner, mountSwitch, unmountSwitch };
+    readTeaching, resolve, narrow, narrowInbox };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.B3OwnerTeacherView = api;
 })(typeof window === 'undefined' ? globalThis : window);

@@ -512,55 +512,12 @@
     localStorage.setItem(LOCAL_FALLBACK_KEY, JSON.stringify(normalizeSettings(settings)));
   }
 
-  // Owner as a teacher (#726). The owner also teaches classes. Owner mode is
-  // the default and is unchanged. Only when the owner switched this browser to
-  // "Teacher view" is the owner's access NARROWED to the classes assigned to
-  // the owner's own email in Owner Admin (see owner-teacher-view.js). Any
-  // doubt (no classes, a failed load or read) keeps the normal owner access.
-  // This never applies to another account and never adds access.
-  function ownerTeacherViewWanted() {
-    try { return localStorage.getItem("b3OwnerViewMode") === "teacher"; } catch (e) { return false; }
-  }
-  function loadOwnerTeacherView() {
-    if (window.B3OwnerTeacherView) return Promise.resolve(window.B3OwnerTeacherView);
-    return new Promise(function (resolve, reject) {
-      const tag = document.createElement("script");
-      tag.src = SITE_BASE + "owner-teacher-view.js?v=20261110-switch";
-      tag.onload = function () { if (window.B3OwnerTeacherView) resolve(window.B3OwnerTeacherView); else reject(new Error("Teacher view is unavailable.")); };
-      tag.onerror = function () { reject(new Error("Teacher view could not load.")); };
-      document.head.appendChild(tag);
-    });
-  }
-  function readOwnerAccess(services, user) {
-    const full = { authorized:true, role:"admin", classIds:["*"] };
-    if (!ownerTeacherViewWanted()) return Promise.resolve(full);
-    return loadOwnerTeacherView().then(function (view) {
-      return view.resolve(services.db, WORKSPACE_ID, user);
-    }).then(function (teaching) { return teaching || full; }).catch(function () { return full; });
-  }
-  // The "Teacher view" reminder with the way back to Owner Admin, and, in owner
-  // mode on the owner's home page, the switch into Teacher view.
-  function isOwnerHomePage() {
-    try {
-      const base = new URL(SITE_BASE), current = new URL(location.href);
-      if (current.origin !== base.origin || current.pathname.indexOf(base.pathname) !== 0) return false;
-      const path = current.pathname.slice(base.pathname.length);
-      return path === "" || path === "index.html";
-    } catch (e) { return false; }
-  }
-  function showOwnerTeacherView(access, user) {
-    if (!document.body) { document.addEventListener("DOMContentLoaded", function () { showOwnerTeacherView(access, user); }, { once:true }); return; }
-    const acting = getActingStudent(), view = window.B3OwnerTeacherView;
-    if (view) {
-      if (access && access.ownerTeacherView === true && !acting) view.mountBanner(SITE_BASE); else view.unmountBanner();
-    }
-    const offerSwitch = !acting && window.top === window && isBootstrapAdmin(user) && access && access.role === "admin" && isOwnerHomePage();
-    if (!offerSwitch) { if (view && view.unmountSwitch) view.unmountSwitch(); return; }
-    const services = ensureFirebase();
-    if (!services || !services.db) return;
-    loadOwnerTeacherView().then(function (loaded) {
-      if (loaded.mountSwitch) return loaded.mountSwitch(services.db, WORKSPACE_ID, user, SITE_BASE);
-    }).catch(function () {});
+  // The owner always has full owner access on every page, so Weekly Quiz,
+  // Class Access and every other tool open with the one Google sign-in and never
+  // ask for a second one. Teacher Home shows the owner's own classes
+  // (owner-teacher-view.js) and holds the owner-only admin sidebar.
+  function readOwnerAccess() {
+    return Promise.resolve({ authorized:true, role:"admin", classIds:["*"] });
   }
 
   let currentAccess = { authorized: false, role: "", classIds: [] };
@@ -1213,7 +1170,6 @@
         try { if (await restoreTeacher(services)) return; }
         catch (error) { console.warn("Could not restore teacher sign-in:", error); }
         currentAccess = { authorized:false, role:"", classIds:[] };
-        if (window.B3OwnerTeacherView && window.B3OwnerTeacherView.unmountSwitch) window.B3OwnerTeacherView.unmountSwitch();
         setSignedInHint(false);
         callback(null, false, currentAccess);
         endAuthChecking();
@@ -1233,7 +1189,6 @@
         currentAccess = access;
         if(document.readyState === "loading") document.addEventListener("DOMContentLoaded",()=>showToolVersions(access),{once:true});
         else showToolVersions(access);
-        showOwnerTeacherView(access, user);
         setSignedInHint(access.authorized);
         if (access.authorized) rememberTeacher(user);
         callback(user, access.authorized, access);

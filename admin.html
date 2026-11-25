@@ -122,11 +122,8 @@ backToTools.addEventListener("click",e=>{
   e.preventDefault();
   try{
     const access=frame.contentWindow?.B3SiteSettings?.getCurrentAccess?.()||{};
-    // The owner keeps the existing B3 home. A regular teacher should never
-    // land on the owner's B3 dashboard; keep them in their scoped Teacher Center
-    // until the generic teacher home is available.
-    if(access.role==="admin") location.href="index.html";
-    else location.href="teacher-home.html";
+    // Everyone, owner included, goes back to their own Teacher Home.
+    location.href="teacher-home.html";
   }catch(err){location.href="teacher-home.html";}
 });
 
@@ -356,8 +353,6 @@ function applyRoleView(){
     const w=frame.contentWindow,d=frame.contentDocument;
     const access=w?.B3SiteSettings?.getCurrentAccess?.()||{};
     const owner=access.role==="admin";
-    // Owner as a teacher (#726): offer the switch into Teacher view here too. Owner email only.
-    if(owner&&window.B3OwnerTeacherView)B3OwnerTeacherView.mountSwitch(w.firebase.database(),w.B3SiteSettings.workspaceId||"b3-2026",w.firebase.auth().currentUser);
     document.getElementById('viewAsTeacher').style.display=owner?'':'none';
     document.getElementById('activitiesNav').style.display=owner?'':'none';
     document.getElementById('administrationNav').style.display=owner?'':'none';

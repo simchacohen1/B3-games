@@ -58,6 +58,7 @@
 .teacher-tools-section{max-width:1130px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261020-demo-student"></script>
+<script src="owner-teacher-view.js?v=20261120-owner-home"></script><script src="owner-sidebar.js?v=20261120-owner-home"></script>
 <script src="shared/home-tool-registry.js?v=20261120-shared-tiles"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
@@ -83,7 +84,7 @@ R.teacherTools.forEach(t=>{if(t.grant&&t.audiences.includes('teacher')&&!TOOLS[t
 TOOLS['class-gallery']=TOOLS['class-gallery']||TOOLS.gallery;
 function esc(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
 const previewParams=new URLSearchParams(location.search),previewTeacherId=previewParams.get('previewTeacher');
-let renderGeneration=0,previewActive=false;
+let renderGeneration=0,previewActive=false,ownerHome=false;
 function previewHref(tool,classId){const p=new URLSearchParams({previewTeacher:previewTeacherId,previewType:previewParams.get('previewType')||'teacher',class:classId,tool});return 'teacher-preview-tool.html?'+p.toString();}
 function showTeacherSignIn(message){
  q('app').classList.add('hidden');q('gate').classList.remove('hidden');
@@ -117,6 +118,7 @@ function setupTopBar(ids,snaps,access){
 }
 async function render(user,access){
  const generation=++renderGeneration;
+ ownerHome=false;
  if(previewTeacherId){
    q('signOut').classList.add('hidden');
    if(!access?.authorized||access.role!=='admin'){q('app').classList.add('hidden');q('gate').classList.remove('hidden');q('gate').textContent='Only the owner can preview another teacher.';return;}
@@ -131,10 +133,18 @@ async function render(user,access){
  if(access?.actingAsStudent){q("app").classList.add("hidden");q("gate").classList.remove("hidden");q("gate").textContent="You are viewing Fun Torah Tools as "+access.actingAsStudent.name+". Press “Exit student view” at the bottom to return to your teacher account.";return}
  if(!access?.authorized){showTeacherSignIn(user?'This Google account is not assigned as a Fun Torah Tools teacher. Choose your authorized account.':'');return}
  if(access.role==="admin"){
-   if(previewParams.get('manageStudentTools')!=='1'){location.replace("index.html");return}
-   const allClasses=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
-   if(generation!==renderGeneration)return;
-   access={...access,classIds:Object.keys(allClasses).filter(id=>allClasses[id]&&allClasses[id].active!==false)};
+   if(previewParams.get('manageStudentTools')==='1'){
+     const allClasses=(await db.ref("b3Games/workspaces/"+WS+"/classes").once("value")).val()||{};
+     if(generation!==renderGeneration)return;
+     access={...access,classIds:Object.keys(allClasses).filter(id=>allClasses[id]&&allClasses[id].active!==false)};
+   }else if(window.B3OwnerTeacherView&&B3OwnerTeacherView.isOwnerUser(user)){
+     // The owner lands here after signing in: their own classes, plus the admin sidebar.
+     // Access stays full owner access; this only decides which classes are drawn.
+     const teaching=await B3OwnerTeacherView.readTeaching(db,WS,user);
+     if(generation!==renderGeneration)return;
+     ownerHome=true;
+     access={...access,classIds:teaching.classIds};
+   }else{location.replace("index.html");return}
  }
  const principal=access.accountType==="principal"&&!previewActive;
  q("homeTitle").textContent=principal?"Principal Center":"Fun Torah Tools";
@@ -142,6 +152,7 @@ async function render(user,access){
  const supervised=principal?Object.values(access.supervisedTeachers||{}):[];
  q("principalSummary").innerHTML=principal?'<p><b>Supervised teachers:</b> '+(supervised.map(t=>esc(t.name)).join(", ")||"No teachers assigned")+'</p><p class="sub" style="color:#64748b">You have teacher-level access to your supervised classes. Adding staff and changing platform-wide settings remain owner-only.</p>':"";
  q("gate").classList.add("hidden");q("app").classList.remove("hidden");q("signOut").classList.remove("hidden");q("who").textContent=user?.email||"Teacher";
+ if(ownerHome&&window.B3OwnerSidebar)B3OwnerSidebar.mount({user,registry:R,classId:(access.classIds||[])[0]||""});else if(window.B3OwnerSidebar)B3OwnerSidebar.unmount();
  if(access.claimPending){const pending=document.createElement("p");pending.textContent="Your invitation is recognized. The owner still needs to deploy teacher account linking before class changes can be saved.";q("who").parentElement.appendChild(pending);}
  const ids=access.classIds||[],snaps=await Promise.all(ids.map(id=>db.ref("b3Games/workspaces/"+WS+"/classes/"+id).once("value"))),siteSettings=access.role!=="admin"&&ids.some(id=>id==="et"||id==="wt")?(await db.ref("b3Games/siteSettings").once("value")).val()||{}:{};
  if(generation!==renderGeneration)return;
@@ -156,7 +167,7 @@ async function render(user,access){
  const teacherCards=R.renderTeacherTools({audience:"teacher",classId:id,isOn,preview:previewActive,previewHref:tool=>previewHref(tool,id)});
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
  return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
- }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
+ }).join("")||(ownerHome?'<div class="gate">You have no classes of your own yet. Open Owner Admin in the sidebar, add your own email as a teacher and give yourself a class. Every admin tool is in the sidebar.</div>':'<div class="gate">No classes are assigned to this teacher yet.</div>');
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  setupTopBar(ids,snaps,access);
  if(previewActive){

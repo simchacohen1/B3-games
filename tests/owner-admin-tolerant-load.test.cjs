@@ -2,7 +2,7 @@ const test = require('node:test'), assert = require('node:assert/strict'), fs = 
 const html = fs.readFileSync(path.join(__dirname, '..', 'owner-admin.html'), 'utf8');
 
 test('Owner Admin still shows teachers and classes when schools, principal links or the student directory cannot be read', () => {
-  const load = html.slice(html.indexOf('async function load(){'), html.indexOf('// Owner as a teacher (#726)'));
+  const load = html.slice(html.indexOf('async function load(){'), html.indexOf('q("addTeacher").onclick'));
   // Teachers and classes stay required; the three extras are each guarded so one denied read cannot empty the page.
   // Classes are read one at a time (IDs from teacher invitations and remembered ones): the rules do not allow reading the whole node.
   assert.match(load, /teacherData=ts\.val\(\)\|\|\{\};/);

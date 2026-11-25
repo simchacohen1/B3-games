@@ -424,7 +424,7 @@ auth.onAuthStateChanged(async function(u){
     var classes=Array.isArray(result.classes)?result.classes:[];
     var teaching=window.B3OwnerTeacherView?await window.B3OwnerTeacherView.resolve(firebase.database(),WS,u):null;
     ownClassIds=teaching?teaching.classIds:null;
-    if(ownClassIds){classes=window.B3OwnerTeacherView.narrow(classes,ownClassIds);window.B3OwnerTeacherView.mountBanner()}
+    if(ownClassIds){classes=window.B3OwnerTeacherView.narrow(classes,ownClassIds)}
     var ids=classes.map(function(c){return c.id});
     if(!classes.length){$('signin').style.display='';$('app').style.display='none';say($('signinMsg'),'No authorized homework classes are assigned to this Google account.');return}
     $('cls').replaceChildren();

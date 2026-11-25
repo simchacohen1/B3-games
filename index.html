@@ -2692,6 +2692,13 @@ document.addEventListener("DOMContentLoaded",function(){
     if(isAuthorizedTeacher&&isGuest())window.B3Guest.stop();
     try{if(authorized)sessionStorage.setItem("b3TeacherBypass","1");else sessionStorage.removeItem("b3TeacherBypass");}catch(e){}
     testLinkAuthKnown=true;
+    // The owner goes straight to their own Teacher Home once per tab (plain home page only).
+    try{
+      const owner=isAuthorizedAdmin&&user&&user.emailVerified===true&&String(user.email||"").toLowerCase()==="simcha5770@gmail.com";
+      if(owner&&!location.search&&!location.hash&&!sessionStorage.getItem("b3OwnerLanded")&&!sessionStorage.getItem("b3ActingAsStudent")){
+        sessionStorage.setItem("b3OwnerLanded","1");window.location.href="teacher-home.html";return;
+      }
+    }catch(e){}
     // Finish a Teacher Sign In card login that came back through a redirect.
     try{if(isAuthorizedTeacher&&sessionStorage.getItem("b3TeacherCardSignIn")==="1"){sessionStorage.removeItem("b3TeacherCardSignIn");window.location.href="teacher-home.html";return;}}catch(e){}
     renderStudentAccess();renderAdminPanel();
