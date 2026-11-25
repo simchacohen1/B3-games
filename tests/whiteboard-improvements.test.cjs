@@ -85,7 +85,7 @@ test('the font and Fill reach every place a mark is drawn: the board picture, th
 
 test('fonts: a font control beside bold works on typed, picked and new words, like bold does',()=>{
   assert.match(pdf,/fontSelect=el\('select',null,'pdf-font-select'\)/);
-  assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn,fontSelect\)/);
+  assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn,fontSelect,\.\.\.alignBtns\)/);
   assert.match(pdf,/function setTextFont\(next\)/);assert.match(pdf,/function fontSelected\(next\)/);
   assert.match(pdf,/if\(target\.kind==='typing'\)\{inlineEdit\.font=next;sizeInline\(\)\}/);
   assert.match(pdf,/open\.box\.style\.fontFamily=C\.fontStack\(open\.font\)/);

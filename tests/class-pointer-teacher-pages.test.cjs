@@ -24,7 +24,7 @@ function harness(){
     pagesBar:null,pagesPanel:null,pagesPanelOpen:false,pagesSig:'',pagesTimer:0,wbPages:null,wbAt:0,wbSwitching:false,
     isBoardOpen:()=>true,finishInline(){},finishPictureEdit(){},updateControls(){},composeBoard:()=>'data:image/jpeg;base64,AAAA',
     publishBoard:async()=>{state.published.push(context.boardPictures.map(p=>p.id));},
-    paintInk(){},exportPng:async()=>({size:1,type:'image/png'}),
+    paintInk(){},whenPictures:async()=>[],exportPng:async()=>({size:1,type:'image/png'}),
     confirm:()=>true,setInterval:()=>0,clearInterval(){},Promise,JSON,Image:class{},
   };
   vm.createContext(context);

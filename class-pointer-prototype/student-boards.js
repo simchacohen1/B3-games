@@ -773,7 +773,7 @@
     // My whiteboard as a surface for the shared drawing toolbar. Its marks are ordinary board lines, so the teacher
     // sees them live in my tile, and my own Undo / Clear / Eraser work on them too.
     const boardOpen=()=>on&&mode==='boards'&&!blocked;
-    const boardSurface={id:'board',idPrefix:'s',defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+    const boardSurface={id:'board',idPrefix:'s',defaultTool:'select',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
       getItems:()=>board.strokes.filter(item=>item.by==='student'&&ownItem(item)),
@@ -1882,7 +1882,7 @@
   // refreshes. A shared screen gets the same tools from screen-annotate.js.
   const FA=window.FTTAnnotate;
   const boardOpen=()=>{const m=focusMember();return on&&!suspended&&!view.hidden&&mode==='boards'&&!focus.hidden&&!!m&&!isBlocked(m)};
-  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'pen',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'select',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
     tools:['select','highlight','text','shape','eraser','pen'],hideUnused:true,
     toolLabels:{select:['🖱️','Select','Click any mark on this board, the student’s or yours, to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
     keys:{h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},

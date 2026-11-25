@@ -49,6 +49,28 @@
 
   function el(tag,id,cls,text){const node=document.createElement(tag);if(id)node.id=id;if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
   function svg(tag,attrs){const node=document.createElementNS(ns,tag);for(const key in attrs)node.setAttribute(key,String(attrs[key]));return node}
+  // ---------- Pictures on the whiteboard are marks (tool 'picture'): two corners and the picture itself ----------
+  // They sit in the same pile as words and shapes, so the order of the pile is the layer order (Bring to front, Send to back...).
+  const pictureImages=new Map();
+  // The decoded picture of a picture mark, or null while it is still loading (the board is drawn again when it has loaded).
+  function pictureImage(stroke){
+    if(!stroke||!stroke.image)return null;
+    let entry=pictureImages.get(stroke.ref);
+    if(!entry){
+      const image=new Image();entry={image,done:null};
+      entry.done=new Promise(resolve=>{image.onload=()=>{resolve(true);if(typeof drawInk==='function'){drawInk();pagesSig=''}};image.onerror=()=>resolve(false)});
+      image.src=stroke.image;pictureImages.set(stroke.ref,entry);
+      while(pictureImages.size>60)pictureImages.delete(pictureImages.keys().next().value);
+    }
+    return entry.image.complete&&entry.image.naturalWidth?entry.image:null;
+  }
+  // Wait until every picture in a list of marks is decoded (before a picture of the board is made).
+  function whenPictures(list){
+    const waits=[];
+    for(const stroke of list||[])if(stroke.tool==='picture'&&stroke.image){pictureImage(stroke);const entry=pictureImages.get(stroke.ref);if(entry)waits.push(entry.done)}
+    return Promise.all(waits);
+  }
+  const pictureBox=stroke=>{const [a,b]=stroke.points;return{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(b.x-a.x),h:Math.abs(b.y-a.y)}};
 
   // ---------- Screen ----------
   const scroller=el('div','pdfView',isTeacher?'':'follow');scroller.hidden=true;scroller.setAttribute('aria-label','Lesson PDF');
@@ -66,14 +88,15 @@
   // Pasted words always come in the board's black, whatever color is chosen for drawing.
   const PASTE_INK='#1f2937';
   const sizeOfLabel=label=>Math.round(label/(TEXT_SCALE*TEXT_REF)*1e4)/1e4,labelOfSize=size=>Math.round(size*TEXT_SCALE*TEXT_REF);
-  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null,textBold=false,boldBtn=null,textFont='sans',fontSelect=null,shapeFill=false;
+  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null,textBold=false,boldBtn=null,textFont='sans',fontSelect=null,shapeFill=false,textAlign='',alignBtns=[],arrangeBox=null;
+  const LAYER_CHOICES=[['front','To front','Bring to front: above everything else'],['forward','Forward','Bring forward: one layer up'],['backward','Backward','Send backward: one layer down'],['back','To back','Send to back: below everything else']];
   // What the size control works on: the words being typed, the picked words, or the next new words (Text tool).
   function textTarget(){
     if(!isTeacher)return null;
-    if(inlineEdit)return{kind:'typing',size:inlineEdit.size,bold:inlineEdit.bold===true,font:inlineEdit.font||'sans'};
+    if(inlineEdit)return{kind:'typing',size:inlineEdit.size,bold:inlineEdit.bold===true,font:inlineEdit.font||'sans',align:inlineEdit.align||'',rtl:inlineEdit.rtl===true};
     const picked=selecting()?selectedStroke():null;
-    if(picked?.tool==='text')return{kind:'picked',size:picked.size,bold:picked.bold===true,font:picked.font||'sans'};
-    return $('teacherTool')?.value==='text'?{kind:'new',size:textSize,bold:textBold,font:textFont}:null;
+    if(picked?.tool==='text')return{kind:'picked',size:picked.size,bold:picked.bold===true,font:picked.font||'sans',align:picked.align||'',rtl:picked.points[0].x>picked.points[1].x};
+    return $('teacherTool')?.value==='text'?{kind:'new',size:textSize,bold:textBold,font:textFont,align:textAlign,rtl:false}:null;
   }
   function setTextSize(size){
     const target=textTarget();if(!target)return;
@@ -89,6 +112,22 @@
     if(target.kind==='typing'){inlineEdit.bold=next;sizeInline()}
     else if(target.kind==='picked')boldSelected(next);
     syncTextSize();
+  }
+  // Left, Center or Right for a text box (every line of it): the words being typed, the picked words, or the next new words.
+  function setTextAlign(next){
+    const target=textTarget();if(!target||!C.TEXT_ALIGNS.includes(next))return;
+    textAlign=next;
+    if(target.kind==='typing'){inlineEdit.align=next;inlineEdit.box.style.textAlign=next}
+    else if(target.kind==='picked')alignSelected(next);
+    syncTextSize();
+  }
+  // The picked words laid out again with the lines lined up left, centered or right inside the box.
+  function alignSelected(next){
+    const stroke=selectedStroke();if(!stroke||stroke.tool!=='text')return false;
+    const block=textBlock(stroke);if(block[0].align===next)return true;
+    const made=reflow(block,{align:next}),ids=made.strokes.length?B.swapMarks?.(block.map(item=>item.id),made.strokes):null;
+    if(ids){selectedId=ids[0];drawInk()}else B.status('That text could not be changed.');
+    return true;
   }
   function toggleTextBold(){const target=textTarget();if(target)setTextBold(!target.bold)}
   // The font for the whole text mark, like bold: the words being typed, the picked words, or the next new words.
@@ -123,8 +162,9 @@
   }
   // The control shows only while there are words to size, with their size.
   function syncTextSize(){
+    syncArrange();
     if(!textSizeBox)return;const target=textTarget();
-    textSizeBox.hidden=!target;if(target){if(document.activeElement!==textSizeValue)textSizeValue.value=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true));if(fontSelect)fontSelect.value=target.font||'sans'}
+    textSizeBox.hidden=!target;if(target){if(document.activeElement!==textSizeValue)textSizeValue.value=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true));if(fontSelect)fontSelect.value=target.font||'sans';const effective=target.align||(target.rtl?'right':'left');for(const b of alignBtns)b.setAttribute('aria-pressed',String(b.dataset.align===effective))}
   }
   let measurer=null;
   function width100(line){
@@ -157,14 +197,14 @@
     const farLeft=Math.min(...xs),farRight=Math.max(...xs);
     const left=boxW&&rtl?Math.max(0,farRight-boxW):farLeft,right=boxW&&!rtl?Math.min(1,farLeft+boxW):farRight;
     const top=first.points[0].y,bottom=Math.min(1,block[block.length-1].points[0].y+lineStep(first.size));
-    return{left,right,top,bottom,rtl,size:first.size,bold:first.bold===true,font:first.font||'sans',boxW,text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')};
+    return{left,right,top,bottom,rtl,size:first.size,bold:first.bold===true,font:first.font||'sans',align:first.align||'',boxW,text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')};
   }
   // The block laid out again with something changed: size, boxW (0 = no chosen width), text. One corner stays
   // where it is: fixX 'left'|'right' (default: where the lines start), fixY 'top'|'bottom'.
   function reflow(block,patch={}){
     const f=blockFrame(block),size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,patch.size||f.size)),boxW=patch.boxW!==undefined?patch.boxW:f.boxW;
     const fixX=patch.fixX||(f.rtl?'right':'left'),fixY=patch.fixY||'top';
-    return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,bold:patch.bold!==undefined?patch.bold===true:f.bold,font:patch.font!==undefined?patch.font:f.font,[fixX]:f[fixX],[fixY]:f[fixY]});
+    return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,bold:patch.bold!==undefined?patch.bold===true:f.bold,font:patch.font!==undefined?patch.font:f.font,align:patch.align!==undefined?(patch.align||undefined):(f.align||undefined),[fixX]:f[fixX],[fixY]:f[fixY]});
   }
   // ---------- Typing right on the board ----------
   // All typing happens in a plain text box laid on the board; there is no popup.
@@ -174,14 +214,14 @@
   // Clicking anywhere else (or Ctrl+Enter) keeps what was typed; Escape drops it.
   function editInline(target){
     finishInline(true);
-    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null,bold=false,font='sans';
+    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null,bold=false,font='sans',align='';
     if(fresh){
       const half=Math.max(.1,Math.min(target.point.x-margin,1-margin-target.point.x));
-      size=target.size;bold=textBold;font=textFont;color=target.color;left=Math.max(0,target.point.x-half);right=Math.min(1,target.point.x+half);
+      size=target.size;bold=textBold;font=textFont;align=textAlign;color=target.color;left=Math.max(0,target.point.x-half);right=Math.min(1,target.point.x+half);
       top=Math.max(0,Math.min(1-lineStep(size),target.point.y-lineStep(size)/2));
     }else{
       block=textBlock(target,B.highlights?.()||strokes);const f=blockFrame(block);
-      size=f.size;bold=f.bold;font=f.font;color=block[0].color;value=f.text;rtl=f.rtl;top=f.top;
+      size=f.size;bold=f.bold;font=f.font;align=f.align;color=block[0].color;value=f.text;rtl=f.rtl;top=f.top;
       // A width the teacher chose is kept. Otherwise the box runs from where the lines start to the far edge of
       // the board, so a longer sentence has room; the words are laid out properly when the box closes.
       left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left;right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
@@ -190,8 +230,8 @@
     box.dataset.stageUi='true';box.value=value;box.maxLength=2000;box.dir=fresh?'auto':rtl?'rtl':'ltr';box.spellcheck=false;box.rows=1;
     box.setAttribute('aria-label',fresh?'Type the words for the board':'Change the words on the board');
     if(fresh)box.placeholder='Type here';
-    Object.assign(box.style,{left:left*100+'%',top:top*100+'%',width:(right-left)*100+'%',color});
-    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,bold,boldBefore:bold,font,fontBefore:font,before:value};
+    Object.assign(box.style,{left:left*100+'%',top:top*100+'%',width:(right-left)*100+'%',color,textAlign:align||''});
+    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,bold,boldBefore:bold,font,fontBefore:font,align,alignBefore:align,rtl,before:value};
     content.appendChild(box);sizeInline();drawInk();
     box.focus();box.setSelectionRange(box.value.length,box.value.length);
     // Nothing typed or clicked in the box may reach the lesson (shortcuts, the Delete key, drawing, panning).
@@ -217,22 +257,22 @@
   function finishInline(save){
     const open=inlineEdit;if(!open)return;inlineEdit=null;
     const text=open.box.value;open.box.remove();
-    if(open.create){if(save&&text.trim())addTextStroke({...open.create,bold:open.bold,font:open.font},text)}
+    if(open.create){if(save&&text.trim())addTextStroke({...open.create,bold:open.bold,font:open.font,align:open.align},text)}
     else if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
-    else if(save&&(text!==open.before||open.size!==open.sizeBefore||open.bold!==open.boldBefore||open.font!==open.fontBefore))replaceTextStroke(open.stroke,text,open.size,open.bold,open.font);
+    else if(save&&(text!==open.before||open.size!==open.sizeBefore||open.bold!==open.boldBefore||open.font!==open.fontBefore||open.align!==open.alignBefore))replaceTextStroke(open.stroke,text,open.size,open.bold,open.font,open.align);
     drawInk();
   }
   window.addEventListener('resize',sizeInline);
   // New words where the typing box was: centered on the clicked spot, first line where the box's line was.
   function addTextStroke(spot,text){
-    const made=flow(text,{size:spot.size,color:spot.color,bold:spot.bold===true,font:spot.font,center:spot.point,top:spot.top});
+    const made=flow(text,{size:spot.size,color:spot.color,bold:spot.bold===true,font:spot.font,align:spot.align||undefined,center:spot.point,top:spot.top});
     if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
     made.strokes.forEach(stroke=>B.submitStroke(stroke));
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
-  function replaceTextStroke(stroke,text,size,bold,font){
+  function replaceTextStroke(stroke,text,size,bold,font,align){
     // The new words go where the whole block was, in the same color and width (and size, unless it was changed).
-    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size,bold,font});
+    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size,bold,font,align});
     if(!made.strokes.length){B.status('Enter some text to keep this text box.');return false}
     const ids=B.swapMarks?.(block.map(item=>item.id),made.strokes);
     if(!ids){selectedId=null;B.status('That whiteboard text is no longer available to edit.');return false}
@@ -273,6 +313,20 @@
   // Paint marks on a canvas, matching the document ink's coordinate system, widths and opacity.
   // W and H are the size of the whole document in the canvas's current drawing units.
   function paintInk(ctx,canvas,all,W,H){
+    // Pictures are separate layers: the marks before a picture are painted, then the picture, then the marks after it.
+    let run=[];
+    const flush=()=>{if(run.length)paintInkRun(ctx,canvas,run,W,H);run=[]};
+    for(const stroke of all){
+      if(stroke.tool==='picture'){
+        flush();const image=pictureImage(stroke),box=stroke.points?.length===2?pictureBox(stroke):null;
+        if(image&&box){ctx.save();ctx.imageSmoothingQuality='high';ctx.drawImage(image,box.x*W,box.y*H,box.w*W,box.h*H);ctx.restore()}
+        continue;
+      }
+      run.push(stroke);
+    }
+    flush();
+  }
+  function paintInkRun(ctx,canvas,all,W,H){
     // Same as the live SVG ink: transparency is applied once per owner and tool group,
     // so a person's overlapping highlights stay one flat layer in the video students see.
     const penTools=['pen','line','pen-arrow','rectangle','ellipse','triangle','text'];
@@ -410,10 +464,28 @@
     for(const [key,[label]] of Object.entries(C.FONTS)){const option=document.createElement('option');option.value=key;option.textContent=label;option.style.fontFamily=C.fontStack(key);fontSelect.append(option)}
     fontSelect.addEventListener('change',()=>{setTextFont(fontSelect.value);inlineEdit?.box.focus()});
     for(const type of ['pointerdown','mousedown','keydown','keyup','click'])fontSelect.addEventListener(type,event=>{if(type==='keydown'||type==='keyup'||type==='click')event.stopPropagation()});
-    textSizeBox.append(el('span',null,'pdf-label','Text size'),smaller,textSizeValue,bigger,boldBtn,fontSelect);nav.appendChild(textSizeBox);
+    // Left / Center / Right for the text box.
+    for(const [value,label,title] of [['left','Left','Align the words to the left of their box'],['center','Center','Center the words in their box'],['right','Right','Align the words to the right of their box']]){
+      const b=el('button',null,'pdf-btn pdf-textsize-btn pdf-align-btn',label);b.type='button';b.title=title;b.dataset.align=value;b.setAttribute('aria-label',title);b.setAttribute('aria-pressed','false');
+      b.addEventListener('click',()=>setTextAlign(value));
+      for(const type of ['pointerdown','mousedown'])b.addEventListener(type,event=>event.preventDefault());
+      alignBtns.push(b);
+    }
+    textSizeBox.append(el('span',null,'pdf-label','Text size'),smaller,textSizeValue,bigger,boldBtn,fontSelect,...alignBtns);nav.appendChild(textSizeBox);
+    // Layers: shows while a picture, shape or words are picked.
+    arrangeBox=el('span',null,'pdf-arrange');arrangeBox.hidden=true;arrangeBox.setAttribute('role','group');arrangeBox.setAttribute('aria-label','Layers');
+    arrangeBox.append(el('span',null,'pdf-label','Layer'));
+    for(const [how,label,title] of LAYER_CHOICES){
+      const b=el('button',null,'pdf-btn pdf-textsize-btn pdf-layer-btn',label);b.type='button';b.title=title;b.setAttribute('aria-label',title);b.dataset.layer=how;
+      b.addEventListener('click',()=>arrange(how));
+      for(const type of ['pointerdown','mousedown'])b.addEventListener(type,event=>event.preventDefault());
+      arrangeBox.append(b);
+    }
+    nav.appendChild(arrangeBox);
+    button('⬆ Upload','Put pictures (jpg, png, gif, webp) or a PDF on the whiteboard',()=>openUpload(),'pdf-btn pdf-board-only pdf-upload-btn').hidden=true;
     button('📋 Paste','Put the picture or words you copied on the whiteboard. You can also press Ctrl+V.',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.pasteInto(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
     button('✏ Edit latest text','Change the words you added last (all of their lines).',()=>editLatestText(),'pdf-btn pdf-board-only').hidden=true;
-    button('📄 Copy board','Copy a picture of the whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom(clipTarget)},'pdf-btn pdf-board-only').hidden=true;
+    button('📄 Copy board','Copy a picture of the whole whiteboard, so you can paste it somewhere else',()=>{const clip=window.ClassPointerClipboard;if(clip)void clip.copyFrom({...clipTarget,copy:()=>clipTarget.copyWhole()})},'pdf-btn pdf-board-only').hidden=true;
     movePicturesBtn=button('🖼 Move pictures','Move, resize or remove pictures pasted on the whiteboard',()=>editBoardPictures(),'pdf-btn pdf-board-pictures');movePicturesBtn.hidden=true;
     button('✕ Close PDF','Close the PDF for everyone',()=>closePdf(),'pdf-btn pdf-close');
     const toggle=button('▾ Hide','Hide these buttons (for example while sharing this tab on Zoom)',()=>{const min=nav.classList.toggle('min');toggle.textContent=min?'▴ '+navWord()+' controls':'▾ Hide'},'pdf-btn pdf-toggle');
@@ -575,8 +647,14 @@
     let shown=inlineEdit?strokes.filter(stroke=>!inlineEdit.ids.has(stroke.id)):strokes;
     if(edit?.moved&&edit.swap){const gone=new Set(edit.swap.ids);shown=strokes.filter(stroke=>!gone.has(stroke.id)).concat(edit.swap.strokes.map((stroke,index)=>({...stroke,owner:'teacher',id:'preview'+index})))}
     else if(edit?.moved)shown=strokes.map(stroke=>edit.preview.has(stroke.id)?{...stroke,points:edit.preview.get(stroke.id)}:stroke);
-    const all=draft?[...shown,{...draft,owner:B.owner()}]:shown,groups=new Map();
+    const all=draft?[...shown,{...draft,owner:B.owner()}]:shown;let groups=new Map();
     for(const stroke of all){
+      // A picture is a layer of its own: marks after it are drawn in new groups, on top of it.
+      if(stroke.tool==='picture'){
+        if(stroke.points?.length!==2)continue;
+        const box=pictureBox(stroke),node=pictureImage(stroke)?svg('image',{x:box.x*W,y:box.y*H,width:box.w*W,height:box.h*H,href:stroke.image,preserveAspectRatio:'none'}):svg('rect',{x:box.x*W,y:box.y*H,width:box.w*W,height:box.h*H,fill:'#e5e7eb',stroke:'#9ca3af','stroke-dasharray':'8 6'});
+        node.dataset.strokeTool='picture';if(stroke.id)node.dataset.strokeId=stroke.id;node.dataset.owner=stroke.owner||'';ink.appendChild(node);groups=new Map();continue;
+      }
       const kind=C.isHighlightShape(stroke.tool)?'highlight-shape':PEN_TOOLS.includes(stroke.tool)?'pen':(['pencil','crayon'].includes(stroke.tool)?stroke.tool:'highlight'),key=stroke.owner+'|'+kind;
       let group=groups.get(key);
       if(!group){group=svg('g',{'data-owner':stroke.owner,'data-tool':kind,opacity:kind==='highlight-shape'?'0.35':kind==='pen'?'1':kind==='pencil'?'0.94':kind==='crayon'?'0.78':'0.32'});groups.set(key,group);ink.appendChild(group)}
@@ -644,6 +722,8 @@
   // Is p on this mark? inside: anywhere inside a closed shape counts (Select); otherwise only its outline (Eraser).
   function markHits(stroke,p,inside){
     if(!stroke.points?.length)return false;
+    // A picture is picked anywhere inside it (Select); the eraser never reaches it.
+    if(stroke.tool==='picture'){if(!inside||stroke.points.length!==2)return false;const b=pictureBox(stroke);return p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h}
     const shape=C.shapeTool(stroke.tool);
     if(!['rectangle','ellipse','triangle','box'].includes(shape))return inkHits(stroke,p);
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1],t=Math.max(0.008,(stroke.size||0.016)*0.6),ty=t*W/Math.max(1,H);
@@ -711,6 +791,17 @@
     if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,again,pid:event.pointerId};content.setPointerCapture(edit.pid)}
     drawInk();return !!hit;
   }
+  // A picture keeps its shape while a corner is dragged: the opposite corner stays, the picture grows or shrinks, and none of it leaves the board.
+  function resizePicture(stroke,handle,x,y){
+    const b=pictureBox(stroke),west=handle[1]==='w',north=handle[0]==='n',ax=west?b.x+b.w:b.x,ay=north?b.y+b.h:b.y;
+    const aspect=(b.w*W)/Math.max(1e-6,b.h*H);
+    let w=Math.abs(x-ax),h=Math.abs(y-ay)*1;
+    const fromY=(h*H*aspect)/W;if(fromY>w)w=fromY;
+    w=Math.max(.02,w);h=(w*W/aspect)/H;
+    const k=Math.min(1,(west?ax:1-ax)/w,(north?ay:1-ay)/h);w*=k;h*=k;
+    const nx=west?ax-w:ax,ny=north?ay-h:ay;
+    return[{x:nx,y:ny},{x:nx+w,y:ny+h}];
+  }
   function moveSelect(event){
     const G=geometry(),at=clampedPoint(event);if(!G||!at)return;
     if(!edit.moved&&Math.hypot(at.px-edit.start.px,at.py-edit.start.py)<3)return;
@@ -730,7 +821,7 @@
       if(made.strokes.length)edit.swap={ids:edit.group.map(item=>item.id),strokes:made.strokes};
       drawInk();return;
     }
-    if(edit.kind==='resize')edit.preview=new Map([[edit.stroke.id,G.resizePoints(edit.stroke,edit.handle,at.x,at.y)]]);
+    if(edit.kind==='resize')edit.preview=new Map([[edit.stroke.id,edit.stroke.tool==='picture'?resizePicture(edit.stroke,edit.handle,at.x,at.y):G.resizePoints(edit.stroke,edit.handle,at.x,at.y)]]);
     else{
       // One shift for the whole group, held back so that no part of it leaves the board.
       const all={points:edit.group.flatMap(item=>item.points)},moved=G.movePoints(all,at.x-edit.start.x,at.y-edit.start.y);
@@ -827,6 +918,7 @@
   let inkLabelTimer=null;
   function inkHits(stroke,p){
     if(!stroke.points?.length)return false;const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
+    if(stroke.tool==='picture'){if(stroke.points.length!==2)return false;const b=pictureBox(stroke);return p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h}
     const t=Math.max(0.006,(stroke.size||0.016)*0.6);
     if(stroke.tool==='box')return p.x>=Math.min(first.x,last.x)-t&&p.x<=Math.max(first.x,last.x)+t&&p.y>=Math.min(first.y,last.y)-t&&p.y<=Math.max(first.y,last.y)+t;
     const pts=stroke.tool==='underline'?[first,{x:last.x,y:first.y}]:stroke.points;
@@ -1468,19 +1560,214 @@
     publishBoard();
     B.status('Move, resize or remove the pictures, then press ✓ Show to class.');
   }
-  async function pastePicture(blob){
-    if(!isBoardOpen())return;
-    if(boardPictures.length+pictureEdits.length>=MAX_PICTURES){B.fail('This whiteboard already has '+MAX_PICTURES+' pictures. Remove one first.');return}
-    if(blob.size>MAX_PICTURE_BYTES){B.fail('That picture is too large. Copy a smaller screenshot.');return}
-    let image;try{image=await loadPicture(blob)}catch(error){B.fail(error.message||'This picture could not be read.');return}
-    if(!isBoardOpen())return;
-    // Fit inside 60% of the visible part of the board, centered where the teacher is looking.
-    const r=content.getBoundingClientRect(),v=scroller.getBoundingClientRect();
-    const visible={x:Math.max(0,(v.left-r.left)/r.width),y:Math.max(0,(v.top-r.top)/r.height),w:Math.min(1,v.width/r.width),h:Math.min(1,v.height/r.height)};
-    const ratio=image.naturalHeight/image.naturalWidth*(r.width/r.height);
-    let w=Math.min(visible.w*0.6,image.naturalWidth/boardSize.w),h=w*ratio;
-    if(h>visible.h*0.6){h=visible.h*0.6;w=h/ratio}
-    startPictureEdit(image,{x:visible.x+(visible.w-w)/2,y:visible.y+(visible.h-h)/2,w,h,after:lastTeacherMark()});
+  // ---------- Adding pictures: paste, Upload (pictures and PDFs) ----------
+  const pictureCount=()=>(B.highlights?.()||strokes).filter(item=>item.tool==='picture').length;
+  // Put a picture (a small data: URL, iw by ih pixels) on the board as a mark. opts: fill (a whole slide), center (a point of the board), nudge.
+  function placePictureData(data,iw,ih,opts={}){
+    if(!isBoardOpen())return false;
+    const ratio=(ih/iw)*(boardSize.w/boardSize.h);let w,h,x,y;
+    if(opts.fill){w=Math.min(.96,.96/ratio);h=w*ratio;x=(1-w)/2;y=(1-h)/2}
+    else{
+      // Fit inside 60% of the visible part of the board, centered where the teacher is looking.
+      const r=content.getBoundingClientRect(),v=scroller.getBoundingClientRect();
+      const visible={x:Math.max(0,(v.left-r.left)/r.width),y:Math.max(0,(v.top-r.top)/r.height),w:Math.min(1,v.width/r.width),h:Math.min(1,v.height/r.height)};
+      w=Math.min(visible.w*0.6,iw/boardSize.w);h=w*ratio;
+      if(h>visible.h*0.6){h=visible.h*0.6;w=h/ratio}
+      const c=opts.center||{x:visible.x+visible.w/2,y:visible.y+visible.h/2},n=opts.nudge||0;
+      x=P.clamp(c.x-w/2+n,0,Math.max(0,1-w));y=P.clamp(c.y-h/2+n,0,Math.max(0,1-h));
+    }
+    B.submitStroke({tool:'picture',color:'#1f2937',size:.016,points:[{x,y},{x:x+w,y:y+h}],image:data});
+    const made=[...(B.highlights?.()||[])].reverse().find(item=>item.tool==='picture'&&item.image===data);
+    if(made&&selecting()){selectedId=made.id;drawInk()}
+    return !!made;
+  }
+  async function pastePicture(blob,opts={}){
+    if(!isBoardOpen())return false;
+    if(!B.live()||!B.writingAllowed('pen')){B.status('You cannot add pictures right now.');return false}
+    if(pictureCount()>=C.PICTURES_MAX){B.fail('This page already has '+C.PICTURES_MAX+' pictures. Remove one first.');return false}
+    if(blob.size>MAX_PICTURE_BYTES){B.fail('That picture is too large. Copy a smaller screenshot.');return false}
+    const clip=window.ClassPointerClipboard;let made;
+    try{made=await clip.encodeImage(blob,{maxChars:C.PICTURE_MAX_CHARS-2000,maxSide:1100})}catch(error){B.fail(error&&error.friendly?error.message:'This picture could not be read.');return false}
+    if(!isBoardOpen())return false;
+    const ok=placePictureData(made.data,made.width,made.height,opts);
+    if(ok&&!opts.quiet)B.status('Picture added. Drag it to move it, drag a corner to resize it. Right-click it for layers (front or back of words), copy and cut.');
+    return ok;
+  }
+  // A PDF page as a picture small enough for a board mark (JPEG, shrunk until it fits).
+  async function pdfPagePicture(page){
+    const base=page.getViewport({scale:1});
+    for(const width of [1200,1000,860,720,600,480]){
+      const viewport=page.getViewport({scale:width/base.width}),canvas=document.createElement('canvas');
+      canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+      const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({canvasContext:ctx,viewport}).promise;
+      for(const quality of [.82,.68,.52]){
+        const data=canvas.toDataURL('image/jpeg',quality);
+        if(data.length<=C.PICTURE_MAX_CHARS-2000){const out={data,width:canvas.width,height:canvas.height};canvas.width=0;return out}
+      }
+      canvas.width=0;
+    }
+    return null;
+  }
+  const UPLOAD_PDF_BYTES=25*1024*1024;
+  // One PDF page per slide: the first page goes on the page that is open when it is still empty, every other page on a new page.
+  async function uploadPdf(file){
+    if(!pdfjs){B.fail('The PDF reader could not load. Refresh the page and try again.');return false}
+    if(file.size>UPLOAD_PDF_BYTES){B.fail('That PDF is too big. The biggest PDF you can add is 25 MB.');return false}
+    pdfjs.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js?v=3.11.174';
+    let loaded;
+    try{loaded=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,enableXfa:false}).promise}
+    catch(error){B.fail('That PDF could not be opened.');return false}
+    const token=opening;
+    try{
+      const canSlides=!!(Pages&&wbPages),room=canSlides?Pages.MAX_PAGES-wbPages.length+((B.highlights?.()||[]).length===0?1:0):1;
+      const count=Math.max(0,Math.min(loaded.numPages,room));
+      if(!count){B.status('This whiteboard has no room for more pages.');return false}
+      if(count<loaded.numPages)B.status('Only the first '+count+' of '+loaded.numPages+' PDF pages fit on this whiteboard.');
+      let firstIndex=null;
+      for(let i=1;i<=count;i++){
+        if(!isBoardOpen()||opening!==token)return false;
+        B.status('Adding PDF page '+i+' of '+count+'…');
+        const shot=await pdfPagePicture(await loaded.getPage(i));
+        if(!shot){B.fail('PDF page '+i+' is too detailed to put on the whiteboard.');continue}
+        const empty=(B.highlights?.()||[]).length===0;
+        if(!(i===1&&empty)){
+          if(!canSlides){B.status('Only the first page of the PDF was added (this whiteboard has no extra pages).');break}
+          if(!await addPage(false))break;
+        }
+        if(firstIndex===null)firstIndex=wbPages?wbAt:0;
+        placePictureData(shot.data,shot.width,shot.height,{fill:true});
+      }
+      if(canSlides&&firstIndex!==null&&wbAt!==firstIndex)await showPage(firstIndex);
+      B.status('PDF added to the whiteboard'+(canSlides&&count>1?' ('+count+' pages, one on each page).':'.'));
+      return true;
+    }finally{loaded.destroy()}
+  }
+  let uploadInput=null,uploadBusy=false;
+  async function uploadFiles(files){
+    if(uploadBusy||!isBoardOpen())return;
+    uploadBusy=true;let nudge=0,skipped=0;
+    try{
+      for(const file of files){
+        if(!isBoardOpen())return;
+        const name=String(file.name||'');
+        if(file.type==='application/pdf'||/\.pdf$/i.test(name))await uploadPdf(file);
+        else if(/^image\/(jpeg|png|gif|webp)$/.test(file.type)||/\.(jpe?g|png|gif|webp)$/i.test(name)){await pastePicture(file,{nudge,quiet:files.length>1});nudge+=.03}
+        else skipped++;
+      }
+      if(skipped)B.status('Only jpg, png, gif, webp pictures and PDF files can be uploaded.');
+    }finally{uploadBusy=false}
+  }
+  function openUpload(){
+    if(!isBoardOpen()){B.status('Open a whiteboard first, then use Upload.');return}
+    if(!uploadInput){
+      uploadInput=el('input',null,'board-upload-input');uploadInput.type='file';uploadInput.multiple=true;uploadInput.hidden=true;uploadInput.dataset.stageUi='true';
+      uploadInput.accept='image/jpeg,image/png,image/gif,image/webp,application/pdf,.jpg,.jpeg,.png,.gif,.webp,.pdf';
+      uploadInput.addEventListener('change',()=>{const chosen=Array.from(uploadInput.files||[]);uploadInput.value='';if(chosen.length)void uploadFiles(chosen)});
+      stage.appendChild(uploadInput);
+    }
+    uploadInput.click();
+  }
+
+  // ---------- Copy, Cut and Paste of the picked item (not the whole board) ----------
+  // What is picked (a picture, a shape, a pen line, or every line of a block of words) is kept inside the page as well as put on the
+  // computer's clipboard, so Paste puts back exactly the same item (pictures with their picture, words with their size and font).
+  let itemClip=null,cursorAt=null,pasteHint=null,pastedCount=0;
+  const selectedGroup=()=>{const stroke=isBoardOpen()&&selecting()?selectedStroke():null;return stroke?textBlock(stroke):null};
+  function pictureBlob(stroke){
+    const image=pictureImage(stroke);if(!image)return null;
+    const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;c.getContext('2d').drawImage(image,0,0);
+    return new Promise(resolve=>c.toBlob(blob=>{c.width=0;resolve(blob)},'image/png'));
+  }
+  async function copyItems(cut){
+    const group=selectedGroup(),clip=window.ClassPointerClipboard;
+    if(!group){B.status('Click an item first (Select tool), then copy or cut it. "Copy board" copies a picture of the whole whiteboard.');return false}
+    const id='c'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);
+    itemClip={id,strokes:group.map(item=>({...item})),pasted:0};pastedCount=0;
+    // Also on the computer's clipboard, so Ctrl+V and the Paste button know it is the same item: a marker, the words, or the picture.
+    const parts={'text/html':new Blob(['<meta charset="utf-8"><span data-ftt-board-clip="'+id+'"></span>'],{type:'text/html'})};
+    const words=group[0].tool==='text'?(clip.blockText?.(group)||''):'';
+    parts['text/plain']=new Blob([words||' '],{type:'text/plain'});
+    if(group.length===1&&group[0].tool==='picture'){const png=await pictureBlob(group[0]);if(png)parts['image/png']=png}
+    let wrote=true;
+    try{await clip.writeParts(parts)}catch{wrote=false}
+    const picked=group[0];
+    if(cut){selectedId=null;endSelect(false);eraseBlock(picked)}
+    B.status((cut?'Cut. ':'Copied. ')+'Press '+clip.KEY+'+V to paste it'+(wrote?'.':' (inside this whiteboard only: the browser did not let us use the computer clipboard).'));
+    return true;
+  }
+  // The board point to paste at: the right-click spot, else where the mouse is over the board, else slightly down and right of the original.
+  function pasteSpot(){
+    if(pasteHint&&Date.now()-pasteHint.at<4000){const p=pasteHint.p;pasteHint=null;return p}
+    return cursorAt;
+  }
+  function pasteItems(){
+    const c=itemClip;if(!c||!isBoardOpen())return false;
+    if(!B.live()||!B.writingAllowed('pen')){B.status('You cannot add to the whiteboard right now.');return false}
+    const pts=c.strokes.flatMap(item=>item.points),xs=pts.map(q=>q.x),ys=pts.map(q=>q.y);
+    const x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys),spot=pasteSpot();
+    pastedCount++;let dx,dy;
+    if(spot){dx=spot.x-(x1+x2)/2;dy=spot.y-(y1+y2)/2}else{dx=.03*pastedCount;dy=.03*pastedCount*(W/Math.max(1,H))}
+    dx=Math.max(-x1,Math.min(1-x2,dx));dy=Math.max(-y1,Math.min(1-y2,dy));
+    const block=c.strokes[0].tool==='text'?newBlockId():null,before=new Set((B.highlights?.()||[]).map(item=>item.id));
+    for(const item of c.strokes){
+      const {id,owner,ref,...rest}=item;
+      B.submitStroke({...rest,points:item.points.map(q=>({x:Math.max(0,Math.min(1,q.x+dx)),y:Math.max(0,Math.min(1,q.y+dy))})),...(block&&item.tool==='text'?{block}:{})});
+    }
+    const added=(B.highlights?.()||[]).filter(item=>!before.has(item.id));
+    if(!added.length)return false;
+    if(selecting()){selectedId=added[0].id;drawInk()}
+    B.status('Pasted. Drag it where you want it.');
+    return true;
+  }
+  // ---------- Layers ----------
+  const LAYER_WORDS={front:'Brought to the front.',forward:'Brought forward one layer.',backward:'Sent back one layer.',back:'Sent to the back.'};
+  function arrange(how){
+    const group=selectedGroup();if(!group){B.status('Pick a picture, shape or words first (Select tool).');return false}
+    const moved=B.reorderMarks?.(group.map(item=>item.id),how);
+    B.status(moved?LAYER_WORDS[how]:(how==='front'||how==='forward'?'It is already on top.':'It is already at the bottom.'));
+    drawInk();return !!moved;
+  }
+  function syncArrange(){
+    if(!arrangeBox)return;
+    arrangeBox.hidden=!(isBoardOpen()&&selecting()&&selectedStroke());
+  }
+  // ---------- Right-click menu (on the whiteboard only) ----------
+  let boardMenu=null;
+  function closeBoardMenu(){if(boardMenu){boardMenu.remove();boardMenu=null}}
+  function showBoardMenu(event){
+    closeBoardMenu();
+    const group=selectedGroup(),has=!!group,menu=el('div',null,'board-ctx-menu');menu.dataset.stageUi='true';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Whiteboard');
+    const add=(label,run,disabled)=>{const b=el('button',null,'board-ctx-item',label);b.type='button';b.setAttribute('role','menuitem');b.disabled=!!disabled;b.addEventListener('click',()=>{closeBoardMenu();run()});menu.appendChild(b)};
+    const sep=()=>menu.appendChild(el('div',null,'board-ctx-sep'));
+    const clip=window.ClassPointerClipboard,spot=normalized(event);
+    add('Cut',()=>void copyItems(true),!has);
+    add('Copy',()=>void copyItems(false),!has);
+    add('Paste',()=>{pasteHint=spot?{p:spot,at:Date.now()}:null;if(clip)void clip.pasteInto(clipTarget)},!clip);
+    if(has){sep();for(const [how,,title] of [['front',0,'Bring to Front'],['forward',0,'Bring Forward'],['backward',0,'Send Backward'],['back',0,'Send to Back']])add(title,()=>arrange(how))}
+    for(const type of ['pointerdown','pointerup','click','dblclick','wheel','contextmenu'])menu.addEventListener(type,e=>{e.stopPropagation();if(type==='contextmenu')e.preventDefault()});
+    stage.appendChild(menu);boardMenu=menu;
+    const r=stage.getBoundingClientRect(),mw=menu.offsetWidth,mh=menu.offsetHeight;
+    menu.style.left=Math.max(4,Math.min(event.clientX-r.left,r.width-mw-4))+'px';menu.style.top=Math.max(4,Math.min(event.clientY-r.top,r.height-mh-4))+'px';
+    menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
+  }
+  if(isTeacher){
+    scroller.addEventListener('contextmenu',event=>{
+      if(!isBoardOpen())return;
+      // Typing boxes keep the browser's own menu (spelling, paste of words). Everywhere else on the board gets ours.
+      if(event.target?.closest?.('textarea,input'))return;
+      event.preventDefault();event.stopPropagation();
+      const p=normalized(event),hit=p?teacherMarkAt(event,p,true,true):null;
+      if(hit){window.FTTAnnotate?.select?.('select');selectedId=hit.id}else selectedId=null;
+      drawInk();showBoardMenu(event);
+    });
+    document.addEventListener('pointerdown',event=>{if(boardMenu&&!boardMenu.contains(event.target))closeBoardMenu()},true);
+    document.addEventListener('keydown',event=>{if(boardMenu&&event.key==='Escape'){event.preventDefault();closeBoardMenu()}},true);
+    for(const type of ['blur','resize'])window.addEventListener(type,closeBoardMenu);
+    scroller.addEventListener('scroll',closeBoardMenu);
+    // Where the mouse is over the board (Paste with Ctrl+V drops the item there).
+    content.addEventListener('pointermove',event=>{cursorAt=normalized(event)});
+    content.addEventListener('pointerleave',()=>{cursorAt=null});
   }
   // Undo takes back the newest thing the teacher did. A pasted picture counts: it is removed when no pen mark
   // was made after it. (Otherwise Undo removes that newer mark, as always.)
@@ -1499,6 +1786,10 @@
     active:()=>isBoardOpen()&&!window.ClassPointerBoards?.workspace?.(),
     async paste(payload){
       const clip=window.ClassPointerClipboard;
+      if(payload.kind==='item'){
+        if(itemClip&&itemClip.id===payload.id){pasteItems();return}
+        B.status('That item was copied in another window. Copy it again here.');return;
+      }
       if(payload.kind==='image'){await pastePicture(payload.blob);return}
       if(!B.live()||!B.writingAllowed()){B.status('You cannot add whiteboard text right now.');return}
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font='100px sans-serif';
@@ -1506,23 +1797,27 @@
       // at the smallest size are wrapped (at the middle size, so they stay readable).
       let made=null;
       const chosen=labelOfSize(textSize),steps=[chosen,...[...TEXT_LABELS].reverse().filter(label=>label<chosen&&label>=TEXT_FLOOR)];
-      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:PASTE_INK,bold:textBold,font:textFont,center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
-      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:PASTE_INK,bold:textBold,font:textFont,center:{x:.5,y:.5}});
+      for(const label of steps){const tried=flow(payload.text,{size:label===chosen?textSize:sizeOfLabel(label),color:PASTE_INK,bold:textBold,font:textFont,align:textAlign||undefined,center:{x:.5,y:.5}});if(tried.strokes.length&&!tried.cut&&!tried.strokes.some(line=>line.soft)){made=tried;break}}
+      if(!made)made=flow(payload.text,{size:sizeOfLabel(Math.min(chosen,Math.max(TEXT_FLOOR,steps[steps.length-1]))),color:PASTE_INK,bold:textBold,font:textFont,align:textAlign||undefined,center:{x:.5,y:.5}});
       let added=0;for(const stroke of made.strokes){B.submitStroke(stroke);added++}
       if(!added){B.status('No whiteboard text could be added.');return}
       B.status((payload.cut||made.cut)?clip.MSG.textCut:'Words pasted. To change them, choose 🖱️ Select on the toolbar and click the words: pick a color or a size, drag a corner or a side, or click them again to type in them.');
     },
-    async copy(){
+    // Copy and Cut act on the picked item only. (Copy board, the button, copies a picture of the whole board.)
+    async copy(){await copyItems(false)},
+    async cut(){await copyItems(true)},
+    // Nothing on the computer's clipboard that we know, but an item was copied inside the page (the browser blocked the clipboard): paste it.
+    pasteEmpty(){if(!itemClip)return false;pasteItems();return true},
+    async copyWhole(){
       const clip=window.ClassPointerClipboard;
       await clip.copyImage(exportPng());
-      B.status('Copied a picture of the whiteboard. Press '+clip.KEY+'+V to paste it somewhere.');
+      B.status('Copied a picture of the whole whiteboard. Press '+clip.KEY+'+V to paste it somewhere.');
     }};
   // A PNG picture of the whole whiteboard: pictures and everyone's marks.
   function exportPng(){
     if(!isBoardOpen())return Promise.reject(Error('The whiteboard is not open.'));
     const c=boardCanvas();
-    paintInk(c.getContext('2d'),c,strokes,c.width,c.height);
-    return new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of the whiteboard.'))},'image/png'));
+    return whenPictures(strokes).then(()=>{paintInk(c.getContext('2d'),c,strokes,c.width,c.height);return new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of the whiteboard.'))},'image/png'))});
   }
   // ---------- Whiteboard pages (slides) ----------
   // The teacher can add, copy, delete and reorder pages, jump between them, and see a small picture of each. Only the
@@ -1611,6 +1906,7 @@
     const blobs=[];
     for(let i=0;i<wbPages.length;i++){
       if(only&&only-1!==i)continue;
+      await whenPictures(i===wbAt?strokes:wbPages[i].strokes);
       const c=pageCanvas(wbPages[i],boardSize.w,i===wbAt);
       blobs.push(await new Promise((resolve,reject)=>c.toBlob(blob=>{c.width=0;blob?resolve(blob):reject(Error('Could not make a picture of page '+(i+1)+'.'))},'image/png')));
     }
@@ -1673,6 +1969,18 @@
 
   // ---------- Save and restore (used by "Save whiteboard") ----------
   const SAVED_PICTURE=700000;
+  // A loaded picture as a data: URL of at most maxChars (shrunk until it fits), or null.
+  function imageToData(image,maxChars){
+    let side=1100;
+    for(let attempt=0;attempt<6;attempt++,side=Math.round(side*.75)){
+      const scale=Math.min(1,side/Math.max(image.naturalWidth,image.naturalHeight)),c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(image.naturalWidth*scale));c.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(image,0,0,c.width,c.height);
+      for(const quality of [.82,.66,.5]){const data=c.toDataURL('image/jpeg',quality);if(data.length<=maxChars){c.width=0;return data}}
+      c.width=0;
+    }
+    return null;
+  }
   function savedPicture(image){
     const scale=Math.min(1,1400/Math.max(image.naturalWidth,image.naturalHeight)),c=document.createElement('canvas');
     c.width=Math.max(1,Math.round(image.naturalWidth*scale));c.height=Math.max(1,Math.round(image.naturalHeight*scale));
@@ -1685,7 +1993,7 @@
   // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
   // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
   function savedStrokes(list){
-    return(list||[]).map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{}),...(s.font&&s.font!=='sans'?{font:s.font}:{})}:{}),...(s.fill===true?{fill:true}:{})}));
+    return(list||[]).map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{}),...(s.font&&s.font!=='sans'?{font:s.font}:{}),...(C.TEXT_ALIGNS.includes(s.align)?{align:s.align}:{})}:{}),...(s.tool==='picture'&&s.image?{image:s.image}:{}),...(s.fill===true?{fill:true}:{})}));
   }
   function savedPictures(list){
     const out=[];
@@ -1712,13 +2020,15 @@
     if(!isBoardOpen()||docId===before)return false;
     const board=docId,pages=[];
     for(const saved of data.pages){
-      const page={id:Pages?Pages.newId():'pg',pictures:[],strokes:saved.strokes,thumb:''};
+      // Pictures saved before pictures became marks come back as picture marks at the very back (below every word and shape).
+      const legacy=[];
       for(const p of saved.pictures){
         let image=null;try{image=await loadPicture(p.data)}catch{}
         if(!isBoardOpen()||docId!==board)return false;
-        if(image)page.pictures.push({image,x:p.x,y:p.y,w:p.w,h:p.h,after:null});
+        const data=image&&imageToData(image,C.PICTURE_MAX_CHARS-2000);
+        if(data){const k=Math.min(1,1/p.w,1/p.h),w=p.w*k,h=p.h*k,x=P.clamp(p.x,0,1-w),y=P.clamp(p.y,0,1-h);legacy.push({owner:'teacher',tool:'picture',color:'#1f2937',size:.016,points:[{x,y},{x:x+w,y:y+h}],image:data})}
       }
-      pages.push(page);
+      pages.push({id:Pages?Pages.newId():'pg',pictures:[],strokes:[...legacy,...saved.strokes],thumb:''});
     }
     if(Pages){wbPages=pages;wbAt=data.current}
     boardPictures=pages[data.current].pictures.slice();
@@ -1792,7 +2102,7 @@
     setLayout:opts=>changeLayout(opts),
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
-    pastePicture,boardPictureCount:()=>boardPictures.length+pictureEdits.length,
+    pastePicture,openUpload,uploadFiles,arrange,boardPictureCount:()=>boardPictures.length+pictureEdits.length+pictureCount(),
     pagesInfo,exportPagePngs,showPage,addPage,
     exportWhiteboard,importWhiteboard,exportPng,boardRatio,
     presentationStream:()=>boardPresentation
