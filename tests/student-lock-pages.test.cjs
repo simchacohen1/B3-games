@@ -15,7 +15,7 @@ const core = require('../student-lock-core.js');
 const ROOT = path.join(__dirname, '..');
 const FEATURES = new Set(core.FEATURES.map(f => f.id));
 const TAG = /<script\b[^>]*\bsrc="([^"]*student-lock\.js)(?:\?[^"]*)?"[^>]*>/gi;
-const TILE_ALIAS = { gallery: 'class-gallery', tag: 'class-gallery', rashi: 'rashi-letters', 'chayus-meter': 'davening' };
+const TILE_ALIAS = { gallery: 'class-gallery', tag: 'class-gallery', rashi: 'rashi-letters' };
 
 // Tracked files and new files not yet added (but not ignored ones): a new page is caught while you are still writing it.
 function trackedHtml() {

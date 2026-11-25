@@ -65,7 +65,7 @@
   }
 
   // ---------- locked tiles on the student home page ----------
-  var TILE_ALIAS = { 'gallery': 'class-gallery', 'tag': 'class-gallery', 'rashi': 'rashi-letters', 'chayus-meter': 'davening' };
+  var TILE_ALIAS = { 'gallery': 'class-gallery', 'tag': 'class-gallery', 'rashi': 'rashi-letters' };
   function decorateTiles() {
     Array.prototype.forEach.call(document.querySelectorAll('.game-card[data-game-id]'), function (card) {
       var id = card.getAttribute('data-tile-key') || card.getAttribute('data-game-id'), f = TILE_ALIAS[id] || id, st = states[f];

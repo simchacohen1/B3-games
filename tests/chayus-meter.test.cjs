@@ -201,17 +201,20 @@ test('the student Chayus page has the meter but no Davening player, audio or con
   const html = fs.readFileSync(path.join(root, 'chayus-meter', 'index.html'), 'utf8');
   assert.ok(html.includes('../chayus-meter/core.js') && html.includes('../chayus-meter/panel.js'));
   assert.ok(html.indexOf('chayus-meter/core.js') < html.indexOf('chayus-meter/panel.js'));
-  assert.match(html, /student-lock\.js[^>]*data-feature="davening"/);
+  assert.match(html, /student-lock\.js[^>]*data-feature="chayus-meter"/);
   for (const banned of ['<audio', '<video', 'playBtn', 'davening_student_app', 'class-pointer', 'firebase']) {
     assert.equal(html.includes(banned), false, `index.html must not contain ${banned}`);
   }
-  // The home tile exists, opens that page, and follows the class's Davening setting (grant, per-student block, lock).
+  // The home tile exists and opens that page. It has its own class permission, its own per-student block and its own lock.
   const registry = fs.readFileSync(path.join(root, 'shared', 'home-tool-registry.js'), 'utf8');
   assert.match(registry, /id:"chayus-meter",title:"Chayus Meter"[^}]*href:"chayus-meter\/index\.html"/);
   const policy = require('../backend/functions/student-tool-policy.js');
-  assert.equal(policy.granted({ toolGrants: { davening: true } }, 'chayus-meter'), true);
-  assert.equal(policy.granted({ toolGrants: {} }, 'chayus-meter'), false);
-  assert.equal(policy.allowed({ members: { s1: { toolAccess: { davening: false } } } }, 's1', 'chayus-meter'), false);
+  assert.equal(policy.granted({ toolGrants: { 'chayus-meter': true } }, 'chayus-meter'), true);
+  assert.equal(policy.granted({ toolGrants: { davening: true } }, 'chayus-meter'), false, 'Davening Player does not open it');
+  assert.equal(policy.allowed({ members: { s1: { toolAccess: { 'chayus-meter': false } } } }, 's1', 'chayus-meter'), false);
+  assert.ok(policy.studentActivities.includes('chayus-meter'));
   // The student does not get the player: Davening itself is still not a student activity.
   assert.equal(policy.studentActivities.includes('davening'), false);
+  assert.ok(require('../backend/functions/class-access-core.cjs').CLASS_TOOL_GRANTS.includes('chayus-meter'));
+  assert.ok(require('../student-lock-core.js').FEATURES.some(x => x.id === 'chayus-meter'));
 });

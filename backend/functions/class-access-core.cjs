@@ -5,7 +5,7 @@ const rashiRecording=require('./rashi-recording-core.cjs');
 const rashiRuleOk=id=>rashiRecording.isSection(id)||Object.keys(rashiRecording.PASSAGES).some(key=>key.startsWith(id+'-'));
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const validId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(value);
-const CLASS_TOOL_GRANTS=Object.freeze(['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','multiplayer-center','homework','gallery','tag','davening','chavrusa','name-picker','daily-checklist','class-pointer','sync-to-nigri']);
+const CLASS_TOOL_GRANTS=Object.freeze(['sefer-hamitzvos','halacha','yiddish','posuk-practice-scroll','rashi-letters','gematria','shorashim','chazara','game-show','student-rewards','weekly-quiz','multiplayer-center','homework','gallery','tag','davening','chayus-meter','chavrusa','name-picker','daily-checklist','class-pointer','sync-to-nigri']);
 const CLASS_TOOL_GRANT_SET=new Set(CLASS_TOOL_GRANTS);
 // The Chumash Cheder tool shows four tiles; each can be starred on its own (it is one tool grant, four star keys).
 const STAR_TILE_KEYS=new Set(['chumash-quiz','record-mishnayos','record-mishnayos-quiz']);
