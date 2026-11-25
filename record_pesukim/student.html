@@ -3602,7 +3602,69 @@ function applyManualCorrections(text, perekNum, posukNum){
   return text;
 }
 
+
+/* ---------- Teacher's recorded translation ("Need help? Hear it") ----------
+   One recording per posuk per class, made by the teacher. No recording = no button. */
+let teacherHelpToken = 0, teacherHelpAudio = null, teacherHelpClassId;
+function stopTeacherHelpAudio(){ if(teacherHelpAudio){ try{ teacherHelpAudio.pause(); }catch(_e){} teacherHelpAudio = null; } }
+function clearTeacherHelp(){
+  teacherHelpToken++;
+  stopTeacherHelpAudio();
+  document.querySelectorAll('.teacher-help-wrap').forEach(el => el.remove());
+}
+async function studentClassIdForHelp(){
+  if(teacherHelpClassId !== undefined) return teacherHelpClassId;
+  try{
+    const user = firebase.auth().currentUser;
+    const tok = user ? await user.getIdTokenResult() : null;
+    teacherHelpClassId = (tok && tok.claims && tok.claims.b3ClassId) || '';
+  }catch(_e){ teacherHelpClassId = ''; }
+  return teacherHelpClassId;
+}
+function addTeacherHelpButton(host, audioUrl){
+  const wrap = document.createElement('div');
+  wrap.className = 'teacher-help-wrap';
+  wrap.style.cssText = 'margin:6px 0;text-align:left;direction:ltr;';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn small teacher-help-btn';
+  const idle = '🎧 Need help? Hear it';
+  btn.textContent = idle;
+  btn.onclick = () => {
+    if(teacherHelpAudio && teacherHelpAudio._btn === btn){ stopTeacherHelpAudio(); btn.textContent = idle; return; }
+    stopTeacherHelpAudio();
+    document.querySelectorAll('.teacher-help-btn').forEach(b => { b.textContent = idle; });
+    const a = new Audio(audioUrl); a._btn = btn; teacherHelpAudio = a;
+    btn.textContent = '⏹ Stop';
+    a.onended = () => { btn.textContent = idle; if(teacherHelpAudio === a) teacherHelpAudio = null; };
+    a.onerror = () => { btn.textContent = idle; };
+    a.play().catch(() => { btn.textContent = idle; });
+  };
+  wrap.appendChild(btn);
+  host.appendChild(wrap);
+}
+async function loadTeacherTranslationHelp(){
+  clearTeacherHelp();
+  if(teacherPreview) return;
+  const token = teacherHelpToken;
+  const classId = await studentClassIdForHelp();
+  if(!classId || token !== teacherHelpToken) return;
+  const sefer = currentSefer, perek = currentPerekNum;
+  (currentSelectionParts || []).forEach(part => {
+    db.ref('posukPractice/translationAudio/' + classId + '/' + sefer + '_' + perek + '_' + part.posukNum).once('value').then(snap => {
+      const v = snap.val();
+      if(token !== teacherHelpToken || !v || typeof v.audio !== 'string' || v.audio.indexOf('data:audio/') !== 0) return;
+      const host = currentIsRange
+        ? document.querySelector('#posukText .range-posuk[data-posuk="' + part.posukNum + '"]')
+        : document.getElementById('scrollBox');
+      if(!host) return;
+      if(!currentIsRange){ const w = document.createElement('div'); host.insertAdjacentElement('afterend', w); w.className = 'teacher-help-wrap'; addTeacherHelpButton(w, v.audio); }
+      else addTeacherHelpButton(host, v.audio);
+    }).catch(() => {});
+  });
+}
+
 function resetScroll(){
+  clearTeacherHelp();
   document.getElementById('scrollPlaceholder').classList.remove('hidden');
   document.getElementById('posukText').classList.add('hidden');
   document.getElementById('recordingArea').classList.add('hidden');
@@ -3644,7 +3706,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   const textEl = document.getElementById('posukText');
   if(isRange){
     textEl.innerHTML = currentSelectionParts.map(p =>
-      '<div class="range-posuk"><span class="range-posuk-num">' + hebrewNumeral(p.posukNum) + '</span><span class="range-posuk-text">' + safeHebrewHtml(p.text) + '</span></div>'
+      '<div class="range-posuk" data-posuk="' + p.posukNum + '"><span class="range-posuk-num">' + hebrewNumeral(p.posukNum) + '</span><span class="range-posuk-text">' + safeHebrewHtml(p.text) + '</span></div>'
     ).join('');
   }else{
     textEl.innerHTML = safeHebrewHtml(text);
@@ -3655,6 +3717,7 @@ function showPosuk(parsha, perekNum, posukNum, text, translation, endPosukNum = 
   collapseSelectionPicker();
   updateNavArrows();
   resetRecordingUI();
+  loadTeacherTranslationHelp();
   if(window.POSUK_TOOL_MODE === 'practice') loadCombinedState();
   else loadHistory();
 }
