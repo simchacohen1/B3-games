@@ -101,8 +101,12 @@
   // ---------- deciding ----------
   function evaluate() {
     if (!core) return;
-    var list = Object.keys(locksByClass).map(function (k) { return locksByClass[k]; });
-    states = core.evaluateStudent(list, Date.now());
+    // The locks come from the class the student is in right now (live lesson's class, else the class in session);
+    // only when neither applies is a tool locked because ANY of his classes locks it.
+    var now = Date.now(), live = String(window.ClassPointerLiveClass || ''),
+      current = typeof core.contextClass === 'function' ? core.contextClass(locksByClass, live, now) : null,
+      list = current ? [locksByClass[current]] : Object.keys(locksByClass).map(function (k) { return locksByClass[k]; });
+    states = core.evaluateStudent(list, now);
     var mine = states[feature];
     if (feature && feature !== 'home' && mine && mine.locked) showCover(); else hideCover();
     // Class Pointer is spread over many pages (lesson overlay, whiteboard, share button), not one page of its own: while it
@@ -174,7 +178,7 @@
   async function start() {
     if (started) return; started = true;
     try {
-      if (!window.B3StudentLockCore) await load(new URL('student-lock-core.js', base).href);
+      if (!window.B3StudentLockCore) await load(new URL('student-lock-core.js', base).href + (script && /[?]/.test(script.src) ? '?' + script.src.split('?')[1] : ''));
       core = window.B3StudentLockCore;
       // What was known on the previous page: covers at once, before the network answers.
       try {
@@ -185,6 +189,9 @@
       await follow();
     } catch (error) { console.warn('Student lock check unavailable; the page stays open.', error); }
   }
+
+  // The sharing code tells us which class's lesson the student is following; his locks then come from that class.
+  window.addEventListener('b3:live-class', function () { evaluate(); });
 
   // ---------- who is the student ----------
   function whoIsHere() { try { return sessionStorage.getItem('b3Games_studentId') || ''; } catch (e) { return ''; } }

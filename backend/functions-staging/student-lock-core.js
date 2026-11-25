@@ -152,6 +152,20 @@
     return out;
   }
 
+  // A student in several classes works in ONE of them at a time. Which class's locks apply right now:
+  //  1. the class of the live Class Pointer lesson he is following (liveClassId), if its locks are known;
+  //  2. otherwise the one class whose own schedule covers right now (the class that is in session);
+  //  3. otherwise null: the caller falls back to evaluateStudent (locked if any of his classes locks it).
+  function contextClass(locksByClass, liveClassId, now) {
+    var all = locksByClass || {};
+    if (liveClassId && Object.prototype.hasOwnProperty.call(all, liveClassId)) return liveClassId;
+    var parts = nyParts(now), inSession = Object.keys(all).filter(function (cid) {
+      var schedules = (all[cid] && all[cid].schedules) || {};
+      return Object.keys(schedules).some(function (uid) { return rulesOf(schedules[uid]).some(function (r) { return ruleCovers(r, parts); }); });
+    });
+    return inSession.length === 1 ? inSession[0] : null;
+  }
+
   // ---- who has the class ----
   // The teacher whose own schedule covers right now; if several, the one who opened the class most recently. With no
   // schedule covering now, the teacher who most recently opened the class. null when nobody ever has.
@@ -183,7 +197,7 @@
 
   var api = { TZ: TZ, DAYS: DAYS, GROUPS: GROUPS, FEATURES: FEATURES, MAX_RULES: MAX_RULES, DEFAULT_CLASS_MINUTES: DEFAULT_CLASS_MINUTES,
     isTarget: isTarget, specificity: specificity, nyParts: nyParts, minutesOf: minutesOf, ruleCovers: ruleCovers, rulesOf: rulesOf,
-    normalizeRules: normalizeRules, featureState: featureState, evaluate: evaluate, evaluateStudent: evaluateStudent,
+    normalizeRules: normalizeRules, featureState: featureState, evaluate: evaluate, evaluateStudent: evaluateStudent, contextClass: contextClass,
     holderOf: holderOf, endOfClass: endOfClass, describe: describe, clock: clock };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.B3StudentLockCore = api;
 })(typeof window === 'object' ? window : globalThis);
