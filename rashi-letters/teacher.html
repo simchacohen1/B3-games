@@ -120,6 +120,18 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 
 .wrap{max-width:1250px}header.top{display:block}#tableHolder{overflow-x:auto}table{border:1px solid #dce3f4}thead th{font-size:15px;padding:18px 14px}tbody td{font-size:17px;padding:18px 14px}.unit-pill{font-size:15px;padding:7px 10px}.phase-tag{font-size:14px}.toolbar{background:white;border-color:#dce3f4;padding:20px}.toolbar label{font-size:18px!important}tbody tr:nth-child(even){background:#f6f8ff}
+  .who-recorded{ margin:0 0 14px; padding:10px 12px; border-radius:14px; background:#fffdf6; border:2px solid #e0d3ad; }
+  .who-recorded:empty{ display:none; }
+  .wr-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:8px; color:#5a4310; }
+  .wr-head span{ font-size:.85rem; font-weight:700; color:#7a6a3d; }
+  .wr-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .wr-chip{ font:inherit; font-size:.88rem; font-weight:700; padding:6px 12px; border-radius:999px; cursor:pointer; border:2px solid transparent; }
+  .wr-chip.done{ background:#d3f2d8; color:#14532d; border-color:#4caf6a; }
+  .wr-chip.none{ background:#eceae4; color:#6b6558; border-color:#d4d0c4; }
+  .wr-chip:hover,.wr-chip:focus-visible{ outline:2px solid #1f3d73; outline-offset:1px; }
+  .wr-check{ font-weight:900; }
+  .wr-n{ margin-left:4px; font-size:.78rem; opacity:.8; }
+  .wr-empty{ color:#7a6a3d; font-size:.88rem; }
 </style>
 </head>
 <body>
@@ -139,6 +151,8 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     </div>
     <button class="btn gold" id="refreshBtn">Refresh</button>
   </div>
+
+  <div id="whoRecordedStrip" class="who-recorded" aria-label="Who recorded today"></div>
 
   <section id="recPanel" aria-live="polite">
     <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
@@ -166,6 +180,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 <script src="../teacher-class-scope.js"></script>
 <script src="../shared/one-audio-at-a-time.js?v=20261124"></script>
 <script src="./rashi-letter-marks-core.js?v=20261122"></script>
+<script src="../record_pesukim/who-recorded.js?v=20261125"></script>
 <script>
 if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const db = firebase.database();
@@ -490,6 +505,32 @@ async function loadTeacher(user, access){
   }
 }
 window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => loadTeacher(user, access || { authorized }));
+</script>
+<script>
+/* "Who recorded today" strip. Rashi recordings are only readable through the teacher server call, so the strip is
+   worked out from the list that call already returned (waiting + recently graded), each time the list is drawn. */
+(function(){
+  const strip=document.getElementById('whoRecordedStrip');
+  if(!strip||!window.B3WhoRecorded||typeof renderRecordings!=='function') return;
+  const drawList=renderRecordings;
+  renderRecordings=function(allRows,recent){
+    drawList.apply(this,arguments);
+    try{
+      const from=B3WhoRecorded.startOfDay(Date.now()),counts={};
+      (allRows||[]).concat(recent||[]).forEach(r=>{ if(r&&r.studentId&&(Number(r.createdAt)||0)>=from) counts[r.studentId]=(counts[r.studentId]||0)+1; });
+      const names={};
+      Object.entries((teacherScope&&teacherScope.students)||{}).forEach(([id,s])=>{ names[id]=(s&&s.name)||id; });
+      strip.innerHTML=B3WhoRecorded.html(B3WhoRecorded.chips(names,counts),'Who recorded today');
+    }catch(_e){ strip.innerHTML=''; }
+  };
+  strip.onclick=e=>{
+    const chip=e.target.closest&&e.target.closest('[data-wr-sid]');
+    if(!chip) return;
+    // Jump to that boy's first reading in the list below (if he has one showing).
+    const card=[...document.querySelectorAll('#recList .rec-item')].find(c=>recRows[c.dataset.id]&&recRows[c.dataset.id].studentId===chip.dataset.wrSid);
+    if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+  };
+})();
 </script>
 <script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body>
 </html>
