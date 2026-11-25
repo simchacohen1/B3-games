@@ -57,7 +57,9 @@
     // On a group board the teacher's page marks each line with the code of the student who drew it ("m3").
     if(typeof s.who==='string'&&/^m[0-9]{1,5}$/.test(s.who))out.who=s.who;
     if(tool){
-      if(tool==='text'){if(typeof s.text!=='string'||!s.text.trim()||s.text.length>200||out.points.length!==1)return null;out.text=s.text}
+      if(tool==='text'){if(typeof s.text!=='string'||!s.text.trim()||s.text.length>200||out.points.length!==1)return null;out.text=s.text;
+        // Left is the usual and stored as nothing; the lines of the words may also be centered or right.
+        if(s.align==='center'||s.align==='right')out.align=s.align}
       else if(tool!=='highlight'&&out.points.length!==2)return null;
       out.tool=tool;
       // A closed shape may be filled with its own color (a picture, which is also a rectangle, never is).
@@ -209,6 +211,17 @@
       if(at>=0)board.strokes[at]=s;else board.strokes.push(s);
       return true;
     }
+    // Layers: the marks named in `ids` are put in that order, in the places those marks already hold in the pile. A student
+    // orders only their own marks (the teacher's marks and everyone else's keep their places); the teacher may order any.
+    if(op.type==='board-order'){
+      if(!Array.isArray(op.ids))return false;
+      const want=[...new Set(op.ids.slice(0,MAX_STROKES).filter(id=>typeof id==='string'))],rank=new Map(want.map((id,i)=>[id,i])),slots=[],picked=[];
+      board.strokes.forEach((s,i)=>{if(rank.has(s.id)&&(by==='teacher'||s.by===by)){slots.push(i);picked.push(s)}});
+      if(picked.length<2)return false;
+      const sorted=picked.slice().sort((a,b)=>rank.get(a.id)-rank.get(b.id));
+      if(sorted.every((s,i)=>s===picked[i]))return false;
+      slots.forEach((at,i)=>{board.strokes[at]=sorted[i]});return true;
+    }
     if(op.type==='board-clear'){
       board.strokes=op.all===true&&by==='teacher'?[]:board.strokes.filter(s=>s.by!==by);board.drafts={student:null,teacher:null};return true;
     }
@@ -267,6 +280,13 @@
     const removed=gone.filter(item=>!moved.has(item.id)).map(item=>item.id);
     if(removed.length)act({type:'board-remove',ids:removed});
     for(const item of list)if(!had.has(item.id)&&!moved.has(item.id)){const {by:_by,...stroke}=item;act({type:'board-add',stroke})}
+    syncOrder(board,list,act,item=>item.by===by&&(!own||own(item)));
+  }
+  // The toolbar's list is the pile (last on top). A mark that was moved or recolored is added again at the top, and a Bring
+  // forward / Send back only changes the order, so after the adds and removes send the order when it is not the list's.
+  function syncOrder(board,list,act,mine){
+    const want=list.map(item=>item.id),listed=new Set(want),now=board.strokes.filter(item=>mine(item)&&listed.has(item.id)).map(item=>item.id);
+    if(now.length>1&&now.length===want.length&&now.some((id,i)=>id!==want[i]))act({type:'board-order',ids:want});
   }
   // The teacher's toolbar sees every mark on a student's board. A change to the student's own mark (move, resize,
   // recolor, nudge, delete, or undo of those) keeps it the student's, and only the teacher can make it. The toolbar's
@@ -286,6 +306,7 @@
     const mine=list.filter(item=>item.id[0]==='t'&&(!owner.has(item.id)||owner.get(item.id)==='teacher'));
     syncBoardItems(board,'teacher',mine,act);
     for(const item of fresh)if(item.id[0]==='s')act({type:'board-put',stroke:strip(item),owner:'student'});
+    syncOrder(board,list,act,()=>true);
   }
   function cleanGroup(raw){
     if(!raw||typeof raw!=='object'||!/^g[0-9]{1,4}$/.test(String(raw.id))||!/^m[0-9]{1,5}$/.test(String(raw.me)))return null;
@@ -648,7 +669,7 @@
     function update(){pictureGroup.hidden=!mine();move.setAttribute('aria-pressed',String(o.tools.tool==='move'))}
     clipReady.then(clip=>{if(clip)clip.register(target);else root.hidden=true});
     update();
-    return{root,update,say};
+    return{root,update,say,paste:()=>{if(Clip)void Clip.pasteInto(target)}};
   }
 
   // =====================================================================
@@ -660,6 +681,9 @@
     let group=null;
     const ownItem=item=>!group||!item.who||item.who===group.me;
     let on=false,mode='boards',blocked=false,board=emptyBoard(),drawer=null,stream=null,call=null,shareWindow=null,teacherPresenting=false;
+    // Which whiteboard this is. It changes when the board is replaced (New Slides, a board the teacher sends, a saved file
+    // opened), so the automatic save (saved-work.js) never writes one whiteboard over another.
+    let boardSerial=0;
     // Tell the page when this student's whiteboard is actually on display (activity-share.js hides Share My Screen meanwhile).
     let announced=null;
     function announceBoard(){
@@ -685,6 +709,21 @@
       remove:id=>{if(board.pages.length>1&&confirm('Delete this page and everything on it?'))act({type:'board-page-remove',id})},
       move:(id,to)=>{const order=Pages.move(board.pages,id,to).map(p=>p.id);act({type:'board-page-move',order})}});
     bar.append(studentPages.root);
+    // New Slides: a fresh blank whiteboard right from the board. The one I have is saved in My files first (saved-work.js);
+    // when that cannot be done I am asked before anything is lost. A group board is shared, so only the teacher starts a new one.
+    async function newSlides(){
+      if(!on||mode!=='boards'||blocked||group)return false;
+      const used=board.pages.length>1||board.pages.some(p=>p.strokes.some(s=>s.by==='student'));
+      const kept=used?await window.FTTSavedWork?.auto?.flush?.().catch(()=>null):null;
+      if(used&&!kept?.ok&&!confirm('Your whiteboard could not be saved to My files. If you start new slides, what you drew will be lost. Start new slides anyway?'))return false;
+      for(const page of board.pages.slice(1))act({type:'board-page-remove',id:page.id});
+      act({type:'board-page-at',pg:board.pages[0].id});
+      clearMine();boardSerial++;redraw();
+      B.status(used&&kept?.ok?'New blank slides. Your last whiteboard is saved in My files.':'New blank slides.');
+      return true;
+    }
+    const newSlidesBtn=button('🆕 New Slides','Start a new, blank whiteboard. The one you have now is saved in My files first.',()=>void newSlides());
+    bar.append(newSlidesBtn);
     const tools=makeTools(drawGroup,COLORS[0],st=>{drawer?.cancel();surface.classList.toggle('erasing',st.tool==='eraser');surface.classList.toggle('moving',st.tool==='move')});
     drawGroup.append(
       button('↶ Undo','Undo my last line',()=>{const mine=board.strokes.filter(s=>s.by==='student'&&ownItem(s));const last=mine[mine.length-1];if(last)act({type:'board-remove',ids:[last.id]})}),
@@ -725,7 +764,7 @@
       // The slim top bar keeps the title, Paste, Copy board, Save, My files, Back to Activity and Full screen.
       const oneToolbar=boardsOn&&!!window.FTTAnnotate;view.classList.toggle('boards-annotated',oneToolbar);
       drawGroup.hidden=!boardsOn||oneToolbar;surface.hidden=!boardsOn;sharePanel.hidden=!screensOn;pausedPanel.hidden=!(on&&blocked);
-      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';studentPages.update();announceBoard();
+      editWord.update();editWord.root.hidden=!boardsOn||activity?.kind!=='word';studentPages.update();newSlidesBtn.hidden=!boardsOn||!!group;announceBoard();
       clip.root.hidden=!boardsOn||!Clip;clip.update();
       shareText.textContent=stream?'✅ Your screen is being shared from this Pointer page.':'Use Share My Screen to open the same blue Share / red Stop Sharing controls used in your activities. Choose Entire Screen and keep that window open.';
       shareBtn.hidden=teacherPresenting;
@@ -773,7 +812,9 @@
     // My whiteboard as a surface for the shared drawing toolbar. Its marks are ordinary board lines, so the teacher
     // sees them live in my tile, and my own Undo / Clear / Eraser work on them too.
     const boardOpen=()=>on&&mode==='boards'&&!blocked;
-    const boardSurface={id:'board',idPrefix:'s',defaultTool:'select',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+    // `arrange`: the right-click menu, layers (Bring forward / Send back) and text alignment of the shared toolbar.
+    const boardSurface={id:'board',idPrefix:'s',defaultTool:'select',renders:true,arrange:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+      pasteFromClipboard:()=>clip.paste(),
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
       getItems:()=>board.strokes.filter(item=>item.by==='student'&&ownItem(item)),
@@ -909,6 +950,7 @@
         // A picture the teacher sent to every board: keep this student's own copy in My files (saved-work.js).
         if(activity?.kind==='image'&&on&&mode==='boards'&&!blocked)window.FTTSavedWork?.keepTeacherCopy?.({kind:'image',data:activity.data,id:activity.id,subject:activity.subject,important:activity.important});
         board=on&&mode==='boards'&&!blocked?boardFromMessage(message.strokes,message.text,message.tiles,message):emptyBoard();
+        if(message.send)boardSerial++;
         // Pictures the teacher sent as pages: keep this student's own copy in My files (saved-work.js).
         if(on&&mode==='boards'&&!blocked&&message.send&&Pages&&Array.isArray(message.pages)&&board.pages.length&&board.pages.every(p=>p.bg))window.FTTSavedWork?.keepTeacherPages?.({id:message.send.id,subject:message.send.subject,important:message.send.important,pages:board.pages.map(p=>({bg:p.bg}))});
         // In embedded mode, screens are shared via the existing activity button;
@@ -976,6 +1018,7 @@
     // Replaces my own marks with the saved ones. A version 1 file is one page; a version 2 file brings back its pages.
     function importBoard(data){
       if(!boardOpen()||!data||data.kind!=='student-board')return false;
+      boardSerial++;
       if(data.version===1){
         if(!Array.isArray(data.strokes))return false;
         // One page: any other pages on my board go, and the saved marks fill the first page.
@@ -1000,7 +1043,7 @@
       return true;
     }
     const exportPng=()=>boardOpen()?boardPng(board):Promise.reject(Error('Your whiteboard is not open.'));
-    window.ClassPointerBoards={fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,reset(){clearScreenMarks();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false);syncAnnotate()}};
+    window.ClassPointerBoards={fromTeacher,clearScreenMarks,exportBoard,importBoard,exportPng,boardId:()=>boardOpen()?'b'+boardSerial:null,newSlides:()=>newSlides(),reset(){clearScreenMarks();drawer.cancel();stopShare(false);on=false;blocked=false;mode='boards';chooseActivity(null,redraw);board=emptyBoard();show(false);syncAnnotate()}};
     return;
   }
 
@@ -1517,6 +1560,8 @@
         return line&&(!line.who||line.who===code)?op:null;
       }
       case 'board-remove':{const ids=mineOf(op.ids);return ids.length?{...op,ids}:null}
+      // Layers: a member orders only their own lines.
+      case 'board-order':{const ids=mineOf(op.ids);return ids.length>1?{...op,ids}:null}
       case 'board-clear':{
         const ids=(page?.strokes||[]).filter(x=>x.by==='student'&&(!x.who||x.who===code)).map(x=>x.id);
         return ids.length?{type:'board-remove',...(op.pg!==undefined?{pg:op.pg}:{}),ids}:null;
@@ -1885,7 +1930,7 @@
   // refreshes. A shared screen gets the same tools from screen-annotate.js.
   const FA=window.FTTAnnotate;
   const boardOpen=()=>{const m=focusMember();return on&&!suspended&&!view.hidden&&mode==='boards'&&!focus.hidden&&!!m&&!isBlocked(m)};
-  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'select',renders:true,maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
+  const boardInk=FA&&{id:'student-board',idPrefix:'t',autoOpen:true,defaultTool:'select',renders:true,arrange:true,pasteFromClipboard:()=>focusClip.paste(),maxItems:MAX_STROKES,maxPoints:MAX_POINTS,
     tools:['select','highlight','text','shape','eraser','pen'],hideUnused:true,
     toolLabels:{select:['🖱️','Select','Click any mark on this board, the student’s or yours, to pick it: drag to move it, drag a corner to resize it, click a color or a size. Click words again to type in them.',-1]},
     keys:{h:{tool:'highlight'},d:{tool:'pen'},e:{tool:'eraser'},u:'undo'},
