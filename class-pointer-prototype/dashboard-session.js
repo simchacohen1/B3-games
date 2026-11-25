@@ -65,6 +65,44 @@
       if(row&&row.roomId===last&&row.teacherUid===context.user.uid&&Number.isFinite(row[OFFLINE]))await Promise.all([old.remove(),context.db.ref(permissionPath(last)).remove()]);
     }catch{/* best effort: students already ignore a lesson whose teacher stayed offline */}
   }
+  // ---------- Two lessons open for one class ----------
+  // Student pages follow only the NEWEST live lesson of their class. If a second teacher window or account opens a
+  // lesson for the same class, every student joins that one and this teacher sees an empty class ("1 of 16 joined",
+  // sharing ON but nothing reaches the students). This watcher notices a newer competing lesson, says so, and offers
+  // a one-click takeover: the lesson's start time is refreshed, so it becomes the newest again. Nothing is deleted.
+  let competeBanner=null,competeOff=null;
+  function hideCompeting(){if(competeBanner)competeBanner.hidden=true}
+  function showCompeting(ref,otherRoom,sameTeacher){
+    if(typeof document==='undefined'||!document.body)return;
+    if(!competeBanner){
+      competeBanner=document.createElement('div');competeBanner.id='cpCompetingLessonBanner';competeBanner.setAttribute('role','alert');
+      competeBanner.style.cssText='position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:2147483000;max-width:min(680px,calc(100% - 24px));display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:#fef2f2;color:#7f1d1d;border:2px solid #dc2626;box-shadow:0 8px 28px #0003;font:600 15px/1.4 system-ui,sans-serif';
+      const text=document.createElement('span');text.className='cp-compete-text';text.style.cssText='flex:1 1 300px';
+      const take=document.createElement('button');take.type='button';take.className='cp-compete-take';take.textContent='Make students join THIS lesson';
+      take.style.cssText='min-height:44px;padding:0 16px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font:800 15px system-ui;cursor:pointer';
+      competeBanner.append(text,take);document.body.appendChild(competeBanner);
+    }
+    competeBanner.querySelector('.cp-compete-text').textContent=(sameTeacher?'Another window of yours':'Another teacher account')+' has also opened Class Pointer for this class (lesson …'+otherRoom.slice(-4)+'). Students join the newest lesson, so they are connected to that one, not this one (this lesson …'+ref.key.slice(-4)+').';
+    const button=competeBanner.querySelector('.cp-compete-take');
+    button.onclick=()=>{button.disabled=true;writeSession(ref,()=>ref.update({createdAt:firebase.database.ServerValue.TIMESTAMP})).catch(()=>{}).finally(()=>{button.disabled=false})};
+    competeBanner.hidden=false;
+  }
+  function watchCompetingLessons(context,ref){
+    try{competeOff?.()}catch{}
+    const sessions=context.ref.child('classPointerSessions');
+    if(typeof sessions?.on!=='function')return; // a warning is optional: it must never stop a lesson from opening
+    const handler=snapshot=>{
+      if(activeRef!==ref){hideCompeting();try{sessions.off('value',handler)}catch{}return}
+      const rows=snapshot.val()||{},mine=rows[ref.key],now=Date.now();
+      if(!mine||!Number.isFinite(mine.createdAt)){hideCompeting();return}
+      const other=Object.entries(rows)
+        .filter(([key,row])=>key!==ref.key&&row&&row.roomId===key&&Number.isFinite(row.createdAt)&&row.createdAt>mine.createdAt&&now-row.createdAt<14400000&&!(Number.isFinite(row.teacherOfflineAt)&&now-row.teacherOfflineAt>=120000))
+        .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0];
+      if(other)showCompeting(ref,other[0],other[1].teacherUid===context.user.uid);else hideCompeting();
+    };
+    competeOff=()=>sessions.off('value',handler);
+    sessions.on('value',handler,()=>{});
+  }
   // Closing or reloading the teacher page ends the lesson for students at once (no grace period).
   if(typeof window.addEventListener==='function')window.addEventListener('pagehide',event=>{
     if(event?.persisted||!activeRef)return;
@@ -196,6 +234,7 @@
     try{await armOffline(ref)}catch(error){await ref.remove().catch(()=>{});if(activeRef===ref){activeRef=null;activePolicyRef=null}throw error}
     if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),disarmOffline(ref)]);return}
     watchConnection(context);
+    watchCompetingLessons(context,ref);
     void clearAbandoned(context,room);
   },async requestScreenSharing(){
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
