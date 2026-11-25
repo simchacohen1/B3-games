@@ -966,7 +966,7 @@
           if(presenceConn!==conn||!sameStudent()||!message||typeof message!=='object')return;
           if(message.type==='pong'){if(Number.isFinite(message.t)){rtt=Math.max(0,Date.now()-message.t);lastPong=Date.now()}return}
           if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
-          if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;classLink('ok','Connected to class'+(latestSession?.studentScreenSharing===true?' – screen sharing is ON':''));return}
+          if(message.type==='present'){admitted=true;presenceDelay=0;presenceFailures=0;classLink('ok','Connected to class (lesson …'+String(room).slice(-4)+')'+(latestSession?.studentScreenSharing===true?' – screen sharing is ON':''));return}
           if(typeof message.type==='string'&&message.type.startsWith('board-')){
             if(admitted)window.ClassPointerBoards?.fromTeacher(message);
             return;
