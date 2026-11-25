@@ -28,6 +28,9 @@ const ALLOWED_NEW = [
   // reads as posukPractice/attempts.
   ['posukPractice', 'submissions'],
   ['posukPractice', 'reviews'],
+  // Teacher-recorded translation per posuk (PENDING OWNER REVIEW): one small audio data URL per class and posuk.
+  // Read by that class's students, its assigned teachers, admins and the owner; written only by the latter three (never students).
+  ['posukPractice', 'translationAudio'],
   // Class locks (PENDING OWNER REVIEW): a class's locks, schedules and timed overrides. Written only by the studentLocks
   // function (the node has no write rule of its own: only the class's existing owner/admin write rule applies, so a
   // teacher or student can never write it from a browser). The student/teacher read rule is in the hardened file; the
