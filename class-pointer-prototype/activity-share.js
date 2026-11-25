@@ -994,7 +994,7 @@
       // The sharing tab never joins the class itself; the student's own tab does that.
       if(persistentShareWindow)return;
       if(!next){presenceTarget='';presenceDelay=0;stopPresence();return}
-      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
+      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;admitted=false;classLink('wait','Your teacher’s class moved to a new lesson. Joining it…');schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
     // The teacher locked Class Pointer for this class (Locks panel): leave the lesson and stop sharing at once. When it opens
@@ -1161,7 +1161,7 @@
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
         &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000&&!teacherGone(v))
-        .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]?.[1]||null;
+        .sort((a,b)=>b[1].createdAt-a[1].createdAt||(a[0]<b[0]?1:-1))[0]?.[1]||null;
     }
     // No database event arrives when the grace period runs out, so look again at that moment.
     function watchGrace(next){
@@ -1189,8 +1189,23 @@
       followSession(next);
       if(next)await watchPermission(next);else{permissionKey='';permissionRequest++;permission={};permissionReady=false;refreshSessionState()}
     }
+    // The database refuses a student who is signed in for another class, or whose class does not have Class Pointer turned on.
+    // Say which, instead of showing a scary error to every student of a class that simply does not use Class Pointer.
+    function explainRefusal(error,forClass){
+      const code=error?.code||error?.message||'database refused';
+      const denied=/permission_denied/i.test(String(code));
+      if(!denied){classLink('bad','Can’t connect – your class’s lesson list could not be read ('+code+'). Retrying.');return}
+      const generic=()=>{if(forClass===classId)classLink('bad','Can’t connect – the lesson list is blocked for your sign-in (PERMISSION_DENIED). Either Class Pointer is not turned on for your class ('+forClass+'), or you are signed in for a different class. Sign out and sign in again, or tell your teacher.')};
+      try{
+        firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+forClass+'/toolGrants/class-pointer').once('value').then(snapshot=>{
+          if(forClass!==classId)return;
+          if(snapshot.val()!==true&&!['et','wt'].includes(forClass))classLink('wait','Class Pointer is not turned on for your class ('+forClass+'), so there is no class lesson to join.');
+          else generic();
+        },generic);
+      }catch{generic()}
+    }
     function onSessionsError(error){
-      classLink('bad','Can’t connect – your class’s lesson list could not be read ('+(error?.code||error?.message||'database refused')+'). Please sign in again. Retrying.');
+      explainRefusal(error,classId);
       stopPresence();latestSession=null;permissionKey='';permissionRequest++;permission={};permissionReady=false;active=null;holder.style.display='none';stop();
       // The database cancelled this listener. Without listening again this boy would have no
       // Share My Screen button for the rest of the day, so try again, slowly.

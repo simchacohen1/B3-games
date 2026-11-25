@@ -53,7 +53,7 @@ test('teacher can End and Restart three times; duplicate clicks never overlap cl
  makePeer:()=>{const events={};const p={events,on:(name,fn)=>events[name]=fn,destroy(){this.destroyed=true}};peers.push(p);return p},
  clearError(){},status(){},fail:message=>errors.push(message),stopSharing(){},roster(){},send(){},receiveStudent(){},
  clearTimeout(){},setTimeout:()=>1,crypto:{randomUUID:()=>String(peers.length)},URL,location:{href:'https://example.test/classroom.html?dashboard=teacher&class=wt'}});
- vm.runInContext(start+'\n'+end,context);
+ vm.runInContext('var takenOverNow=false;'+start+'\n'+end,context);
  for(let cycle=0;cycle<3;cycle++){
   await vm.runInContext('startClass()',context);
   await peers.at(-1).events.open(room);
