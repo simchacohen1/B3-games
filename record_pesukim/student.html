@@ -1275,7 +1275,7 @@ document.documentElement.classList.add('tool-' + window.POSUK_TOOL_MODE);
   .combined-unsent small{ display:block; font-weight:600; font-size:.88rem; margin-top:4px; }
   .combined-unsent.cannot-send{ background:#f1f3f5; border-color:#868e96; color:#343a40; }
   #combinedSubmitBtn.needs-send{ animation:combinedNudge 1.4s ease-in-out infinite; box-shadow:0 0 0 3px #e8590c; }
-  @keyframes combinedNudge{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.04); } }
+  @keyframes combinedNudge{ 0%,100%{ box-shadow:0 0 0 3px #e8590c; } 50%{ box-shadow:0 0 0 8px rgba(232,89,12,.35); } }
   .combined-state.pending{ background:#eef4ff; border:2px solid #9db8e8; color:#1f3d73; }
   .combined-state.gold{ background:#fff7dc; border:2px solid var(--gold); color:#6b4a00; }
   .combined-state.retry{ background:#fff0ec; border:2px solid #e8a797; color:#7a2a17; }
