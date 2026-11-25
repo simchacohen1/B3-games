@@ -85,7 +85,7 @@ test('the font and Fill reach every place a mark is drawn: the board picture, th
 
 test('fonts: a font control beside bold works on typed, picked and new words, like bold does',()=>{
   assert.match(pdf,/fontSelect=el\('select',null,'pdf-font-select'\)/);
-  assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn,fontSelect\)/);
+  assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn,fontSelect,\.\.\.alignBtns\)/);
   assert.match(pdf,/function setTextFont\(next\)/);assert.match(pdf,/function fontSelected\(next\)/);
   assert.match(pdf,/if\(target\.kind==='typing'\)\{inlineEdit\.font=next;sizeInline\(\)\}/);
   assert.match(pdf,/open\.box\.style\.fontFamily=C\.fontStack\(open\.font\)/);
@@ -162,9 +162,9 @@ test('Save, My files and Send to class are right on the toolbar, with a Send cho
   assert.match(actions,/id:'quick-files'[^\n]*window\.FTTSavedWork\?\.open\?\.\(\)/);
   assert.match(actions,/id:'quick-send'[^\n]*Every student gets their own copy|id:'quick-send'[^\n]*every student gets their own copy/i);
   assert.match(actions,/id:'quick-send'[^\n]*items:sendItems/);
-  // The order: Students, Stop, Save, My files, Send, Groups (only with student whiteboards), Poll, Lesson, More.
+  // The order: Students, Stop, Save, My files, Upload (whiteboard only), Send, Groups (only with student whiteboards), Poll, Lesson, More.
   const order=[...actions.matchAll(/\{id:'([a-z-]+)'/g)].map(m=>m[1]);
-  assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-send','groups','poll','lesson','more']);
+  assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-upload','quick-send','groups','poll','lesson','more']);
   const more=annotate.slice(annotate.indexOf('function moreItems(){'),annotate.indexOf('function sendItems(){'));
   assert.doesNotMatch(more,/FTTSavedWork|Send|My files|Save/);
 });

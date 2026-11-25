@@ -167,8 +167,9 @@ test('full screen: the drawing toolbar is the only toolbar and its Switch presen
     const r = document.querySelector(sel)!.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return r.width > 0 && !!top && !!top.closest('#stage') && !top.closest('.cp-tabs-row');
   }))).toEqual([true, true]);
-  await expect(bar.getByRole('button', { name: 'Pen', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  expect(await page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
+  // A new whiteboard opens on the pointer/select tool (whiteboard round 1), so nothing is drawn by accident.
+  await expect(bar.getByRole('button', { name: 'Select', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('select');
   await bar.locator('[data-action="stop"]').click();
   await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.isOpen())).toBe(false);
   expect(errors).toEqual([]);
@@ -187,10 +188,12 @@ async function boardPixel(page: Page, fx: number, fy: number) {
   }, { fx, fy });
 }
 // The drawing toolbar opens in its own strip on the left shortly after a lesson starts (#770): the lesson moves
-// right and gets a little narrower, and the whiteboard opens on the pen. Positions measured before that are stale,
-// so wait until the strip is there, the pen is chosen and the lesson has stopped moving.
+// right and gets a little narrower, and the whiteboard opens on Select (the tests then pick the pen to draw). Positions
+// measured before that are stale, so wait until the strip is there, the pen is chosen and the lesson has stopped moving.
 async function whiteboardSettled(page: Page) {
   await expect(page.locator('body')).toHaveClass(/cp-tool-gutter/);
+  await expect.poll(() => page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('select');
+  await page.locator('#fttAnnotate .fa-bar').getByRole('button', { name: 'Pen', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (document.getElementById('teacherTool') as HTMLSelectElement).value)).toBe('pen');
   const bar = (await page.locator('#fttAnnotate .fa-bar').boundingBox())!;
   let last = '';
@@ -261,11 +264,11 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   const page = await context.newPage(); const errors = await openTeacher(page);
   await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
   await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
-  // A newly opened whiteboard opens the drawing toolbar on the Pen by itself within half a second, and a shape
-  // chosen before that is put back to Pen. Wait for the toolbar, as a teacher would see it, before choosing a shape.
+  // A newly opened whiteboard opens the drawing toolbar on Select by itself within half a second, and a shape
+  // chosen before that is put back. Wait for the toolbar, as a teacher would see it, before choosing a shape.
   await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toBeVisible();
-  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toContainText('Pen');
-  await expect(page.locator('#teacherTool')).toHaveValue('pen');
+  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toContainText('Select');
+  await expect(page.locator('#teacherTool')).toHaveValue('select');
   const content = await settledContentBox(page);
   const shapes: Array<[string, string, string]> = [['line', 'line', '━ Straight line'], ['pen-arrow', 'g', '➜ Pen arrow'], ['rectangle', 'rect', '▭ Rectangle'], ['ellipse', 'ellipse', '◯ Circle / oval'], ['triangle', 'polygon', '△ Triangle']];
   for (let i = 0; i < shapes.length; i++) {
@@ -330,10 +333,13 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   await expect.poll(() => inkCount(page)).toBeGreaterThan(0);
   const marks = await inkCount(page);
 
+  // A pasted picture is a mark on the board (it can be moved, resized, layered and copied like any other), and it is picked.
+  await page.locator('#fttAnnotate .fa-bar').getByRole('button', { name: 'Select', exact: true }).click();
   await pasteRedPicture(page);
-  const picture = page.locator('#pdfContent .board-picture-edit');
-  await expect(picture).toBeVisible();
-  await expect(page.getByRole('button', { name: '✓ Show to class' })).toBeVisible();
+  const picture = page.locator('#pdfInk image');
+  await expect(picture).toHaveCount(1);
+  await expect(page.locator('#pdfInk [data-handle="se"]')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
   const p0 = (await picture.boundingBox())!;
 
   // Move.
@@ -342,36 +348,30 @@ test('teacher pastes a screenshot onto the shared whiteboard, moves, resizes and
   const p1 = (await picture.boundingBox())!;
   expect(p1.x).toBeLessThan(p0.x - 120);
   // Resize from the bottom-right corner; the picture keeps its shape.
-  const se = (await picture.locator('.board-picture-handle.se').boundingBox())!;
+  const se = (await page.locator('#pdfInk [data-handle="se"]').boundingBox())!;
   await page.mouse.move(se.x + se.width / 2, se.y + se.height / 2); await page.mouse.down();
   await page.mouse.move(se.x + se.width / 2 + 100, se.y + se.height / 2 + 100, { steps: 8 }); await page.mouse.up();
   const p2 = (await picture.boundingBox())!;
   await shot(page, 'paste-editing');
   expect(p2.width).toBeGreaterThan(p1.width + 60);
   expect(Math.abs(p2.width / p2.height - p1.width / p1.height)).toBeLessThan(0.05);
-
-  // Students only receive it once the teacher places it.
-  expect(Math.min(...await boardPixel(page, (p2.x + p2.width / 2 - content.x) / content.width, (p2.y + p2.height / 2 - content.y) / content.height))).toBeGreaterThan(245);
-  await page.getByRole('button', { name: '✓ Show to class' }).click();
-  await expect(picture).toHaveCount(0);
-  await expect.poll(async () => {
-    const box = (await page.locator('#pdfContent').boundingBox())!;
-    const [r, g, b] = await boardPixel(page, (p2.x + p2.width / 2 - box.x) / box.width, (p2.y + p2.height / 2 - box.y) / box.height);
-    return r > 180 && g < 90 && b < 120;
-  }).toBe(true);
   expect(await inkCount(page)).toBe(marks);
 
+  // The picture is in the board's own picture (what Copy board and Send give), where the teacher put it.
+  const pixel = await page.evaluate(async ({ fx, fy }) => {
+    const blob = await (window as any).ClassPointerPdf.exportPng(), bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d')!; ctx.drawImage(bitmap, 0, 0); bitmap.close();
+    return [...ctx.getImageData(Math.floor(fx * canvas.width), Math.floor(fy * canvas.height), 1, 1).data].slice(0, 3);
+  }, { fx: (p2.x + p2.width / 2 - content.x) / content.width, fy: (p2.y + p2.height / 2 - content.y) / content.height });
+  expect(pixel[0]).toBeGreaterThan(180); expect(pixel[1]).toBeLessThan(90); expect(pixel[2]).toBeLessThan(120);
+
   // Annotate on top of the picture with the pen.
+  await page.locator('#fttAnnotate .fa-bar').getByRole('button', { name: 'Pen', exact: true }).click();
   await page.mouse.move(p2.x + 10, p2.y + 10); await page.mouse.down();
   await page.mouse.move(p2.x + p2.width - 10, p2.y + p2.height - 10, { steps: 6 }); await page.mouse.up();
   await expect.poll(() => inkCount(page)).toBeGreaterThan(marks);
   await shot(page, 'paste-annotated');
-
-  // Placed pictures can be moved again later.
-  await page.getByRole('button', { name: '🖼 Move pictures' }).click();
-  await expect(picture).toHaveCount(1);
-  await page.keyboard.press('Enter');
-  await expect(picture).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardPictureCount())).toBe(1);
 
   // Closing the whiteboard discards its pictures.
@@ -385,7 +385,7 @@ test('pasting outside the whiteboard does not add pictures', async ({ browser })
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);
   await pasteRedPicture(page);
-  await expect(page.locator('.board-picture-edit')).toHaveCount(0);
+  await expect(page.locator('#pdfInk image')).toHaveCount(0);
   expect(errors).toEqual([]);
   await context.close();
 });
@@ -547,7 +547,7 @@ test('My Screen whiteboard supplies live frames with published pictures and pen 
   await expect.poll(()=>page.evaluate(()=>!!(window as any).ClassPointerPdf.presentationStream()?.active)).toBe(true);
   await page.evaluate(async()=>{const video=document.createElement('video');video.id='testPresentation';video.muted=true;video.srcObject=(window as any).ClassPointerPdf.presentationStream();document.body.append(video);await video.play()});
   await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>v.videoWidth)).toBeGreaterThan(0);
-  await pasteRedPicture(page);await page.getByRole('button',{name:'✓ Show to class'}).click();
+  await pasteRedPicture(page);
   // Sample every pixel from the actual video, rather than only inspecting source canvas state.
   await expect.poll(()=>page.locator('#testPresentation').evaluate((v:HTMLVideoElement)=>{const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d')!;ctx.drawImage(v,0,0);const pixels=ctx.getImageData(0,0,c.width,c.height).data;let red=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>180&&pixels[i+1]<90&&pixels[i+2]<120)red++;return red})).toBeGreaterThan(100);
   await whiteboardSettled(page);

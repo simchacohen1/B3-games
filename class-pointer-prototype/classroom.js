@@ -100,7 +100,26 @@ function eraseStudentMarks(member,ids){
 // A whiteboard lesson is a picture of the board with every mark already painted into it (pdf-mode.js paintInk), so a
 // student page that also draws the marks on top must not draw the words a second time. PDF and screen lessons carry no marks.
 function marksInVideo(){return state.pdf===true&&state.documentKind==='whiteboard'}
-function send(connection,message){if(connection?.open){try{if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;if(message.type==='lesson-marks')message={...message,marksInVideo:marksInVideo(),boardBox:window.ClassPointerPdf?.active()?window.ClassPointerPdf.activityBoardBox?.()||null:null};connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
+// Pictures on the whiteboard are marks, but the picture itself is big. The teacher sends each picture to a student once ('pictures'),
+// and every list of marks after that carries only its short reference. A page that only watches the lesson video gets no pictures.
+function wireStrokes(connection,strokes){
+  const sent=connection.fttPictures||(connection.fttPictures=new Set());
+  return strokes.map(stroke=>{
+    if(!stroke||stroke.tool!=='picture')return stroke;
+    if(stroke.image&&!sent.has(stroke.ref)){sent.add(stroke.ref);try{connection.send({type:'pictures',items:[{ref:stroke.ref,image:stroke.image}]})}catch{}}
+    const {image,...rest}=stroke;return rest;
+  });
+}
+const pictureCache=new Map();let lastWireStrokes=null;
+function resolvePictures(strokes){return Array.isArray(strokes)?strokes.map(stroke=>stroke&&stroke.tool==='picture'&&!stroke.image&&pictureCache.has(stroke.ref)?{...stroke,image:pictureCache.get(stroke.ref)}:stroke):strokes}
+function receivePictures(items){
+  for(const item of (Array.isArray(items)?items:[]).slice(0,4)){
+    const clean=item&&typeof item.ref==='string'?C.cleanStroke({tool:'picture',points:[{x:0,y:0},{x:1,y:1}],image:item.image}):null;
+    if(clean&&clean.ref===item.ref){pictureCache.set(item.ref,item.image);while(pictureCache.size>40)pictureCache.delete(pictureCache.keys().next().value)}
+  }
+  if(lastWireStrokes)highlighter?.receive(resolvePictures(lastWireStrokes));
+}
+function send(connection,message){if(connection?.open){try{if(message.type==='highlights'&&Array.isArray(message.strokes))message={...message,strokes:wireStrokes(connection,message.strokes)};if(message.type==='lesson-marks'&&Array.isArray(message.strokes))message={...message,strokes:message.strokes.filter(stroke=>stroke.tool!=='picture')};if(message.type==='lesson-marks'&&window.ClassPointerPdf?.active())message=window.ClassPointerPdf.activityMarks?.(message)||message;if(message.type==='lesson-marks')message={...message,marksInVideo:marksInVideo(),boardBox:window.ClassPointerPdf?.active()?window.ClassPointerPdf.activityBoardBox?.()||null:null};connection.send(message)}catch{fail('The connection was interrupted. Please rejoin the class.')}}}
 function ownMember(){return state.members.find(member=>member.id==='student:'+peer?.id)}
 function selected(member){return !!member?.admitted&&member.allowed===true&&state.mode==='selected'}
 function memberTools(member){return member?.tools||state.tools}
@@ -321,7 +340,7 @@ function receiveStudent(connection){
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(message.type==='poll-vote'){window.ClassPointerPoll?.fromStudent(member,message);return}
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
-    if(message.type==='highlight'&&live()&&selected(member)&&writingAllowed(message.stroke?.tool,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&selected(member)&&message.stroke?.tool!=='picture'&&writingAllowed(message.stroke?.tool,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){
       if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}
       // Select edits only the sender's own marks. Highlight permission covers highlight shapes.
@@ -657,7 +676,8 @@ function joinClass(event){
       if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
       if(window.ClassPointerBoards?.fromTeacher(message))return;
       if(window.ClassPointerPdf?.handleMessage(message))return;
-      if(message.type==='highlights'){highlighter?.receive(message.strokes);return}
+      if(message.type==='pictures'){receivePictures(message.items);return}
+      if(message.type==='highlights'){lastWireStrokes=message.strokes;highlighter?.receive(resolvePictures(message.strokes));return}
       if(message.type==='highlight-error'){fail('Could not add the highlight. Try a shorter stroke or clear some of your highlights.');return}
       if(message.type==='waiting'){clearTimeout(joinTimer);joining=false;$('joinForm').hidden=true;$('leaveClass').hidden=false;status('Connected. Waiting for your teacher to admit you.');pointerPermission()}
       if(message.type==='points'&&admitted&&state&&message.points&&typeof message.points==='object'){
@@ -820,6 +840,8 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   eraseMarks(ids){if(!isTeacher||!Array.isArray(ids))return false;const before=highlightStore.strokes.length;highlightStore.group('teacher',()=>{for(const id of ids)highlightStore.edit(markOwner(id),'erase',id)});if(highlightStore.strokes.length===before)return false;publishHighlights();return true},
   // Put new marks in the place of some of the teacher's own (a block of words laid out again). Returns the new ids or null.
   swapMarks(ids,strokes){if(!isTeacher||!Array.isArray(ids)||!ids.length)return null;const owner=markOwner(ids[0]);if(!owner||ids.some(id=>markOwner(id)!==owner))return null;const made=highlightStore.group('teacher',()=>highlightStore.swap(owner,ids,strokes));if(made)publishHighlights();return made},
+  // Teacher only: layers. Move marks (by id) to the front or back, or one step forward or backward. Sent to the class once.
+  reorderMarks(ids,how){if(!isTeacher||!Array.isArray(ids)||!ids.length)return false;const changed=highlightStore.group('teacher',()=>highlightStore.reorder('teacher',ids,how));if(changed)publishHighlights();return changed},
   replaceMark(id,stroke){if(!isTeacher)return editOwnHighlightShape(id,stroke);if(!highlightStore.group('teacher',()=>highlightStore.replace(markOwner(id),id,stroke)))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
   replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
