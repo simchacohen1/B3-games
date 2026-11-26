@@ -122,14 +122,18 @@ test('backend milestone route returns approved points to the student page',()=>{
   assert.match(student,/data\.awarded && data\.status === 'approved' \? Number\(data\.amount \|\| 0\) : 0/);
 });
 
-test('owner can reach the Student Rewards Approvals tab (activity points, Approve All, refunds)',()=>{
+test('owner can reach activity-point approvals (Today) and refunds (Prize Store) in the four-tab Student Rewards page',()=>{
   const js=fs.readFileSync('student-rewards/teacher.js','utf8');
   const owner=js.match(/OWNER_NAV=(\[[^\]]*\])/);assert.ok(owner);
-  assert.ok(JSON.parse(owner[1]).includes('Approvals'),'owner navigation lists Approvals');
-  const approvals=js.slice(js.indexOf('if(state.tab==="Approvals"){'),js.indexOf('if(state.tab==="Approvals"){')+900);
-  assert.match(approvals,/approveAllActivityPoints/);
-  assert.match(approvals,/\[data-refund-approve\]/,'refund buttons work on the Approvals tab');
-  assert.match(js,/data-go="Approvals"/);
+  assert.deepEqual(JSON.parse(owner[1]),['Today','Students','Prize Store','Settings'],'four tabs');
+  const bind=js.slice(js.indexOf('function bindActivity(){'),js.indexOf('function bindPage(){'));
+  assert.match(bind,/approveAllActivityPoints/);assert.match(bind,/data-point-approve/);assert.match(bind,/data-point-reject/);
+  assert.match(js,/function activityQueueHTML\(\)/,'Approvals moved onto Today');
+  assert.match(js,/\$\{activityQueueHTML\(\)\}/);
+  const page=js.slice(js.indexOf('function bindPage(){'));
+  assert.match(page,/\[data-refund-approve\]/,'refund buttons work in the Prize Store waiting list');
+  assert.match(js,/\$\{waitingStoreHTML\(\)\}/);
+  for(const old of ['Approvals','Rewards','Overview','Daily Points','Points Dashboard','Reports','People & Classes','Categories','Comments'])assert.ok(js.includes('"'+old+'":['),'old tab link still opens: '+old);
 });
 
 test('homepage shows class names (ET / WT), not internal class ids',()=>{
