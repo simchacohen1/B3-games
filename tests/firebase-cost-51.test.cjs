@@ -61,7 +61,7 @@ test('Student Rewards owner view keeps its collections live instead of re-downlo
       on:(e,cb,err)=>{assert.equal(typeof err,'function','a refused path must not throw');listeners.push(path);},
       once:async()=>{reads.push(path);return {val:()=>path.endsWith('/classes')?{c1:{active:true}}:null};}
     })},
-    prepareDraft(){},renderClassSelect(){},setHeader(){},buildNav(){},sweepAutomaticPosukPoints(){},activeClasses:()=>[],requestedClassId:()=>'',B3ClassGate:{choose:async()=>'c1'}};
+    prepareDraft(){},normalizeClassNames(){},renderClassSelect(){},setHeader(){},buildNav(){},sweepAutomaticPosukPoints(){},activeClasses:()=>[],requestedClassId:()=>'',B3ClassGate:{choose:async()=>'c1'}};
   const loadRoot=vm.runInNewContext(source.slice(source.indexOf('const OWNER_ROOT_PATHS='),source.indexOf('async function ensureRewardModelV2('))+';loadRoot',ctx);
   await loadRoot();await loadRoot();await loadRoot();
   assert.equal(listeners.length,19,'each collection is held open once, however many refreshes run');

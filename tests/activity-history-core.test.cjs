@@ -76,3 +76,28 @@ test('row links open the tool page on the class and student', () => {
   assert.equal(C.rowHref({ tool: 'chazara', classId: 'c 1', sid: 's1' }), 'chazara/teacher.html?class=c%201&student=s1');
   assert.equal(C.rowHref({ tool: 'daily', classId: 'c1', sid: 's1' }), 'student-rewards/teacher.html?tab=Daily%20Points&class=c1&student=s1');
 });
+
+test('reward rows match the Student Rewards id (b3_<hash>) to the real student id', () => {
+  const root = {
+    students: { b3_aaa: { name: 'Dovid', b3StudentId: 's1' }, b3_bbb: { name: 'Moshe' }, b3_ccc: { name: 'Nobody' } },
+    dailyAwards: { b3_aaa: { c1: { '2026-11-02': { points: 2, savedAt: 5 } } } },
+    pointRequests: { r1: { source: 'rashi-recording', rewardStudentId: 'b3_zzz', practiceStudentId: 's2', classId: 'c2', status: 'pending', amount: 2, createdAt: 9 } },
+    pointAdjustments: { a1: { studentId: 'b3_bbb', classId: 'c2', amount: 3, createdAt: 8 } },
+    redemptionsByStudent: { b3_aaa: { p1: { cost: 5, requestedAt: 7, status: 'pending' } }, b3_ccc: { p2: { cost: 5, requestedAt: 7 } } }
+  };
+  const rows = C.rewardRows(root, people);
+  assert.deepEqual(rows.map(r => r.tool + ':' + r.sid).sort(), ['daily:s1', 'points:s2', 'prize:s1', 'rashi:s2']);
+});
+
+test('rashi: recorded readings from the server list, and a practice row from progress', () => {
+  const list = { requests: [{ id: 'q1', studentId: 's1', studentName: 'Dovid', classId: 'c1', className: 'Class One', sectionLabel: 'Zayin 1', createdAt: 5, durationMs: 4000, audioUrl: 'u' }],
+    recent: [{ id: 'q2', studentId: 's1', classId: 'c1', sectionLabel: 'Bet 2', createdAt: 3, gradedAt: 4, letterReview: { total: 10, missedCount: 2 } }] };
+  const rows = C.rashiListRows(list, people);
+  assert.equal(rows.length, 2);
+  assert.equal(rows.find(r => r.id === 'rashi:q1').status, 'Waiting for grading');
+  assert.equal(rows.find(r => r.id === 'rashi:q2').result, 'Reading 80%');
+  const pr = C.rashiProgressRows(who, { lastActive: 99, currentUnitIndex: 2, units: { zayin_letter: { attempts: 10, correct: 9 } } });
+  assert.equal(pr.length, 1);
+  assert.equal(pr[0].what, 'Practice · unit 3 of 9');
+  assert.equal(C.rashiProgressRows(who, null).length, 0);
+});

@@ -34,10 +34,10 @@ test('all student tools load the corrected activity screen-sharing script withou
 
 test('the classroom loads the updated PeerJS reconnection handling', () => {
   const html = fs.readFileSync(path.join(root, 'class-pointer-prototype/classroom.html'), 'utf8');
-  assert.match(html, /classroom[.]js[?]v=20261126-lead1/);
+  assert.match(html, /classroom[.]js[?]v=20261126-zn3/);
   // The teacher's screen tiles and the "student stopped" message changed with the sharing tab (#700).
   assert.match(html, /activity-screen-teacher[.]js[?]v=20261120-sharetab3/);
-  assert.match(html, /student-boards[.]js[?]v=20261125-wb3/);
+  assert.match(html, /student-boards[.]js[?]v=20261126-zn1/);
 });
 test('student pages refresh the shared gate for locked-classroom presentation controls',()=>{
   for(const page of [...pages,'halacha/index.html','class-pointer-prototype/student-view.html']) {

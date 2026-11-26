@@ -217,7 +217,7 @@ test('page: each row shows who did it, offers the right Undo, marks undone entri
   same(d.undo, { kind: 'daily', classId: 'c1', studentId: 's1', date: '2026-10-01' }); assert.equal(d.batch.count, 2);
   assert.match(api.undoCell(d), /Undo whole save \(2\)/); assert.match(api.undoCell(d), /data-undo=/);
   assert.match(api.undoCell(by('daily:s1:c1:2026-08-01')), /Saved before Undo existed/);
-  assert.match(api.undoCell(by('class-contribution:s1:k1')), /refund request/);
+  assert.match(api.undoCell(by('class-contribution:s1:k1')), /data-refund-contribution="s1\|k1"/); assert.equal(by('redeem:s1:p1:request').prize, 'waiting'); assert.equal(by('redeem:s1:p2:return').prize, 'refunded');
   assert.equal(api.whoLabel(by('gap:s1')), '—');
   const dailyUndo = rows.find(r => String(r.id).startsWith('dailyundo:'));
   assert.ok(dailyUndo, 'a daily undo is shown in the history'); assert.equal(dailyUndo.counts, false, 'it does not change the running balance a second time'); assert.equal(dailyUndo.amount, -2);
@@ -242,7 +242,7 @@ test('the staging copy of the teacher rewards function uses the same core as the
   assert.doesNotMatch(wrapper, /sols\.tools|funtorahtools\.com/);
   assert.match(fs.readFileSync(path.join(__dirname, '../backend/functions-staging/index.js'), 'utf8'), /exports\.studentRewardsTeacher = require\('\.\/rewards-teacher'\)\.studentRewardsTeacher;/);
   const html = fs.readFileSync(path.join(__dirname, '../student-rewards/teacher.html'), 'utf8');
-  assert.match(html, /brightpath\.css\?v=20261117-undo1/); assert.match(html, /teacher\.js\?v=20261117-undo1/);
+  assert.match(html, /brightpath\.css\?v=20261127-fourtabs/); assert.match(html, /teacher\.js\?v=20261127-fourtabs/);
 });
 
 test('an undo claim left behind by a crash can be taken again after 2 minutes, but not while it is fresh', async () => {
