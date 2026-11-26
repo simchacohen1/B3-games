@@ -7,6 +7,7 @@ const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
+const chayusPoints=require('./chayus-points-core.cjs');
 const posukReviewCore=require('./posuk-review-core.cjs');
 const submissionOpenCore=require('./submission-open-core.cjs');
 const letterMarks=require('./rashi-letter-marks-core.cjs');
@@ -146,11 +147,11 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
+    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','chayus-class-history','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const act=String(req.body?.action||'');
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':'chazara');
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':act.startsWith('chayus-')?(['et','wt'].includes(classId)?'chazara':'chayus-meter'):'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -162,6 +163,7 @@ async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
+ if(String(action).startsWith('chayus-'))return; // read-only; the handler uses the selected class roster
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='posuk-grade'||action==='posuk-delete'||action==='posuk-word-marks')return; // posuk-review-core checks the student against this scope
  if(action==='repair-shorashim-recording'){
@@ -697,6 +699,7 @@ function classRewardCooldown(item,live,completed){
 function modeVoterCount(voters){return Object.values(voters||{}).filter(Boolean).length;}
 function maxModeTotal(modes){return modes.reduce((m,x)=>Math.max(m,Number(x.total)||0),0);}
 
+const NO_STUDENT_CAP=Number.MAX_SAFE_INTEGER;
 function classRewardGoalFromRoot(root,studentId,classId,rewardId){
   const item=root?.classRewardCatalog?.[rewardId];
   if(!item || item.active===false) return null;
@@ -704,7 +707,7 @@ function classRewardGoalFromRoot(root,studentId,classId,rewardId){
   const live=root?.classRewardRounds?.[classId]?.[rewardId]||{};
   const perStudentCost=Math.max(1,Number(live.perStudentCost)||Number(item.costPerStudent)||100);
   const goalPoints=Math.max(1,Number(live.goalPoints)||perStudentCost*count);
-  const studentCap=Math.max(1,Number(live.maxPerStudent)||Math.min(goalPoints,Math.ceil((goalPoints/count)*2)));
+  const studentCap=NO_STUDENT_CAP; // no per-student limit: a student may give as many of his own points as he has
   const settingsAvailable=root?.settings?.classRewardAvailability?.[rewardId];
   const available=item.available!==false && settingsAvailable!==false;
   const modeVoting=isGimkitReward(item,rewardId);
@@ -858,7 +861,7 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
     let live=cur&&typeof cur==='object'?{...cur}:{};
     const perStudentCost=Math.max(1,Number(live.perStudentCost)||goal.perStudentCost);
     const goalPoints=Math.max(1,Number(live.goalPoints)||goal.goalPoints);
-    const maxPerStudent=Math.max(1,Number(live.maxPerStudent)||goal.studentCap);
+    const maxPerStudent=Number.MAX_SAFE_INTEGER; // no per-student limit
     const cooldownDays=Math.max(0,Number(item.cooldownDays)||0);
     const now=Date.now();
 
@@ -1247,6 +1250,39 @@ const posukReview=posukReviewCore.createPosukReview({
     catch(err){console.warn('Posuk recording check failed',err);throw Object.assign(new Error('Recordings cannot be checked on this site (audio storage is not set up).'),{code:503});}
   }
 });
+
+// Chayus Meter: one point per level, at most 10 a day (chayus-points-core.cjs holds the rules). The student's own
+// page reports counted seconds; no audio is ever sent.
+const chayusRewardIdCache=new Map();
+async function chayusRewardStudentId(studentId){
+  const hit=chayusRewardIdCache.get(studentId);
+  if(hit&&hit.until>Date.now())return hit.id;
+  const id=await resolveRewardStudentId(studentId);
+  if(id)chayusRewardIdCache.set(studentId,{id,until:Date.now()+10*60*1000});
+  return id;
+}
+const chayusStore={
+  get:async path=>(await rtdb.ref(path).get()).val(),
+  tx:(path,fn)=>rtdb.ref(path).transaction(fn)
+};
+async function chayusMeter(req,res,body,action){
+  const practice=await requirePracticeStudent(req,'chayus-meter');
+  if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+  const rewardStudentId=await chayusRewardStudentId(practice.studentId);
+  if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
+  // Quick off-switch: set studentRewards/settings/chayusPointsEnabled to false in the database to stop all Chayus points.
+  const enabled=(await rtdb.ref(`${SR_ROOT}/settings/chayusPointsEnabled`).get()).val()!==false;
+  const result=await chayusPoints.report({
+    enabled,store:chayusStore,studentId:practice.studentId,
+    reportedSeconds:action==='chayus-report'?body.countedSeconds:null,
+    award:({requestId,level,name,day})=>awardMilestoneImmediately({
+      requestId,rewardStudentId,studentId:practice.studentId,source:chayusPoints.SOURCE,amount:1,
+      reason:`Chayus Meter — Level ${level}: ${name}`,
+      record:{chayusDay:day,chayusLevel:level},reviewedBy:'Chayus Meter (automatic)'
+    })
+  });
+  return res.status(result.ok?200:(result.status||400)).json(result.ok?result:{error:result.error});
+}
 
 async function resolveRewardStudentId(posukStudentId){
   // Filter in code: the database has no ".indexOn": "b3StudentId" rule, and
@@ -1801,6 +1837,7 @@ exports.studentRewardsAutoAward = onRequest(
           if(!result.ok) return res.status(409).json({error:result.error});
           return res.status(200).json(result);
         }
+        if(action==="chayus-report"||action==="chayus-status")return await chayusMeter(req,res,body,action);
         if(action==="posuk-submit"){
           const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
           if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
@@ -1809,6 +1846,13 @@ exports.studentRewardsAutoAward = onRequest(
           const result=await posukReview.submit({studentId:practice.studentId,classId:practice.classId,
             selectionKey:String(body.selectionKey||''),attemptId:String(body.attemptId||''),
             hebrewText:String(body.hebrewText||''),sefer:String(body.sefer||'')});
+          return res.status(200).json(result);
+        }
+        if(action==="posuk-student-delete"){
+          // A student deletes their own recording, only while the teacher has not graded it (discard refuses otherwise).
+          const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
+          if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+          const result=await posukReview.discard({byStudent:true,studentId:practice.studentId,submissionId:String(body.submissionId||'')});
           return res.status(200).json(result);
         }
         const teacher=await requireTeacher(req);
@@ -1831,6 +1875,12 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json(result);
         }
         await authorizeChazaraAction(teacher,body);
+        if(action==="chayus-class-history"){
+          // Read only: each student's recorded Chayus Meter days (level, counted minutes, points) for the selected class.
+          if(!teacher.scope||!teacher.scope.selected)return res.status(400).json({error:'Choose a class.'});
+          const history=await chayusPoints.classHistory({get:async p=>(await rtdb.ref(p).get()).val(),students:teacher.scope.students,days:body.days,nowMs:Date.now()});
+          return res.status(200).json({ok:true,classId:teacher.scope.selected,...history});
+        }
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});

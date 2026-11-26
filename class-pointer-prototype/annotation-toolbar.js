@@ -56,6 +56,8 @@
     ['pen','✏️','Pen','Draw freehand.']];
   const CAPTURES=new Set(['select','highlight','text','shape','eraser','pen']);
   const MAX_TEXT=200,MAX_ITEMS_DEFAULT=200,MAX_POINTS_DEFAULT=600,HISTORY=40;
+  // How the lines of a text mark line up inside its box (left is the usual, and is stored as nothing).
+  const ALIGNS=['left','center','right'];
   const Z=2147483645;
   const round=v=>Math.round(v*1e4)/1e4;
   const clamp01=v=>Math.max(0,Math.min(1,v));
@@ -80,6 +82,7 @@
     if(tool==='text'){
       if(typeof raw.text!=='string'||!raw.text.trim()||raw.text.length>MAX_TEXT||out.points.length!==1)return null;
       out.text=raw.text;
+      if(ALIGNS.includes(raw.align)&&raw.align!=='left')out.align=raw.align;
     }
     return out;
   }
@@ -93,7 +96,10 @@
     if(tool==='text'){
       const [x,y]=at(pts[0]),fs=Math.max(9,s.size*w);
       ctx.font='600 '+fs+'px Arial, "Segoe UI", sans-serif';ctx.textBaseline='top';ctx.textAlign='left';
-      String(s.text||'').split('\n').slice(0,8).forEach((line,i)=>ctx.fillText(line,x,y+i*fs*1.25));
+      const lines=String(s.text||'').split('\n').slice(0,8),share=s.align==='center'?.5:s.align==='right'?1:0;
+      // The box is as wide as its longest line; the other lines sit left, centered or right inside it.
+      const widest=share?Math.max(...lines.map(line=>ctx.measureText(line).width)):0;
+      lines.forEach((line,i)=>ctx.fillText(line,x+(share?(widest-ctx.measureText(line).width)*share:0),y+i*fs*1.25));
     }else if(tool==='rect'||tool==='ellipse'||tool==='triangle'||tool==='line'||tool==='arrow'){
       const [x1,y1]=at(pts[0]),[x2,y2]=at(pts[pts.length-1]);ctx.beginPath();
       if(tool==='rect')ctx.rect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));
@@ -196,6 +202,21 @@
   }
   const geometry={END_TOOLS,handlesOf,resizePoints,movePoints,handleAt};
 
+  // ---------- Layers ----------
+  // The list of marks is the pile: the last one is on top. `ids` are the marks to move (they keep their order among
+  // themselves) and `how` is front | forward | backward | back. Returns the new list, or null when nothing would change.
+  function reorder(list,ids,how){
+    const want=new Set(ids),moving=list.filter(item=>want.has(item.id));
+    if(!moving.length||moving.length===list.length)return null;
+    let next;
+    if(how==='front')next=list.filter(item=>!want.has(item.id)).concat(moving);
+    else if(how==='back')next=moving.concat(list.filter(item=>!want.has(item.id)));
+    else if(how==='forward'){next=list.slice();for(let i=next.length-2;i>=0;i--)if(want.has(next[i].id)&&!want.has(next[i+1].id))[next[i],next[i+1]]=[next[i+1],next[i]]}
+    else if(how==='backward'){next=list.slice();for(let i=1;i<next.length;i++)if(want.has(next[i].id)&&!want.has(next[i-1].id))[next[i],next[i-1]]=[next[i-1],next[i]]}
+    else return null;
+    return next.every((item,i)=>item===list[i])?null:next;
+  }
+
   // ---------- State ----------
   let role=null;                 // null | 'student' | 'teacher'
   let studentLevel='none';       // what the teacher allows this student off their own whiteboard: none | point | highlight | pen
@@ -283,6 +304,11 @@
 #fttAnnotate .fa-custom[data-active=true]{background:var(--c)}
 #fttAnnotate .fa-custom input{position:absolute;inset:-6px;width:calc(100% + 12px);height:calc(100% + 12px);opacity:0;cursor:pointer;padding:0;border:0}
 #fttAnnotate .fa-shapestyle{display:flex;flex-direction:column;gap:3px}
+#fttAnnotate .fa-ctx{position:fixed;pointer-events:auto;min-width:190px;padding:5px;border-radius:12px;background:#fff;color:#1f2937;box-shadow:0 8px 30px #0f172a40,0 0 0 1px #0f172a1f}
+#fttAnnotate .fa-ctx-item{display:block;width:100%;margin:0;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:inherit;font:700 14px system-ui,"Segoe UI",sans-serif;text-align:left;cursor:pointer}
+#fttAnnotate .fa-ctx-item:hover:not(:disabled),#fttAnnotate .fa-ctx-item:focus-visible{background:#e8f0ff;outline:none}
+#fttAnnotate .fa-ctx-item:disabled{opacity:.4;cursor:default}
+#fttAnnotate .fa-ctx-sep{height:1px;margin:4px 6px;background:#e2e8f0}
 #fttAnnotate .fa-style[aria-pressed=true]{background:#dbe7ff;border-color:#2563eb}
 #fttAnnotate .fa-color[aria-pressed="true"]{outline:3px solid #3b82f6;outline-offset:1px}
 #fttAnnotate .fa-sizes{display:flex;gap:2px}
@@ -393,7 +419,21 @@
   const outlineBtn=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al">Outline</span>','Outline: only the line',()=>setPickedShape(false));
   const filledBtn=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al">Filled</span>','Filled with its color',()=>setPickedShape(true));
   styleBox.append(outlineBtn,filledBtn);
-  bar.append(sep1,colorBox,sizeBox,styleBox,sep2,pair,actionBox,minBtn);
+  // Words: left, center or right (a surface that says `arrange` has it). Marks: bring forward or send back, in the same pile.
+  let textAlign='left';
+  const alignBox=document.createElement('div');alignBox.className='fa-shapestyle fa-alignbox';alignBox.setAttribute('role','group');alignBox.setAttribute('aria-label','Line up the words');alignBox.hidden=true;
+  const alignBtns=new Map();
+  for(const [id,icon,name] of [['left','⯇','Left'],['center','☰','Center'],['right','⯈','Right']]){
+    const b=btn('fa-small fa-act fa-style','<span class="fa-ai"></span><span class="fa-al"></span>','Line the words up on the '+name.toLowerCase()+(id==='center'?' (centered)':''),()=>setAlign(id));
+    b.querySelector('.fa-ai').textContent=icon;b.querySelector('.fa-al').textContent=name;alignBox.append(b);alignBtns.set(id,b);
+  }
+  const LAYERS=[['front','⤒','To front','Bring to front: above everything else'],['forward','↑','Forward','Bring forward: one layer up'],['backward','↓','Backward','Send backward: one layer down'],['back','⤓','To back','Send to back: below everything else']];
+  const layerBox=document.createElement('div');layerBox.className='fa-shapestyle fa-layerbox';layerBox.setAttribute('role','group');layerBox.setAttribute('aria-label','Layer: which mark is on top');layerBox.hidden=true;
+  for(const [how,icon,name,title] of LAYERS){
+    const b=btn('fa-small fa-act','<span class="fa-ai"></span><span class="fa-al"></span>',title,()=>arrangeSelected(how));
+    b.querySelector('.fa-ai').textContent=icon;b.querySelector('.fa-al').textContent=name;layerBox.append(b);
+  }
+  bar.append(sep1,colorBox,sizeBox,styleBox,alignBox,layerBox,sep2,pair,actionBox,minBtn);
   root.append(ink,capture,fly,bar,pencil,tip);
   pencil.addEventListener('click',()=>openBar());
   // Clicks and mouse moves on the toolbar never reach the page or the lesson underneath.
@@ -562,6 +602,11 @@
       outlineBtn.querySelector('.fa-ai').textContent=shapeInfo.outline;filledBtn.querySelector('.fa-ai').textContent=shapeInfo.filled;
       outlineBtn.setAttribute('aria-pressed',String(!shapeInfo.filledNow));filledBtn.setAttribute('aria-pressed',String(!!shapeInfo.filledNow));
     }
+    // Words can be lined up, and any picked mark can move up or down the pile, on a surface that offers it.
+    const picked=s.arrange&&!isDelegate(s)&&st.tool==='select'&&selected?itemsOf(s).find(i=>i.id===selected):null;
+    alignBox.hidden=!(s.arrange&&!isDelegate(s)&&(picked?picked.tool==='text':st.tool==='text'));
+    layerBox.hidden=!picked;
+    if(!alignBox.hidden){const now=picked&&picked.tool==='text'?picked.align||'left':textAlign;for(const [id,b] of alignBtns)b.setAttribute('aria-pressed',String(id===now))}
     const drawing=['pen','highlight','shape','text'].includes(st.tool);
     colorBox.hidden=!drawing&&!isDelegate(s)&&st.tool!=='select';sizeBox.hidden=(!drawing&&st.tool!=='select')||(st.tool==='text'&&!!s.ownTextSize);
     const sizes=sizesOf(s,st.tool);st.sizeIndex=Math.min(st.sizeIndex,sizes.length-1);
@@ -808,6 +853,24 @@
     if(item.color!==color.toLowerCase())changeItem(s,item,{color:color.toLowerCase()});
     return true;
   }
+  // Line the words up left, center or right: the picked words, otherwise the next words typed.
+  function setAlign(next){
+    if(!ALIGNS.includes(next))return;
+    const s=surface(),item=st.tool==='select'&&selected&&!isDelegate(s)?itemsOf(s).find(i=>i.id===selected):null;
+    if(item&&item.tool==='text'){if((item.align||'left')!==next){const {align:_old,...rest}=item;changeItem(s,next==='left'?rest:{...rest,align:next},{})}}
+    else textAlign=next;
+    if(editor){editor.align=next;editor.ta.style.textAlign=next}
+    sync();
+  }
+  // Move the picked mark up or down the pile (To front, Forward, Backward, To back).
+  const LAYER_WORDS={front:'Brought to the front.',forward:'Brought forward one layer.',backward:'Sent back one layer.',back:'Sent to the back.'};
+  function arrangeSelected(how){
+    const s=surface();if(!s.arrange||isDelegate(s))return false;
+    if(!selected){showTip('Pick a mark first (Select tool).');return false}
+    const list=itemsOf(s),next=reorder(list,[selected],how);
+    if(!next){showTip(how==='front'||how==='forward'?'It is already on top.':'It is already at the bottom.');return false}
+    commit(s,next);showTip(LAYER_WORDS[how]);scheduleRender();return true;
+  }
   // One arrow-key step of `px` screen pixels for the picked mark, as a fraction of the surface. True when a mark moved.
   const ARROW_STEP={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
   function nudgeSelected(direction,px){
@@ -824,6 +887,66 @@
     return false;
   }
 
+  // ---------- Right-click menu (only on a surface that says `arrange`: the whiteboards) ----------
+  // Cut, Copy and Paste keep one mark in memory here (pictures and words from outside come through surface.pasteFromClipboard).
+  let itemClip=null,menu=null,pastedCount=0;
+  const cloneItem=item=>JSON.parse(JSON.stringify(item));
+  function closeMenu(){if(menu){menu.remove();menu=null}}
+  function copySelected(cut){
+    const s=surface(),item=selected&&!isDelegate(s)&&itemsOf(s).find(i=>i.id===selected);
+    if(!item)return false;
+    itemClip={item:cloneItem(item)};pastedCount=0;
+    if(cut)deleteSelected();
+    showTip(cut?'Cut. Right-click and choose Paste to put it back.':'Copied. Right-click and choose Paste.');
+    return true;
+  }
+  function pasteClip(spot){
+    const s=surface();if(!itemClip||isDelegate(s))return false;
+    const items=itemsOf(s);
+    if(items.length>=(s.maxItems||MAX_ITEMS_DEFAULT)){showTip('That is a lot of marks. Use 🗑 Clear first.');return false}
+    const base=itemClip.item,xs=base.points.map(p=>p.x),ys=base.points.map(p=>p.y);
+    pastedCount++;
+    const dx=spot?spot.x-(Math.min(...xs)+Math.max(...xs))/2:.03*pastedCount,dy=spot?spot.y-(Math.min(...ys)+Math.max(...ys))/2:.03*pastedCount;
+    const copy={...cloneItem(base),id:newId(s.idPrefix),points:movePoints(base,dx,dy).map(p=>({x:round(p.x),y:round(p.y)}))};
+    commit(s,items.concat(copy));selected=copy.id;showTip('Pasted. Drag it where you want it.');scheduleRender();return true;
+  }
+  function openMenu(e,s,hit){
+    closeMenu();
+    const box=document.createElement('div');box.className='fa-ctx';box.setAttribute('role','menu');box.setAttribute('aria-label','Whiteboard');
+    const add=(label,run,disabled)=>{const b=document.createElement('button');b.type='button';b.className='fa-ctx-item';b.setAttribute('role','menuitem');b.textContent=label;b.disabled=!!disabled;b.addEventListener('click',()=>{closeMenu();run()});box.append(b)};
+    const p=rel(e,s),spot=p?{x:p.x,y:p.y}:null,has=!!hit;
+    add('Cut',()=>copySelected(true),!has);
+    add('Copy',()=>copySelected(false),!has);
+    add('Paste',()=>{if(itemClip)pasteClip(spot);else try{s.pasteFromClipboard?.(spot)}catch{}},!itemClip&&!s.pasteFromClipboard);
+    add('Delete',()=>deleteSelected(),!has);
+    if(has){
+      const sep=document.createElement('div');sep.className='fa-ctx-sep';box.append(sep);
+      for(const [how,label] of [['front','Bring to Front'],['forward','Bring Forward'],['backward','Send Backward'],['back','Send to Back']])add(label,()=>arrangeSelected(how));
+    }
+    for(const type of ['pointerdown','pointerup','click','dblclick','wheel','contextmenu'])box.addEventListener(type,ev=>{ev.stopPropagation();if(type==='contextmenu')ev.preventDefault()});
+    root.append(box);menu=box;
+    const mw=box.offsetWidth,mh=box.offsetHeight;
+    box.style.left=Math.max(4,Math.min(e.clientX,window.innerWidth-mw-4))+'px';box.style.top=Math.max(4,Math.min(e.clientY,window.innerHeight-mh-4))+'px';
+    try{box.querySelector('button:not(:disabled)')?.focus({preventScroll:true})}catch{}
+  }
+  document.addEventListener('contextmenu',e=>{
+    const s=surface();
+    if(mode!=='open'||root.hidden||!s.arrange||isDelegate(s))return;
+    if(root.contains(e.target)&&e.target!==capture)return;
+    // Typing boxes keep the browser's own menu (spelling, paste of words).
+    if(e.target?.closest?.('textarea,input'))return;
+    if(!insideSurface(e,s))return;
+    const p=rel(e,s);if(!p)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    finishEditor(true);
+    const hit=topHit(s,p,true);
+    if(hit){if(st.tool!=='select')chooseTool('select');selected=hit.id}else selected=null;
+    sync();openMenu(e,s,hit);
+  },true);
+  document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))closeMenu()},true);
+  document.addEventListener('keydown',e=>{if(menu&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeMenu()}},true);
+  for(const type of ['blur','resize'])window.addEventListener(type,closeMenu);
+
   // Text boxes: a real text field while typing, then a mark.
   function startEditor(s,item,p){
     finishEditor(true);
@@ -834,6 +957,7 @@
     const fs=Math.max(9,size*r.width);
     Object.assign(ta.style,{left:(r.left+at.x*r.width-6)+'px',top:(r.top+at.y*r.height-4)+'px',fontSize:fs+'px',color,maxWidth:Math.max(140,r.left+r.width-(r.left+at.x*r.width))+'px'});
     ta.value=item?item.text:'';
+    const align=s.arrange?(item?item.align||'left':textAlign):'left';ta.style.textAlign=align;
     const grow=()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';ta.style.width='auto';ta.style.width=Math.max(120,Math.min(ta.scrollWidth+8,r.width))+'px'};
     ta.addEventListener('input',grow);
     ta.addEventListener('keydown',e=>{
@@ -843,18 +967,18 @@
     });
     ta.addEventListener('blur',()=>setTimeout(()=>{if(editor&&editor.ta===ta)finishEditor(true)},0));
     for(const type of ['pointerdown','click'])ta.addEventListener(type,e=>e.stopPropagation());
-    editor={ta,s,item,at,size,color};root.append(ta);grow();
+    editor={ta,s,item,at,size,color,align};root.append(ta);grow();
     if(item){selected=null;scheduleRender()}
     setTimeout(()=>{try{ta.focus({preventScroll:true})}catch{ta.focus()}},0);
   }
   function finishEditor(save){
-    if(!editor)return;const {ta,s,item,at,size,color}=editor;editor=null;
+    if(!editor)return;const {ta,s,item,at,size,color,align}=editor;editor=null;
     const text=ta.value.replace(/\r/g,'').split('\n').slice(0,8).join('\n').slice(0,MAX_TEXT);ta.remove();
     if(!save)return scheduleRender();
     const items=itemsOf(s);
     if(!text.trim()){if(item)commit(s,items.filter(i=>i.id!==item.id));return}
-    if(item&&item.text===text)return scheduleRender();
-    const mark={id:newId(s.idPrefix),tool:'text',color,size,points:[{x:at.x,y:at.y}],text};
+    if(item&&item.text===text&&(item.align||'left')===align)return scheduleRender();
+    const mark={id:newId(s.idPrefix),tool:'text',color,size,points:[{x:at.x,y:at.y}],text,...(s.arrange&&align!=='left'?{align}:{})};
     if(!item&&items.length>=(s.maxItems||MAX_ITEMS_DEFAULT)){showTip('That is a lot of marks. Use 🗑 Clear first.');return}
     commit(s,item?items.map(i=>i.id===item.id?mark:i):items.concat(mark));
   }
@@ -1010,7 +1134,7 @@
 
   // ---------- Public API ----------
   window.FTTAnnotate={
-    PALETTE,SIZE_SETS,KINDS,cleanItem,drawItem,
+    PALETTE,SIZE_SETS,KINDS,ALIGNS,cleanItem,drawItem,reorder,
     // role: 'teacher' shows the pencil everywhere. Anything else: only while a reason is on.
     setRole(next){
       const was=role;role=next==='teacher'?'teacher':next==='student'?'student':null;

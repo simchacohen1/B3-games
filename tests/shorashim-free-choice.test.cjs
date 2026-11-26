@@ -43,7 +43,7 @@ const unitCtx=(items,extra={})=>{
   const s={cards:{}};
   const ctx=vm.createContext({window:{B3ShorashimUnits:Units},currentTrack:'shorashim',learningPerek:null,db:{settings:{}},
     visibleCatalog:()=>items.filter(x=>!x.hidden),student:()=>s,keyFor:(t,id)=>t+':'+id,...extra});
-  ['unitKeyOf','unitLabels','studentUnits','currentLearningUnit','learningCatalog','nextLearningUncreated'].forEach(n=>vm.runInContext(fn(n),ctx));
+  ['chumashCatalog','chumashExtra','unitKeyOf','unitLabels','studentUnits','currentLearningUnit','learningCatalog','nextLearningUncreated'].forEach(n=>vm.runInContext(fn(n),ctx));
   return {ctx,s};
 };
 
@@ -81,7 +81,7 @@ test('words without a perek are grouped by their list/category and teacher label
 test('choosing a unit updates the menu without leaving Shorashim',()=>{
   const screens=[],items=[{id:'x',perek:18},{id:'y',perek:19},{id:'z',perek:20}];
   const ctx=vm.createContext({window:{B3ShorashimUnits:Units},db:{settings:{}},visibleCatalog:()=>items,currentTrack:'prefix',learningPerek:'perek:18',selectedItemKey:'prefix:p',followAllowsScreen:()=>true,goScreen:x=>screens.push(x)}); // no Follow Teacher restriction active
-  ['unitLabels','bookletAllowed','studentUnits','chooseLearningPerek'].forEach(n=>vm.runInContext(fn(n),ctx));
+  ['chumashCatalog','chumashExtra','unitLabels','bookletAllowed','studentUnits','chooseLearningPerek'].forEach(n=>vm.runInContext(fn(n),ctx));
   ctx.chooseLearningPerek('perek:19');
   assert.equal(ctx.currentTrack,'shorashim');
   assert.equal(ctx.learningPerek,'perek:19');

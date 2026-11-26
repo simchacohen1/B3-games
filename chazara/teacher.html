@@ -211,14 +211,18 @@ async function loadApprovals(){
   const btn=$("approvalSignInBtn");
   if(!auth.currentUser){pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Sign in with your teacher Google account to load Chazara point requests.</div>';btn.classList.remove("hidden");setApprovalStatus("");return}
   btn.classList.add("hidden");setApprovalStatus("Loading…");
-  try{const lists=teacherScope.selected||teacherScope.owner?[await teacherApi("list-chazara-pending")]:await Promise.all(Object.keys(teacherScope.classes).map(c=>teacherApi("list-chazara-pending",{},c))),seen=new Set(),requests=lists.flatMap(d=>d.requests||[]).filter(r=>r&&!seen.has(r.id)&&seen.add(r.id)),data={requests},Q=window.FunTorahApprovalQueue,automatic=[];pendingPointRequests={};loadedPointRequests=Object.fromEntries(requests.map(r=>[r.id,r]));for(const item of (data.requests||[])){if(!window.FunTorahTeacherScope.recordAllowed(teacherScope,item.practiceStudentId,item))continue;
+  // A newer loadClassScope() clears teacherScope while this request is in flight;
+  // keep this run on its own scope and drop its result if it went stale.
+  const scope=teacherScope,generation=scopeGeneration;
+  if(!scope)return;
+  try{const lists=scope.selected||scope.owner?[await teacherApi("list-chazara-pending")]:await Promise.all(Object.keys(scope.classes).map(c=>teacherApi("list-chazara-pending",{},c))),seen=new Set(),requests=lists.flatMap(d=>d.requests||[]).filter(r=>r&&!seen.has(r.id)&&seen.add(r.id)),data={requests},Q=window.FunTorahApprovalQueue,automatic=[];pendingPointRequests={};loadedPointRequests=Object.fromEntries(requests.map(r=>[r.id,r]));if(generation!==scopeGeneration)return;for(const item of (data.requests||[])){if(!window.FunTorahTeacherScope.recordAllowed(scope,item.practiceStudentId,item))continue;
     // Posuk Practice milestones are automatic: never shown here, paid quietly.
     if(Q.isPendingAutomatic(item)){automatic.push(item.id);continue}
     // Same queue the homepage Approval Center counts: Chazara requests only
     // (Shorashim recordings are approved on the Shorashim page).
     if(Q.needsManualApproval(item)&&Q.isChazaraApproval(item))pendingPointRequests[item.id]=item}
    renderApprovals();setApprovalStatus("");if(automatic.length)sweepAutomaticPoints(automatic)}
-  catch(err){console.error(err);pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';setApprovalStatus(String(err?.message||err),true)}
+  catch(err){if(generation!==scopeGeneration)return;console.error(err);pendingPointRequests={};renderApprovals();$("approvalList").innerHTML='<div class="approval-empty">Could not load pending point requests.</div>';setApprovalStatus(String(err?.message||err),true)}
 }
 let automaticSweepRunning=false;
 async function sweepAutomaticPoints(ids){if(automaticSweepRunning)return;automaticSweepRunning=true;try{for(const id of ids){try{await teacherApi("approve-point-request",{requestId:id})}catch(err){console.warn("Automatic Posuk point approval failed",id,err)}}}finally{automaticSweepRunning=false}}

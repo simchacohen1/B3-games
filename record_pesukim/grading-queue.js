@@ -75,26 +75,25 @@
   }
 
   function approvalCard(summary){
-    const href = id => "record_pesukim/teacher.html?class=" + encodeURIComponent(id);
+    // One marking place for all of my classes (ET and WT together), not one link per class.
+    const href = "record_pesukim/teacher.html?view=marking";
     const classes = [...summary.classes].sort((a, b) => a.name.localeCompare(b.name));
-    const first = classes.reduce((best, entry) => entry.count > best.count ? entry : best);
     const card = document.createElement("div");
     card.className = "approval-center-item approval-center-item-with-classes";
     card.innerHTML = '<span class="approval-center-icon" aria-hidden="true">🎙️</span>' +
       '<span><strong><a class="approval-center-primary">Posuk Practice Recordings</a></strong>' +
       '<small>Recordings waiting to be graded. <span class="approval-center-class-split"></span></small></span>' +
       '<span class="approval-center-count"></span>';
-    card.querySelector(".approval-center-primary").setAttribute("href", href(first.id));
+    card.querySelector(".approval-center-primary").setAttribute("href", href);
     card.querySelector(".approval-center-count").textContent = String(summary.total);
     const split = card.querySelector(".approval-center-class-split");
     split.append("(");
     classes.forEach(({id, name, count}, index) => {
       if (index) split.append(" · ");
-      const link = document.createElement("a");
-      link.className = "approval-center-class-link";
-      link.setAttribute("href", href(id));
-      link.textContent = name + " " + count;
-      split.append(link);
+      const label = document.createElement("span");
+      label.className = "approval-center-class-count";
+      label.textContent = name + " " + count;
+      split.append(label);
     });
     split.append(")");
     return card;

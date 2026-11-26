@@ -318,7 +318,11 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   const posukTeacherReads:string[]=[];
   posukTeacherPage.on('request',request=>{ if(request.url().startsWith(`http://127.0.0.1:${DB_PORT}/`))posukTeacherReads.push(request.url()); });
   await posukTeacherPage.goto(`${origin}/record_pesukim/teacher.html?class=${CLASS_ID}`);
-  const gradeCard=posukTeacherPage.locator('.grade-card').filter({hasText:'Ari Example'});
+  // The marking list shows one row per recording; clicking a row opens the grade card right there.
+  const gradeRow=posukTeacherPage.locator('.gm-item').filter({hasText:'Ari Example'});
+  await expect(gradeRow).toBeVisible({timeout:20000});
+  await gradeRow.locator('.gm-row').click();
+  const gradeCard=gradeRow.locator('.grade-card');
   await expect(gradeCard).toBeVisible({timeout:20000});
   await expect(gradeCard).toContainText('Posuk 1');
   // The posuk is shown as tappable words (one button per word), each with a small T for "translated wrong".
@@ -407,13 +411,13 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.goto(`${origin}/shorashim/index.html`);
   await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
   await expect(page.locator('#appShell')).toBeVisible();
-  await page.getByRole('button',{name:/Learn New Shorashim/}).click();
+  await page.getByRole('button',{name:/^New Shorashim/}).click();
   await expect(page.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('1 of 1 learned');
   await page.locator('[data-learning-perek="perek:18"]').click();
   await expect(page.locator('#editorContent')).toBeVisible();
   await page.reload();
   await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
-  await page.getByRole('button',{name:/Learn New Shorashim/}).click();
+  await page.getByRole('button',{name:/^New Shorashim/}).click();
   await expect(page.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('1 of 1 learned');
   expect(await readFixture(`posukPractice/shorashimLearning/students/${ariId}`)).toBeNull();
   const chazaraTeacherContext=await browser.newContext(),chazaraTeacherPage=await chazaraTeacherContext.newPage();
@@ -438,7 +442,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   expect(posukClassReads.some(url=>url.includes('/classes/et/')||url.includes('/classes/wt/'))).toBe(false);
   await chazaraTeacherPage.goto(`${origin}/shorashim/index.html?class=${CLASS_ID}`);
   await expect(chazaraTeacherPage.locator('#signedInStudentName')).toHaveText('Teacher Preview');
-  await chazaraTeacherPage.getByRole('button',{name:/Learn New Shorashim/}).click();
+  await chazaraTeacherPage.getByRole('button',{name:/^New Shorashim/}).click();
   await expect(chazaraTeacherPage.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('0 of 1 learned');
   await chazaraTeacherContext.close();
   const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);

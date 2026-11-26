@@ -1318,6 +1318,79 @@
     } catch (e) { return ""; }
   })();
 
+  // One named student tab per teacher browser: asking for it again returns the
+  // tab that is already open instead of making a second one.
+  const STUDENT_TAB_NAME = "b3StudentTab";
+  const ACT_CHANNEL = "b3ActAsStudentChannel";
+  const TOKEN_KEY = "b3ActAsToken";
+  let teacherSessionPersistence = false;
+  let lastStudentTab = null;
+  let actChannel = null;
+
+  function withTimeout(promise, ms, message) {
+    let timer;
+    return Promise.race([Promise.resolve(promise), new Promise(function (_, reject) {
+      timer = setTimeout(function () { reject(new Error(message)); }, ms);
+    })]).finally(function () { clearTimeout(timer); });
+  }
+  function sleepMs(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+  function tabIsActingStudent(tab) {
+    try { return Boolean(tab && !tab.closed && tab.sessionStorage.getItem(ACTING_KEY)); } catch (e) { return false; }
+  }
+  // Must run synchronously inside the click so pop-up blockers allow a new tab.
+  function openStudentTab() {
+    let tab = null;
+    try { tab = window.open("", STUDENT_TAB_NAME); } catch (e) {}
+    if (!tab) return null;
+    try { tab.name = STUDENT_TAB_NAME; } catch (e) {}
+    try { tab.focus(); } catch (e) {}
+    lastStudentTab = tab;
+    return tab;
+  }
+  function findStudentTab() {
+    if (tabIsActingStudent(lastStudentTab)) return lastStudentTab;
+    let tab = null;
+    try { tab = window.open("", STUDENT_TAB_NAME); } catch (e) {}
+    if (tabIsActingStudent(tab)) { lastStudentTab = tab; return tab; }
+    try { if (tab && tab.location.href === "about:blank") tab.close(); } catch (e) {}
+    return null;
+  }
+  function discardStudentTab(tab) {
+    // Never close a tab that still shows a student; only an empty/failed one.
+    try { if (tab && !tabIsActingStudent(tab)) tab.close(); } catch (e) {}
+  }
+  function isSeparateStudentTab() {
+    try { return Boolean(getActingStudent() && sessionStorage.getItem("b3ActAsSeparateTab") === "1"); } catch (e) { return false; }
+  }
+
+  // Fully retire whatever student a tab was showing: sign that student out,
+  // wipe the tab's storage, stop the old page, and confirm it is empty
+  // before anything for the next student is written.
+  async function resetStudentTab(tab) {
+    if (!tab || tab.closed) throw new Error("The student tab was closed. Please try again.");
+    try {
+      const fb = tab.firebase;
+      if (fb && fb.auth) await withTimeout(fb.auth().signOut(), 3000, "sign-out timed out");
+    } catch (e) {}
+    try { tab.sessionStorage.clear(); } catch (e) {}
+    try { tab.location.replace("about:blank"); } catch (e) {}
+    let blank = false;
+    for (let i = 0; i < 60 && !blank; i++) {
+      if (tab.closed) throw new Error("The student tab was closed. Please try again.");
+      try { blank = tab.location.href === "about:blank" && tab.document.readyState === "complete"; } catch (e) {}
+      if (!blank) await sleepMs(50);
+    }
+    let left = -1;
+    try { tab.sessionStorage.clear(); left = tab.sessionStorage.length; } catch (e) {}
+    if (!blank || left !== 0) throw new Error("Could not clear the previous student's session. Close the student tab and try again.");
+  }
+
+  function newActToken() {
+    try { const a = new Uint32Array(4); crypto.getRandomValues(a); return Array.prototype.join.call(a, "-"); }
+    catch (e) { return String(Date.now()) + "-" + Math.random().toString(36).slice(2); }
+  }
+
   function getActingStudent() {
     try {
       const raw = JSON.parse(sessionStorage.getItem(ACTING_KEY) || "null");
@@ -1390,11 +1463,25 @@
     // to every teacher tab using the same browser-wide auth persistence.
     if (studentTab) {
       if (studentTab.closed) throw new Error("The student tab was closed. Please try again.");
-      await services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION);
+      // Only needed once per page; repeating it is what could stall a second switch.
+      if (!teacherSessionPersistence) {
+        await withTimeout(services.auth.setPersistence(window.firebase.auth.Auth.Persistence.SESSION), 8000,
+          "Could not prepare your teacher sign-in. Reload this page and try again.");
+        teacherSessionPersistence = true;
+      }
+      // The previous student (if this tab already shows one) is signed out and
+      // wiped completely before the new student's data is written.
+      await resetStudentTab(studentTab);
     }
     const studentSession = studentTab ? studentTab.sessionStorage : sessionStorage;
-    if (studentTab) studentSession.clear();
-    else clearStudentStorage();
+    if (!studentTab) clearStudentStorage();
+    if (studentTab) {
+      // Proves later switch requests from the student tab came from this teacher tab's own session.
+      const token = newActToken();
+      try { sessionStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+      studentSession.setItem(TOKEN_KEY, token);
+      lastStudentTab = studentTab;
+    }
     studentSession.setItem("b3Games_studentId", studentId);
     studentSession.setItem("b3Games_studentName", name);
     studentSession.setItem("b3Games_studentClass", classId);
@@ -1462,31 +1549,90 @@
     bar.style.cssText = "position:fixed;left:16px;right:16px;bottom:14px;margin:0 auto;width:fit-content;z-index:2147483647;display:flex;align-items:center;gap:12px;" +
       "padding:10px 12px 10px 16px;border-radius:999px;background:rgba(124,45,18,.45);color:#fff;font:600 14px/1.3 Arial,sans-serif;" +
       "text-shadow:0 1px 2px rgba(0,0,0,.6);opacity:.8;pointer-events:none";
+    const btn = "border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap;pointer-events:auto;text-shadow:none";
     bar.innerHTML = '<span>\uD83D\uDC40 Viewing as <strong>' + actingEsc(acting.name) + '</strong> \u00B7 ' + actingEsc(acting.className) + '</span>' +
-      '<button type="button" style="border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#7c2d12;font:800 13px Arial,sans-serif;cursor:pointer;white-space:nowrap;pointer-events:auto;text-shadow:none">Exit student view</button>';
-    bar.querySelector("button").onclick = stopActingAsStudent;
+      (isSeparateStudentTab() ? '<button type="button" data-act="switch" style="' + btn + '">Switch student</button>' : '') +
+      '<button type="button" data-act="exit" style="' + btn + '">Exit student view</button>';
+    bar.querySelector('[data-act="exit"]').onclick = stopActingAsStudent;
+    const sw = bar.querySelector('[data-act="switch"]');
+    if (sw) sw.onclick = openActAsStudentPicker;
     document.body.appendChild(bar);
   }
+
+  // Asks the teacher tab (which holds the teacher login) to do something for
+  // the student tab. Answers only come back for requests carrying this tab's token.
+  function askTeacherTab(payload, ms) {
+    return new Promise(function (resolve, reject) {
+      let token = "";
+      try { token = sessionStorage.getItem(TOKEN_KEY) || ""; } catch (e) {}
+      if (!actChannel || !token) { reject(new Error("Please switch students from your teacher tab.")); return; }
+      const reqId = String(Date.now()) + Math.random().toString(36).slice(2);
+      let timer;
+      const handler = function (ev) {
+        const m = ev.data || {};
+        if (!m.reply || m.reqId !== reqId) return;
+        cleanup();
+        if (m.error) reject(new Error(m.error)); else resolve(m);
+      };
+      const cleanup = function () { clearTimeout(timer); actChannel.removeEventListener("message", handler); };
+      timer = setTimeout(function () {
+        cleanup();
+        reject(new Error("Couldn't reach your teacher tab. Keep the teacher tab open and try again."));
+      }, ms);
+      actChannel.addEventListener("message", handler);
+      actChannel.postMessage(Object.assign({ reqId:reqId, token:token }, payload));
+    });
+  }
+
+  // The teacher tab answers list/switch requests from its own student tab.
+  (function setupActChannel() {
+    if (typeof BroadcastChannel !== "function") return;
+    try { actChannel = new BroadcastChannel(ACT_CHANNEL); } catch (e) { return; }
+    if (getActingStudent()) return; // student tabs only ask
+    actChannel.onmessage = async function (ev) {
+      const m = ev.data || {};
+      let mine = "";
+      try { mine = sessionStorage.getItem(TOKEN_KEY) || ""; } catch (e) {}
+      if (!mine || m.reply || m.token !== mine || !m.reqId) return;
+      const reply = function (p) { actChannel.postMessage(Object.assign({ reqId:m.reqId, reply:true }, p)); };
+      try {
+        if (m.type === "list") {
+          reply({ rows: await listStudentsForActing() });
+        } else if (m.type === "switch") {
+          const tab = findStudentTab();
+          if (!tab) throw new Error("The student tab isn't open any more.");
+          if (m.demo) await withTimeout(openMyDemoStudent(m.classId, tab), 30000, "Switching took too long. Please try again.");
+          else await withTimeout(startActingAsStudent(m.classId, m.studentId, tab), 30000, "Switching took too long. Please try again.");
+          reply({ ok:true });
+        }
+      } catch (e) { reply({ error:(e && e.message) || "Could not switch students." }); }
+    };
+  })();
 
   function openActAsStudentPicker() {
     const old = document.getElementById("b3ActAsPicker");
     if (old) old.remove();
+    // Inside the student tab the picker asks the teacher tab to do the switch.
+    const remote = isSeparateStudentTab();
     const wrap = document.createElement("div");
     wrap.id = "b3ActAsPicker";
     wrap.setAttribute("role", "dialog");
     wrap.setAttribute("aria-modal", "true");
     wrap.style.cssText = "position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);font-family:Arial,sans-serif";
     const field = "width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:10px;font:15px Arial,sans-serif;margin-top:6px;background:#fff;color:#1f2937";
+    const intro = remote
+      ? 'This tab switches to the student you choose. The current student is signed out and cleared first, so nothing is saved to the wrong student. Your teacher tab must stay open.'
+      : 'A student tab opens while this teacher tab stays signed in. If a student tab is already open, it switches to the student you choose instead of opening another. Anything you do in the student tab counts as work by that student. <strong>My demo student</strong> opens your own student account instead, which saves progress like a real student. Press <strong>Exit student view</strong> to close the student tab.';
     wrap.innerHTML = '<div style="background:#fff;color:#1f2937;border-radius:18px;padding:22px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)">' +
-      '<h2 style="margin:0 0 6px;font-size:21px">Sign in as a student</h2>' +
-      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">A new student tab opens while this teacher tab stays signed in. Anything you do in the student tab counts as work by that student. <strong>My demo student</strong> opens your own student account instead, which saves progress like a real student. Press <strong>Exit student view</strong> to close the student tab.</p>' +
-      '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading\u2026</option></select></label>' +
+      '<h2 style="margin:0 0 6px;font-size:21px">' + (remote ? 'Switch student' : 'Sign in as a student') + '</h2>' +
+      '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.4">' + intro + '</p>' +
+      '<label style="display:block;font-weight:700;font-size:14px">Class<select id="b3ActAsClass" style="' + field + '"><option>Loading…</option></select></label>' +
       '<label style="display:block;font-weight:700;font-size:14px;margin-top:12px">Student<select id="b3ActAsStudent" style="' + field + '"></select></label>' +
       '<p id="b3ActAsMsg" style="min-height:20px;margin:12px 0 0;color:#b91c1c;font-size:14px"></p>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">' +
-      '<button type="button" id="b3ActAsDemo" style="margin-right:auto;border:0;background:#7c3aed;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">\uD83E\uDDEA My demo student</button>' +
+      '<button type="button" id="b3ActAsDemo" style="margin-right:auto;border:0;background:#7c3aed;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">🧪 My demo student</button>' +
       '<button type="button" id="b3ActAsCancel" style="border:1px solid #cbd5e1;background:#fff;color:#1f2937;border-radius:10px;padding:10px 14px;font:700 14px Arial,sans-serif;cursor:pointer">Cancel</button>' +
-      '<button type="button" id="b3ActAsGo" disabled style="border:0;background:#15803d;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">Open as student</button>' +
+      '<button type="button" id="b3ActAsGo" disabled style="border:0;background:#15803d;color:#fff;border-radius:10px;padding:10px 14px;font:800 14px Arial,sans-serif;cursor:pointer">' + (remote ? 'Switch to this student' : 'Open as student') + '</button>' +
       '</div></div>';
     document.body.appendChild(wrap);
     const q = function (id) { return document.getElementById(id); };
@@ -1494,46 +1640,66 @@
     q("b3ActAsCancel").onclick = close;
     wrap.addEventListener("click", function (e) { if (e.target === wrap) close(); });
     let classes = [];
+    let busy = false;
+    const setMsg = function (text, isError) { q("b3ActAsMsg").style.color = isError ? "#b91c1c" : "#475569"; q("b3ActAsMsg").textContent = text; };
     const fillStudents = function () {
       const cls = classes.find(function (c) { return c.classId === q("b3ActAsClass").value; });
       q("b3ActAsStudent").innerHTML = (cls ? cls.students : []).map(function (s) {
         return '<option value="' + actingEsc(s.id) + '">' + actingEsc(s.name) + '</option>';
       }).join("");
-      q("b3ActAsGo").disabled = !cls || !cls.students.length;
-      q("b3ActAsDemo").disabled = !cls;
+      q("b3ActAsGo").disabled = busy || !cls || !cls.students.length;
+      q("b3ActAsDemo").disabled = busy || !cls;
     };
-    q("b3ActAsDemo").onclick = function () {
-      const studentTab = window.open("about:blank", "_blank");
-      if (!studentTab) { q("b3ActAsMsg").textContent = "Please allow pop-ups for Fun Torah Tools, then try again."; return; }
-      q("b3ActAsDemo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening your demo student\u2026";
-      openMyDemoStudent(q("b3ActAsClass").value, studentTab).catch(function (e) {
-        try { studentTab.close(); } catch (_error) {}
-        q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open your demo student.";
-        q("b3ActAsDemo").disabled = false;
+    // One path for both buttons: never leaves the dialog stuck, always shows an error.
+    const run = function (busyText, failText, work, tabToDiscard) {
+      busy = true; q("b3ActAsGo").disabled = true; q("b3ActAsDemo").disabled = true;
+      setMsg(busyText, false);
+      let started;
+      try { started = Promise.resolve(work()); } catch (e) { started = Promise.reject(e); }
+      return withTimeout(started, 35000, "This is taking too long. Please try again.").then(function () {
+        close();
+      }, function (e) {
+        if (tabToDiscard) discardStudentTab(tabToDiscard);
+        busy = false;
+        if (!document.getElementById("b3ActAsPicker")) return;
+        setMsg((e && e.message) || failText, true);
+        fillStudents();
       });
     };
     q("b3ActAsClass").onchange = fillStudents;
-    q("b3ActAsGo").onclick = function () {
-      // Open synchronously with the click so popup blockers allow the new tab.
-      const studentTab = window.open("about:blank", "_blank");
-      if (!studentTab) {
-        q("b3ActAsMsg").textContent = "Please allow pop-ups for Fun Torah Tools, then try again.";
+    q("b3ActAsDemo").onclick = function () {
+      if (remote) {
+        run("Switching to your demo student…", "Could not open your demo student.",
+          function () { return askTeacherTab({ type:"switch", demo:true, classId:q("b3ActAsClass").value }, 33000); });
         return;
       }
-      q("b3ActAsGo").disabled = true; q("b3ActAsMsg").style.color = "#475569"; q("b3ActAsMsg").textContent = "Opening\u2026";
-      startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value, studentTab).catch(function (e) {
-        try { studentTab.close(); } catch (_error) {}
-        q("b3ActAsMsg").style.color = "#b91c1c"; q("b3ActAsMsg").textContent = e.message || "Could not open this student.";
-        q("b3ActAsGo").disabled = false;
-      });
+      // Open synchronously with the click so popup blockers allow the tab.
+      const studentTab = openStudentTab();
+      if (!studentTab) { setMsg("Please allow pop-ups for Fun Torah Tools, then try again.", true); return; }
+      run("Opening your demo student…", "Could not open your demo student.",
+        function () { return openMyDemoStudent(q("b3ActAsClass").value, studentTab); }, studentTab);
     };
-    listStudentsForActing().then(function (rows) {
+    q("b3ActAsGo").onclick = function () {
+      if (remote) {
+        run("Switching…", "Could not switch students.",
+          function () { return askTeacherTab({ type:"switch", classId:q("b3ActAsClass").value, studentId:q("b3ActAsStudent").value }, 33000); });
+        return;
+      }
+      const studentTab = openStudentTab();
+      if (!studentTab) { setMsg("Please allow pop-ups for Fun Torah Tools, then try again.", true); return; }
+      run("Opening…", "Could not open this student.",
+        function () { return startActingAsStudent(q("b3ActAsClass").value, q("b3ActAsStudent").value, studentTab); }, studentTab);
+    };
+    const loadRows = remote ? askTeacherTab({ type:"list" }, 10000).then(function (m) { return m.rows || []; }) : listStudentsForActing();
+    loadRows.then(function (rows) {
       classes = rows;
       if (!rows.length) { q("b3ActAsClass").innerHTML = '<option value="">No classes assigned</option>'; fillStudents(); return; }
-      q("b3ActAsClass").innerHTML = rows.map(function (c) { return '<option value="' + actingEsc(c.classId) + '">' + actingEsc(c.className) + '</option>'; }).join("");
+      const mine = getActingStudent();
+      q("b3ActAsClass").innerHTML = rows.map(function (c) { return '<option value="' + actingEsc(c.classId) + '"' + (remote && mine && mine.classId === c.classId ? ' selected' : '') + '>' + actingEsc(c.className) + '</option>'; }).join("");
       fillStudents();
     }).catch(function (e) {
-      q("b3ActAsClass").innerHTML = '<option value="">\u2014</option>';
+      if (!document.getElementById("b3ActAsPicker")) return;
+      q("b3ActAsClass").innerHTML = '<option value="">—</option>';
       q("b3ActAsMsg").textContent = e.message || "Could not load your classes.";
     });
   }

@@ -53,6 +53,8 @@
   // Bound slow Firebase reads while preserving the fail-closed decision.
   var FETCH_TIMEOUT_MS = 15000;
   var FIRST_LOAD_FAILSAFE_MS = 5500;
+  var FAILED_CHECK_RETRY_MS = 4000;
+  var failedCheckRetryTimer = null;
   var authReadyResolve;
   var authReadyPromise = new Promise(function (resolve) { authReadyResolve = resolve; });
   // Other student clients share this initialization instead of loading a second SDK.
@@ -430,6 +432,8 @@
   var classWatch = { id: "", sources: [], timer: null };
   function watchClassLive(classId, classPath) {
     if (typeof EventSource !== "function" || isGuestPreview() || classId === "et" || classId === "wt") return;
+    // A hidden tab's background checks must not reopen the streams it released (they reopen when the tab is visible).
+    if (document.visibilityState === "hidden") return;
     if (classWatch.id === classId && classWatch.sources.length) return;
     classWatch.id = classId;
     classWatch.sources.forEach(function (s) { try { s.close(); } catch (e) {} });
@@ -449,6 +453,15 @@
         classWatch.sources.push(src);
       });
     }).catch(function () { classWatch.id = ""; });
+  }
+
+  // Each open stream holds one of the browser's ~6 connections to the database host. Hidden tabs release theirs, so a
+  // student with several tool tabs open cannot starve the access check (and freeze every page) with idle streams.
+  function closeClassWatch() {
+    classWatch.sources.forEach(function (s) { try { s.close(); } catch (e) {} });
+    classWatch.sources = [];
+    classWatch.id = "";
+    clearTimeout(classWatch.timer);
   }
 
   async function resolveStudentClass() {
@@ -758,6 +771,9 @@
           "Having trouble checking access",
           "We could not reach the Fun Torah Tools access settings yet. This page will try again automatically in a few seconds."
         );
+        // The 30 second poll is too slow for this message; retry soon (checkNow ignores a call while one is in flight).
+        clearTimeout(failedCheckRetryTimer);
+        failedCheckRetryTimer = setTimeout(checkNow, FAILED_CHECK_RETRY_MS);
       }
     }).finally(function () {
       requestInFlight = false;
@@ -779,21 +795,32 @@
   setInterval(checkNow, POLL_INTERVAL_MS);
   // Live push: the settings are watched with a Firebase streaming read, so a lock or unlock a teacher presses reaches a
   // student who is already inside a tool within seconds (the 30 second poll above stays as the backup).
+  var settingsLive = { open: function () {}, close: function () {} };
   (function watchSettingsLive(){
     if (typeof EventSource !== "function" || isGuestPreview()) return;
     var first = true, timer = null, source = null;
-    try {
-      source = new EventSource(databaseUrl() + "/" + SETTINGS_PATH + ".json");
-      var onChange = function(){
-        if (first) { first = false; return; }          // the first message is just the current state
-        clearTimeout(timer); timer = setTimeout(checkNow, 250);
-      };
-      source.addEventListener("put", onChange);
-      source.addEventListener("patch", onChange);
-    } catch (e) { /* the poll still covers it */ }
+    settingsLive.open = function () {
+      if (source) return;
+      first = true;
+      try {
+        source = new EventSource(databaseUrl() + "/" + SETTINGS_PATH + ".json");
+        var onChange = function(){
+          if (first) { first = false; return; }          // the first message is just the current state
+          clearTimeout(timer); timer = setTimeout(checkNow, 250);
+        };
+        source.addEventListener("put", onChange);
+        source.addEventListener("patch", onChange);
+      } catch (e) { source = null; /* the poll still covers it */ }
+    };
+    settingsLive.close = function () {
+      clearTimeout(timer);
+      if (source) { try { source.close(); } catch (e) {} source = null; }
+    };
+    if (document.visibilityState !== "hidden") settingsLive.open();
   })();
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") checkNow();
+    if (document.visibilityState === "visible") { settingsLive.open(); checkNow(); }
+    else { settingsLive.close(); closeClassWatch(); }
   });
   window.addEventListener("focus", checkNow);
   window.addEventListener("ftt:follow-policy-changed", checkNow);

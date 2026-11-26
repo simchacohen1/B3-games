@@ -9,6 +9,7 @@ A boy may turn on his microphone during davening and see that he is davening **s
 - The microphone is **off** until he clicks "Turn on My Chayus Meter". The browser asks permission every time.
 - A flame inside a ring. It is driven only by "is a voice heard" and "how steadily over about the last quarter minute" (`meter.live()` in `core.js`). Loudness is not an input, so a quiet voice and a shout draw the same picture. Very loud input only shows "A comfortable voice is perfect. No need to be loud."
 - No score or percentage is ever shown to the boy.
+- It adjusts to each boy's own microphone: in the first few seconds it measures the room sound, then counts a voice that is clearly above it. A normal quiet davening voice registers; a noisier room needs a clearer voice. A steady background sound (a fan, or davening from the speakers) is learned as background and fades out.
 - A short word of encouragement about every 2.5 minutes of measured davening.
 - **Pause**, **Resume** and **Turn microphone off** at any time. Hiding the tab or a disconnected microphone pauses the meter. Turning it off starts completely fresh next time.
 - Denied or missing microphone: the meter stays off, davening works as normal.
