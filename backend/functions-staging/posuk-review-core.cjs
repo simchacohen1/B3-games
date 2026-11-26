@@ -69,6 +69,8 @@ function blockedReason(row, now){
   return '';
 }
 
+const balanceCore = require('./rewards-balance-core.cjs');
+
 function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRewards', resolveRewardStudentId, studentInfo, fileExists }){
   const reviewsRef = sid => rtdb.ref(`posukPractice/reviews/${sid}`);
   const submissionRef = (sid, id) => rtdb.ref(`posukPractice/submissions/${sid}/${id}`);
@@ -90,13 +92,13 @@ function createPosukReview({ rtdb, now = () => Date.now(), SR_ROOT = 'studentRew
       const existing = (await ref.get()).val() || {};
       return { ok: true, newlyPosted: false, status: existing.status || 'approved', amount: Number(existing.actualAmount ?? existing.amount ?? amount) };
     }
-    const bal = await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur => Number(cur || 0) + amount);
+    const bal = await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`), amount);
     if(!bal.committed){
       await ref.update({ status: 'error', lastError: 'Balance update did not commit' });
       return { ok: false, error: 'Could not update the point balance.' };
     }
     const balanceAfter = Number(bal.snapshot.val() || 0);
-    await ref.update({ status: 'approved', actualAmount: amount, balanceAfter, approvedAutomatically: true,
+    await ref.update({ status: 'approved', actualAmount: amount, balanceAfter, balanceBefore: bal.before, approvedAutomatically: true,
       reviewedBy: 'Posuk Practice teacher review', reviewedAt: now() });
     return { ok: true, newlyPosted: true, status: 'approved', amount, balanceAfter };
   }

@@ -1,4 +1,5 @@
 'use strict';
+const balanceCore=require('./rewards-balance-core.cjs');
 // Lets a student cancel his own Prize Store request while it is still pending.
 // The status is claimed with a transaction first so a cancel can never race a
 // teacher's approve/decline into a double refund.
@@ -26,7 +27,7 @@ async function cancelRedemption(store,studentId,requestId,nowMs=Date.now()){
  let balance=0;
  if(cost){
   try{
-   const r=await store.tx(`${SR}/students/${studentId}/rewardBalance`,cur=>Number(cur||0)+cost);
+   const r=await balanceCore.changeWith({get:()=>store.get(`${SR}/students/${studentId}/rewardBalance`),tx:fn=>store.tx(`${SR}/students/${studentId}/rewardBalance`,fn)},cost);
    if(!r?.committed)throw new Error('Could not return the points.');
    balance=Number(r?.snapshot?.val?.()??0);
   }catch(err){
