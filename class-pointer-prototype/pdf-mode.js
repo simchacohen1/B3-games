@@ -36,6 +36,9 @@
   }
   function navWord(){return webMode?(docLabel==='whiteboard'?'Whiteboard':'Webpage'):'PDF'}
 
+  // boardUid: which whiteboard this is. docId changes whenever the board is republished (a picture or page added), boardUid only
+  // when a new whiteboard is opened, so the automatic save keeps one file for one board.
+  let boardUid=null;
   let doc=null,docId=null,docName='',bytes=null,lay=null,pageEls=[],rendered=new Map();
   // Page-by-page mode (big files): the teacher sends page pictures; students keep them in pageUrls.
   let paged=false,ratiosList=[],pageUrls=new Map(),pageTransfers=new Map(),pageCache=new Map(),pageJobs=new Map(),renderChain=Promise.resolve();
@@ -1136,7 +1139,7 @@
       if(token!==opening)return;
       closePdf(true);const committed=opening;if(B.sharing())B.stopSharing();
       await loadWebDoc(data);if(opening!==committed)return;
-      bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();
+      bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();if(board)boardUid=docId;
       boardSize=board?{w:width,h:height}:null;
       if(board&&Pages){wbPages=[newWbPage()];wbAt=0}
       // The whole board at a glance; a captured tab keeps fitting the width.
@@ -1854,6 +1857,26 @@
     finally{wbSwitching=false;renderPages(true)}
   }
   const showPage=index=>!wbPages||index===wbAt||index<0||index>=wbPages.length?Promise.resolve(false):guardedPageChange(async()=>{wbAt=index;await loadPage(index)});
+  // New Slides: start a fresh, blank whiteboard for the class right from the board. The one on screen is saved to My files
+  // first (the automatic save, see saved-work.js); when that cannot be done, the teacher is asked before it is lost.
+  let startingSlides=false;
+  async function newSlides(){
+    if(!isBoardOpen()||startingSlides)return false;
+    startingSlides=true;
+    try{
+      if(!wbSwitching&&wbPages)capturePage();
+      const used=(B.highlights?.()||[]).length>0||boardPictures.length>0||pictureEdits.length>0||(wbPages||[]).some((page,i)=>i!==wbAt&&(page.strokes?.length||page.pictures?.length));
+      const kept=used?await window.FTTSavedWork?.auto?.flush?.().catch(()=>null):null;
+      if(used&&!kept?.ok&&!confirm('This whiteboard could not be saved to My files. If you start new slides, what is on this board will be lost. Start new slides anyway?'))return false;
+      const open=$('openWhiteboard');
+      if(!open||open.disabled){B.status('New slides could not be started right now.');return false}
+      const before=docId;open.click();
+      for(let i=0;i<150&&!(isBoardOpen()&&docId!==before);i++)await sleep(100);
+      if(!isBoardOpen()||docId===before){B.status('New slides could not be started. Try the Whiteboard button.');return false}
+      B.status(used&&kept?.ok?'New blank slides. The last whiteboard is saved in My files.':'New blank slides.');
+      return true;
+    }finally{startingSlides=false}
+  }
   function addPage(copy){
     if(!Pages||!wbPages)return Promise.resolve(false);
     if(wbPages.length>=Pages.MAX_PAGES){B.status('A whiteboard can have up to '+Pages.MAX_PAGES+' pages.');return Promise.resolve(false)}
@@ -1941,7 +1964,8 @@
       el('span',null,'board-pages-label','Page '+(wbAt+1)+' of '+n),
       btn('▶','Next page',()=>void showPage(wbAt+1),'pdf-btn board-pages-step',busy||wbAt>=n-1),
       btn('＋ New page','Add a blank page after this one',()=>void addPage(false),'pdf-btn',busy||n>=Pages.MAX_PAGES),
-      btn(pagesPanelOpen?'▾ Pages':'▴ Pages','Show small pictures of every page, to jump to, copy, delete or move a page',()=>{pagesPanelOpen=!pagesPanelOpen;renderPages(true)},'pdf-btn'));
+      btn(pagesPanelOpen?'▾ Pages':'▴ Pages','Show small pictures of every page, to jump to, copy, delete or move a page',()=>{pagesPanelOpen=!pagesPanelOpen;renderPages(true)},'pdf-btn'),
+      btn('🆕 New Slides','Start a new, blank whiteboard for the class. This one is saved in My files first.',()=>void newSlides(),'pdf-btn board-new-slides',busy));
     pagesBar.replaceChildren(row,pagesPanel);
     pagesPanel.hidden=!pagesPanelOpen;
     if(!pagesPanelOpen)return;
@@ -2103,7 +2127,9 @@
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
     pastePicture,openUpload,uploadFiles,arrange,boardPictureCount:()=>boardPictures.length+pictureEdits.length+pictureCount(),
-    pagesInfo,exportPagePngs,showPage,addPage,
+    pagesInfo,exportPagePngs,showPage,addPage,newSlides,
+    // Which whiteboard is open (a new one is a new id), so the automatic save never writes one board over another.
+    boardId:()=>isBoardOpen()?boardUid:null,
     exportWhiteboard,importWhiteboard,exportPng,boardRatio,
     presentationStream:()=>boardPresentation
   };
