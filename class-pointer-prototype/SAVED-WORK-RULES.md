@@ -80,7 +80,7 @@ Keep the rules here as the review reference. Before publication, compare with a 
 Notes for the reviewer:
 - `update` allows new file bytes on purpose: saving a whiteboard again replaces the same file. The size and type limits still apply. PDFs are only ever created once by the page, then only their details change.
 - Like `pointerPdfLibrary`, the teacher rule checks ownership by sign-in id, not the teacher role. The page also waits for the class-checked teacher (`ClassPointerDashboard.ready`). Student sign-ins are kept out of this path.
-- Rules cannot count files. The page stops a student at 50 files and a teacher at 200 whiteboards. A student who bypassed the page could store more (worst case is bounded only by the per-file limits), so watch Storage use.
+- Rules cannot count files. The page stops a student at 200 files and a teacher at 200 whiteboards. A student who bypassed the page could store more (worst case is bounded only by the per-file limits), so watch Storage use.
 - If the hardened Storage rules are published later, these two blocks **and** `pointerPdfLibrary` must be in that file first.
 
 ## Database rule (proposal only: NOT in `firebase-rules.json`, not deployed)

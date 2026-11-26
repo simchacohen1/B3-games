@@ -338,7 +338,7 @@
       }),
       button('Delete',async()=>{
         if(!await ask('Delete "'+file.name+'"? You cannot get it back.','Delete',true))return;
-        try{await store.remove(file);if(current?.id===file.id)current=null;await refresh()}catch(error){ui.fail(error)}
+        try{await store.remove(file);if(current?.id===file.id)current=null;try{window.dispatchEvent(new CustomEvent('ftt-myfiles-changed',{detail:{from:'delete'}}))}catch(_){}await refresh()}catch(error){ui.fail(error)}
       },'danger')
     ];
   }
@@ -349,6 +349,8 @@
     const owner=teacherPage?window.ClassPointerPdf:window.ClassPointerBoards,read=teacherPage?'exportWhiteboard':'exportBoard',write=teacherPage?'importWhiteboard':'importBoard';
     return{
       kind:teacherPage?'lesson-whiteboard':'student-board',
+      // Which whiteboard is open (a new one is a new id): the automatic save keeps one file for one board.
+      id:()=>{try{return owner?.boardId?.()??null}catch(_){return null}},
       canSave:typeof owner?.[read]==='function',canOpen:typeof owner?.[write]==='function',
       read:()=>owner[read](),write:data=>owner[write](data),
       picture:async()=>{try{return typeof owner.exportPng==='function'?await owner.exportPng():null}catch(_){return null}}
@@ -387,7 +389,9 @@
         ui.say('Saving…');
         const existing=(await store.list()).map(file=>file.name);
         const title=Core.autoName({date:new Date(),lesson:lessonName(),existing});
-        await store.saveBoard({name:title,folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await api.picture()});
+        const savedId=await store.saveBoard({name:title,folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',data,picture:await api.picture()});
+        // From here the automatic save keeps this file up to date as the student keeps working.
+        current={id:savedId,name:title,folderId:state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'',subject:'',template:false};fromTemplate=null;auto.noteSaved(data);
         ui.say('Saved as "'+title+'".');setTimeout(()=>ui.dialog.close(),1800);
         return;
       }
@@ -413,7 +417,7 @@
         actions.querySelectorAll('button').forEach(node=>{node.disabled=true});ui.say('Saving…');
         try{
           const saved=await store.saveBoard({id,name:clean,folderId:picker.value(),subject:subject.value(),template:asTemplate.checked,data,picture:await api.picture()});
-          current=asTemplate.checked?null:{id:saved,name:clean,folderId:picker.value(),subject:subject.value(),template:false};fromTemplate=null;
+          current=asTemplate.checked?null:{id:saved,name:clean,folderId:picker.value(),subject:subject.value(),template:false};fromTemplate=null;auto.noteSaved(data);
           ui.say('Saved as "'+clean+'". Find it in My files.');setTimeout(()=>ui.dialog.close(),2200);
         }catch(error){ui.fail(error);actions.querySelectorAll('button').forEach(node=>{node.disabled=false})}
       };
@@ -431,12 +435,17 @@
     if(!api.canOpen){ui.say('Open your whiteboard first, then open this file.');return}
     if(!await ask(file.template?'Open a fresh copy of the template "'+file.name+'"? It will replace what is on the whiteboard now. The template itself never changes.':'Open "'+file.name+'"? It will replace what is on the whiteboard now.','Open'))return;
     ui.say('Opening…');
+    // The automatic save waits while the file is put on the board, so it never saves the half-opened board.
+    auto.pause();
     try{
       if(!await api.write(await store.readBoard(file,api.kind)))throw Core.plain('This file could not be opened. Make sure your whiteboard is open.');
       current=file.template?null:{id:file.id,name:file.name,folderId:file.folderId,subject:file.subject,template:false};
       fromTemplate=file.template?{name:file.name+' – '+new Date().toLocaleDateString(),subject:file.subject}:null;
+      // The opened file is this board's file now (a template is not: its copy gets a new file at the first change).
+      await auto.adopt();
       ui.dialog.close();
     }catch(error){ui.fail(error)}
+    finally{auto.resume()}
   }
 
   // ---------- Teacher: send a whiteboard to every student ----------
@@ -779,5 +788,211 @@
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',back)};
   }
 
-  window.FTTSavedWork={saveCurrent,open,sendCurrent,saveGroupBoards,keepTeacherCopy,keepTeacherPages,store,worksheets,snapshot,watch,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
+  // ---------- Auto-save ----------
+  // The whiteboard on this page saves itself as you work: the teacher's whiteboard and slides, a template opened as a copy,
+  // and a student's own board and the copies the teacher sent. A small chip says "Saving…" / "✓ Saved". It uses the same
+  // files, folders and rules as Save (nothing new is written anywhere else), plus a copy kept on this device until the
+  // save has gone through, so closing or refreshing the page loses nothing.
+  //   • A board is written to ONE file for as long as it is the same board (api.id()); a new board (New Slides, a board the
+  //     teacher sent, a file opened) never writes over the old one's file.
+  //   • A blank board is never saved, and a board that was cleared does not replace the saved copy with nothing.
+  //   • Opening a template saves the copy as a new file; the template itself never changes.
+  const auto=(()=>{
+    const POLL=3000,GAP=teacherPage?15000:10000,RETRY=30000,DRAFT_KEEP=14*24*3600*1000,DRAFT_MAX=2400000,MAX_DRAFTS=5;
+    let boardKey=null,savedJson='',lastJson='',lastSaveAt=0,failedAt=0,paused=0,prefixKey='',offered=false,chip=null,running=Promise.resolve(),started=false;
+    const draftKey=()=>prefixKey?'ftt-board-draft:'+prefixKey:'';
+    // Unsaved copies kept on this device, newest first. The newest is the stored value; the copies of other boards sit in "more" (at most MAX_DRAFTS in all), so a new board never pushes an older unsaved one out.
+    const nonce=Date.now().toString(36)+Math.random().toString(36).slice(2,6),mineRef=()=>nonce+':'+(boardKey||'');
+    function loadDrafts(){
+      const key=draftKey();if(!key)return[];
+      try{
+        const saved=JSON.parse(localStorage.getItem(key)||'null');if(!saved)return[];
+        const {more,...top}=saved,list=[top,...(Array.isArray(more)?more:[])];
+        return list.filter(item=>item&&typeof item.json==='string'&&Date.now()-Number(item.at)<DRAFT_KEEP);
+      }catch(_){return[]}
+    }
+    function storeDrafts(list){
+      const key=draftKey();if(!key)return false;
+      try{
+        if(!list.length){localStorage.removeItem(key);return true}
+        // If the browser has no room for all of them, the oldest go first; the newest is kept whenever it fits at all.
+        for(let keep=Math.min(list.length,MAX_DRAFTS);keep>=1;keep-=1){
+          try{localStorage.setItem(key,JSON.stringify({...list[0],more:list.slice(1,keep)}));return true}catch(_){}
+        }
+      }catch(_){}
+      return false;
+    }
+    function writeDraft(json){
+      const key=draftKey();if(!key||json.length>DRAFT_MAX)return false;
+      const ref=mineRef();
+      return storeDrafts([{at:Date.now(),json,b:ref},...loadDrafts().filter(item=>item.b!==ref)]);
+    }
+    function clearDraft(json){const ref=mineRef();storeDrafts(loadDrafts().filter(item=>item.b!==ref&&(!json||item.json!==json)))}
+    function dropDraft(draft){storeDrafts(loadDrafts().filter(item=>!(item.b===draft.b&&item.at===draft.at)))}
+    function readDraft(){return loadDrafts()[0]||null}
+    // Which file this device last saved a board to, and what the board looked like then. After a refresh the class copy of the board comes back as a new board; if it is exactly what was saved, it carries on in the same file instead of making another.
+    const linkKey=()=>prefixKey?'ftt-board-last:'+prefixKey:'';
+    const hash=text=>{let n=5381;for(let i=0;i<text.length;i+=1)n=((n*33)^text.charCodeAt(i))>>>0;return text.length+':'+n};
+    function writeLink(id,json){const key=linkKey();if(key)try{localStorage.setItem(key,JSON.stringify({id,hash:hash(json),at:Date.now()}))}catch(_){}}
+    function readLink(json){const key=linkKey();if(!key)return null;try{const link=JSON.parse(localStorage.getItem(key)||'null');return link&&typeof link.id==='string'&&link.hash===hash(json)&&Date.now()-Number(link.at)<DRAFT_KEEP?link:null}catch(_){return null}}
+    // My files is full: say so where it cannot be missed, for as long as it is true.
+    let full=false,banner=null,bannerMsg=null;
+    function showFull(text,onDevice){
+      full=true;
+      const limit=(String(text).match(/already have (\d+) saved files/)||[])[1];
+      if(!banner){
+        banner=h('div','ftt-autosave-full');banner.setAttribute('role','alert');
+        banner.style.cssText='position:fixed;left:14px;bottom:52px;z-index:2147483000;max-width:min(92vw,380px);padding:12px 14px;border-radius:14px;background:#fff7ed;color:#7c2d12;font:600 14px system-ui,sans-serif;box-shadow:0 8px 30px #0006;border:2px solid #ea580c';
+        bannerMsg=h('div');banner.append(bannerMsg);
+        const row=h('div');row.style.cssText='display:flex;gap:8px;margin-top:10px';
+        row.append(button('Open My files',()=>{void open()},'main'));banner.append(row);
+        document.body.append(banner);
+      }
+      bannerMsg.textContent='My files is full'+(limit?' ('+limit+' files)':'')+'. Your whiteboard is not saved in your account yet'+(onDevice?', only on this computer':' and is NOT kept on this computer either')+'. Delete a file you no longer need in My files and this will save by itself.';
+      banner.hidden=false;
+    }
+    function hideFull(){full=false;if(banner)banner.hidden=true}
+    function say(text,tone,title){
+      if(!text){if(chip)chip.hidden=true;return}
+      if(!chip){
+        chip=h('div','ftt-autosave');chip.setAttribute('role','status');chip.setAttribute('aria-live','polite');
+        chip.style.cssText='position:fixed;left:14px;bottom:14px;z-index:2147483000;padding:5px 12px;border-radius:999px;color:#fff;font:600 13px system-ui,sans-serif;pointer-events:none;box-shadow:0 2px 10px #0003';
+        document.body.append(chip);
+      }
+      chip.hidden=false;chip.textContent=text;chip.title=title||'';chip.style.background=tone==='warn'?'#9a3412e6':tone==='busy'?'#334155e6':'#14532de6';
+    }
+    // A board with nothing on it (no marks, pictures or pages with pictures on them) is never saved.
+    function blank(data){
+      const pages=Array.isArray(data?.pages)?data.pages:[data];
+      return !pages.some(page=>page&&((page.strokes&&page.strokes.length)||(page.pictures&&page.pictures.length)||(page.images&&page.images.length)));
+    }
+    const unique=(base,existing)=>{
+      const taken=new Set(existing.map(item=>Core.cleanName(item))),first=Core.cleanName(base);
+      if(!taken.has(first))return first;
+      for(let n=2;n<1000;n+=1){const next=Core.cleanName(first+' ('+n+')');if(!taken.has(next))return next}
+      return Core.cleanName(first+' ('+Date.now().toString(36)+')');
+    };
+    // Writes the board to its file (a new one the first time). Returns the file, or throws.
+    async function write(api,data){
+      const me=await who();prefixKey=me.prefix;
+      let file=null;
+      if(current&&!current.template){
+        // Keep the name, folder and star the owner gave the file in My files since the last save.
+        try{const found=Core.fileFromMetadata(await firebase.storage().ref(me.prefix).child(Core.objectName(current.id,'json')).getMetadata());file=found&&!found.template?found:null}
+        catch(error){if(error?.code!=='storage/object-not-found')throw error}
+        if(!file)current=null;
+      }
+      let name,folderId,subject;
+      if(file){name=file.name;folderId=file.folderId||'';subject=file.subject||''}
+      else{
+        const state=me.teacher?NO_FOLDERS:await store.folders().catch(()=>NO_FOLDERS),existing=(await store.list().catch(()=>[])).map(item=>item.name);
+        name=fromTemplate?.name?unique(fromTemplate.name,existing):Core.autoName({date:new Date(),lesson:lessonName(),existing});
+        folderId=state.saveTarget&&state.folders[state.saveTarget]?state.saveTarget:'';subject=fromTemplate?.subject||'';
+      }
+      const id=await store.saveBoard({id:file?file.id:undefined,name,folderId,subject,fromTeacher:file?.fromTeacher,important:file?.important,data,picture:await api.picture()});
+      return{id,name,folderId,subject,template:false,created:!file};
+    }
+    async function step(force){
+      if(paused)return{ok:false,reason:'busy'};
+      const api=board();if(!api.canSave)return{ok:true,blank:true};
+      let data=null;try{data=await api.read()}catch(_){data=null}
+      if(!data){say('');return{ok:true,blank:true}}
+      const key=api.id?api.id():null;
+      // A different board from the one that was being saved: it starts its own file.
+      const json=JSON.stringify(data);
+      if(key!==boardKey){
+        boardKey=key;current=null;savedJson='';lastJson='';failedAt=0;
+        // The same board as was last saved on this device (a refresh brought it back): keep using that file.
+        if(!fromTemplate&&!blank(data)){
+          // On a page that has only just opened nobody has been looked up yet: find out whose files these are first.
+          if(!prefixKey)try{prefixKey=(await who()).prefix}catch(_){}
+          const link=readLink(json);if(link){current={id:link.id,name:'',folderId:'',subject:'',template:false};savedJson=json;if(!offered)void offerRestore(api)}}
+      }
+      lastJson=json;
+      if(blank(data)){
+        if(!offered)offerRestore(api);
+        if(!savedJson)say('');
+        return{ok:true,blank:true};
+      }
+      if(json===savedJson){say('✓ Saved');return{ok:true,id:current?.id}}
+      const onDevice=writeDraft(json);
+      if(!force&&(Date.now()-lastSaveAt<GAP||Date.now()-failedAt<RETRY)){say(failedAt&&Date.now()-failedAt<RETRY?(onDevice?'⚠ Saved on this device only':'⚠ Not saved yet'):'● Changes not saved yet',failedAt?'warn':'busy');return{ok:false,reason:'waiting'}}
+      say('Saving…','busy');
+      try{
+        // With no connection an upload would just wait for minutes: say so at once. The copy on this device is already kept, and the save is tried again when the connection is back.
+        if(typeof navigator!=='undefined'&&navigator.onLine===false)throw Core.plain('You are offline. Your work is kept on this computer and will save when you are back online.');
+        const saved=await write(api,data);
+        // The board may have been replaced while it was uploading: that file stays, but it is not the new board's file.
+        if((api.id?api.id():null)===key){current={id:saved.id,name:saved.name,folderId:saved.folderId,subject:saved.subject,template:false};fromTemplate=null;savedJson=json}
+        lastSaveAt=Date.now();failedAt=0;clearDraft(json);hideFull();say('✓ Saved');
+        if((api.id?api.id():null)===key)writeLink(saved.id,json);
+        if(saved.created)try{window.dispatchEvent(new CustomEvent('ftt-myfiles-changed',{detail:{from:'autosave'}}))}catch(_){}
+        return{ok:true,id:saved.id};
+      }catch(error){
+        failedAt=Date.now();
+        const text=Core.errorText?Core.errorText(error):String(error?.message||error);
+        // Who is saving is known by now (unless nobody is signed in), so the copy on this device can be kept under their id.
+        const kept=onDevice||writeDraft(json);
+        const limitHit=/already have \d+ saved files/.test(text);if(limitHit)showFull(text,kept);
+        say(text===SIGN_IN?'⚠ Not saved: sign in to save':limitHit?'⚠ My files full – not saved':kept?'⚠ Saved on this device only':'⚠ Not saved yet','warn',text);
+        return{ok:false,error:text};
+      }
+    }
+    // One step at a time, so a save never overlaps the next one.
+    function run(force){const next=running.then(()=>step(force));running=next.catch(()=>{});return next}
+    // A copy of the last board that was never saved (the page was closed or refreshed first): offer to bring it back.
+    async function offerRestore(api){
+      offered=true;
+      // Only the person signed in on this device is offered their own copy (it is kept under their own id).
+      try{prefixKey=(await who()).prefix}catch(_){return}
+      const draft=readDraft();if(!draft||!api.canOpen)return;
+      // A copy that is the board already saved is nothing to bring back.
+      if(draft.json===savedJson){dropDraft(draft);return offerRestore(api)}
+      let data=null;try{data=JSON.parse(draft.json)}catch(_){dropDraft(draft);return offerRestore(api)}
+      if(!data||data.kind!==api.kind||blank(data)){dropDraft(draft);return offerRestore(api)}
+      // The board may have been used while the sign-in was checked: then keep it as it is.
+      let now=null;try{now=await api.read()}catch(_){}
+      // Only a board with nothing on it, or one that is exactly what is already saved, can be replaced: never one with unsaved work.
+      if(!now||!(blank(now)||(savedJson&&JSON.stringify(now)===savedJson)))return;
+      const box=h('div','ftt-autosave-restore');box.setAttribute('role','alertdialog');box.setAttribute('aria-label','Restore your whiteboard');
+      box.style.cssText='position:fixed;left:14px;bottom:52px;z-index:2147483000;max-width:min(92vw,360px);padding:12px 14px;border-radius:14px;background:#fff;color:#1f2937;font:600 14px system-ui,sans-serif;box-shadow:0 8px 30px #0006;border:2px solid #2563eb';
+      const when=new Date(draft.at).toLocaleString([],{weekday:'short',hour:'numeric',minute:'2-digit'});
+      box.append(h('div',null,'Your last whiteboard ('+when+') was not saved before the page closed.'));
+      const row=h('div');row.style.cssText='display:flex;gap:8px;margin-top:10px';
+      row.append(button('Bring it back',async()=>{
+        box.remove();paused++;
+        try{if(!await api.write(data))throw Core.plain('Open your whiteboard first, then try again.');dropDraft(draft)}
+        catch(error){say('⚠ Could not bring it back','warn',Core.errorText?Core.errorText(error):'')}
+        finally{paused--}
+        void run(true);
+      },'main'),button('Not now',()=>{box.remove();dropDraft(draft);void offerRestore(api)}));
+      box.append(row);document.body.append(box);
+    }
+    function start(){
+      if(started||typeof setInterval!=='function')return;started=true;
+      setInterval(()=>{void run(false)},POLL);
+      // A file was deleted in My files: if the board was waiting for room, save it now instead of at the next retry.
+      window.addEventListener?.('online',()=>{failedAt=0;void run(true)});
+      window.addEventListener?.('ftt-myfiles-changed',event=>{if(full&&event?.detail?.from!=='autosave'){failedAt=0;void run(true)}});
+      // Leaving the page: keep what is there on this device at once, and try to save it too.
+      const leaving=()=>{if(lastJson&&lastJson!==savedJson){let blankNow=true;try{blankNow=blank(JSON.parse(lastJson))}catch(_){}if(!blankNow)writeDraft(lastJson)}};
+      window.addEventListener('pagehide',leaving);
+      document.addEventListener('visibilitychange',()=>{if(document.hidden){leaving();void run(true)}});
+    }
+    return{
+      start,
+      // Saves now (waiting for any save in progress). {ok:true} when the board is saved or has nothing on it.
+      flush:()=>run(true),
+      pause(){paused++},resume(){paused=Math.max(0,paused-1)},
+      // A file was opened onto the board (or saved by hand): this board now lives in that file and is up to date.
+      async adopt(){
+        const api=board();let data=null;try{data=api.canSave?await api.read():null}catch(_){}
+        boardKey=api.id?api.id():null;savedJson=data?JSON.stringify(data):'';lastJson=savedJson;lastSaveAt=Date.now();failedAt=0;offered=true;
+      },
+      noteSaved(data){try{savedJson=JSON.stringify(data);if(current?.id)writeLink(current.id,savedJson);lastSaveAt=Date.now();failedAt=0;boardKey=board().id?.()??boardKey;clearDraft(savedJson);say('✓ Saved')}catch(_){}}
+    };
+  })();
+  auto.start();
+
+  window.FTTSavedWork={saveCurrent,open,sendCurrent,saveGroupBoards,keepTeacherCopy,keepTeacherPages,store,worksheets,snapshot,watch,auto,ui:{h,button,openDialog,folderPicker,fileList,manageButtons}};
 })();

@@ -259,6 +259,39 @@ test('teacher pastes editable text onto the shared whiteboard and can edit it', 
   await context.close();
 });
 
+test('New Slides starts a new blank whiteboard right from the board, and asks first when the old one could not be saved', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  const dialogs: string[] = [];
+  page.on('dialog', async d => { dialogs.push(d.message()); await d.dismiss(); });
+  await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
+  const newSlides = page.getByRole('button', { name: '🆕 New Slides' });
+  // An untouched board: the button is there.
+  await expect(newSlides.first()).toBeVisible();
+  const first = await page.evaluate(() => (window as any).ClassPointerPdf.boardId());
+  expect(first).toBeTruthy();
+  await pasteWords(page, 'First lesson');
+  await expect(page.locator('#pdfInk text[data-text-mark]').filter({ hasText: 'First lesson' })).toBeVisible();
+  // There is work on the board and saving to My files is not available on this synthetic page: the teacher is asked, and
+  // saying no keeps the board exactly as it is.
+  await newSlides.first().click();
+  await expect.poll(() => dialogs.length).toBe(1);
+  expect(dialogs[0]).toMatch(/could not be saved to My files.*lost/);
+  expect(await page.evaluate(() => (window as any).ClassPointerPdf.boardId())).toBe(first);
+  await expect(page.locator('#pdfInk text[data-text-mark]').filter({ hasText: 'First lesson' })).toBeVisible();
+  // Saying yes starts a new, blank whiteboard for the class.
+  page.removeAllListeners('dialog');
+  page.on('dialog', async d => { dialogs.push(d.message()); await d.accept(); });
+  await newSlides.first().click();
+  await expect.poll(() => page.evaluate(() => (window as any).ClassPointerPdf.boardId()), { timeout: 15000 }).not.toBe(first);
+  await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).ClassPointerBridge.highlights().length)).toBe(0);
+  await expect(newSlides.first()).toBeVisible();
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
 test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline text', async ({ browser }) => {
   const context = await browser.newContext(); await wire(context);
   const page = await context.newPage(); const errors = await openTeacher(page);

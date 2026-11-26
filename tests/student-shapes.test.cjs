@@ -15,7 +15,7 @@ const toolbar=read('annotation-toolbar.js');
 function load(){
   const at=toolbar.indexOf('  function cleanItem(raw,opts={}){'),end=toolbar.indexOf('  const measurer=document.createElement');
   const line=re=>toolbar.match(re)[0];
-  const code=[line(/  const KINDS=[^\n]*\n/),line(/  const CLOSED=[^\n]*\n/),line(/  const MAX_TEXT=[^\n]*\n/),line(/  const round=[^\n]*\n/),line(/  const validPoint=[^\n]*\n/),
+  const code=[line(/  const KINDS=[^\n]*\n/),line(/  const CLOSED=[^\n]*\n/),line(/  const MAX_TEXT=[^\n]*\n/),line(/  const ALIGNS=[^\n]*\n/),line(/  const round=[^\n]*\n/),line(/  const validPoint=[^\n]*\n/),
     toolbar.slice(at,end),'this.api={cleanItem,drawItem};'].join('\n');
   const context={};vm.runInNewContext(code,context);return context.api;
 }
@@ -93,15 +93,15 @@ test('a student\'s whiteboard keeps the fill and the triangle; the worksheet and
 test('student pages load the new toolbar and board scripts (new versions)',()=>{
   const share=read('activity-share.js');
   const toolbarToken=share.match(/annotation-toolbar\.js\?v=([^'"]+)/)[1],boardsToken=share.match(/student-boards\.js\?v=([^'"]+)/)[1];
-  assert.match(toolbarToken,/tiles2$/);assert.match(boardsToken,/wb2$/);
+  assert.match(toolbarToken,/wb3$/);assert.match(boardsToken,/wb3$/);
   for(const page of ['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html','index.html'])
-    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261125-wb2/,page);
-  assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=hlshapes1/);
-  assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=20261123-tiles2/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261125-wb2/);
+    assert.match(fs.readFileSync(path.join(__dirname,'..',page),'utf8'),/activity-share\.js\?v=20261125-wb3/,page);
+  assert.match(read('my-files.html'),/annotation-toolbar\.js\?v=20261125-wb3/);
+  assert.match(read('classroom.html'),/annotation-toolbar\.js\?v=20261125-wb3/);assert.match(read('classroom.html'),/student-boards\.js\?v=20261125-wb3/);
 });
 
 test('the teacher pencil on regular activity pages loads the current toolbar (new shapes)', () => {
   const g = fs.readFileSync(path.join(__dirname,'../teacher-global-controls.js'),'utf8');
-  assert.match(g, /annotation-toolbar\.js\?v=hlshapes1/);
+  assert.match(g, /annotation-toolbar\.js\?v=20261125-wb3/);
   assert.doesNotMatch(g, /annotate1/);
 });
