@@ -69,11 +69,11 @@
   /* Every row has the same shape. who = {sid, name, classId, className}. */
   function mk(who, tool, when, what, result, status, extra) {
     var r = {
-      id: tool + ':' + who.classId + ':' + who.sid + ':' + (extra && extra.key != null ? extra.key : when + ':' + what),
+      id: extra && extra.fullId ? extra.fullId : tool + ':' + who.classId + ':' + who.sid + ':' + (extra && extra.key != null ? extra.key : when + ':' + what),
       sid: who.sid, student: who.name, classId: who.classId, className: who.className || who.classId,
       tool: tool, when: when || 0, what: what || '', result: result || '', status: status || ''
     };
-    if (extra) Object.keys(extra).forEach(function (k) { if (k !== 'key') r[k] = extra[k]; });
+    if (extra) Object.keys(extra).forEach(function (k) { if (k !== 'key' && k !== 'fullId') r[k] = extra[k]; });
     return r;
   }
 
@@ -145,6 +145,40 @@
     return out;
   }
 
+
+  /* ---- Rashi Letters ----
+     1) One row per recorded reading, from the server list the Rashi teacher page uses ("rashi-list-pending":
+        every reading waiting for marking plus the newest marked ones, with the recording to play).
+     2) One "practice" row per student: his latest practice, from rashiLetters/progress (totals only, no dated events). */
+  var RASHI_UNITS = ['zayin', 'bet', 'tsadi', 'alef', 'tsadisofit', 'memsofit', 'shin', 'samech', 'finalreview'];
+  function rashiListRows(list, people) {
+    var out = [];
+    ['requests', 'recent'].forEach(function (k) {
+      ((list && list[k]) || []).forEach(function (r) {
+        if (!r || !r.studentId) return;
+        var p = people[r.studentId] || {};
+        var who = { sid: r.studentId, name: r.studentName || p.name || r.studentId, classId: r.classId || p.classId || '', className: r.className || p.className || r.classId || '' };
+        var rev = r.letterReview, graded = !!(rev && Number(rev.total) > 0) || (r.gradedAt && true);
+        var result = 'Recorded reading';
+        if (rev && Number(rev.total) > 0) result = 'Reading ' + Math.round((Number(rev.total) - Number(rev.missedCount || 0)) / Number(rev.total) * 100) + '%';
+        var secs = Number(r.durationMs) ? ' · ' + Math.round(Number(r.durationMs) / 1000) + ' sec' : '';
+        out.push(mk(who, 'rashi', timeOf(r.createdAt), String(r.sectionLabel || r.sectionId || 'Reading') + (Number(r.attempt) > 1 ? ' · try #' + Number(r.attempt) : ''),
+          result + secs, graded ? 'Graded' : 'Waiting for grading', { key: r.id, fullId: 'rashi:' + r.id, audioUrl: r.audioUrl || '', audioPath: '' }));
+      });
+    });
+    return out;
+  }
+  function rashiProgressRows(who, progress) {
+    var p = obj(progress), u = obj(p.units), a = 0, c = 0;
+    if (!progress) return [];
+    RASHI_UNITS.forEach(function (id) { ['_letter', '_word'].forEach(function (s) { var x = obj(u[id + s]); a += Number(x.attempts) || 0; c += Number(x.correct) || 0; }); });
+    var when = num(p.lastActive) || 0;
+    if (!when && !a) return [];
+    var idx = typeof p.currentUnitIndex === 'number' ? p.currentUnitIndex : 0;
+    return [mk(who, 'rashi', when, 'Practice · unit ' + Math.min(idx + 1, RASHI_UNITS.length) + ' of ' + RASHI_UNITS.length,
+      a ? Math.round(c / a * 100) + '% over ' + a + ' answers (all time)' : '—', 'Latest practice', { key: 'progress' })];
+  }
+
   /* ---- Weekly Quiz: one row per quiz attempt that was started (B3QuizHistory.buildHistory) ---- */
   function quizRows(who, hist) {
     var out = [];
@@ -179,13 +213,35 @@
     return { sid: sid, name: p.name, classId: classId || p.classId, className: (classId && p.classNames && p.classNames[classId]) || p.className };
   }
   var starText = function (n) { return (n > 0 ? '+' : '') + n + ' ★'; };
+  function normName(v) { return String(v == null ? '' : v).toLowerCase().replace(/[^a-z0-9֐-׿]+/g, ''); }
   function rewardRows(rootData, people) {
     var r = obj(rootData), out = [];
+    /* Student Rewards keeps its own student ids (for example b3_<hash>), not the ids the tools use.
+       Same links the server uses (resolveRewardStudentId): the request's own practiceStudentId, the reward
+       student's b3StudentId, the same id, then the same name (only when exactly one student has it). */
+    var nameIndex = {};
+    Object.keys(people).forEach(function (sid) { var k = normName(people[sid].name); if (k) nameIndex[k] = nameIndex[k] === undefined ? sid : null; });
+    var cache = {};
+    function realId(rid, item) {
+      var direct = item && (item.practiceStudentId || item.b3StudentId);
+      if (direct && people[direct]) return direct;
+      if (cache[rid] !== undefined) return cache[rid];
+      var st = obj(obj(r.students)[rid]), found = null;
+      if (st.b3StudentId && people[st.b3StudentId]) found = st.b3StudentId;
+      else if (people[rid]) found = rid;
+      else {
+        var hit = nameIndex[normName(st.name || st.displayName)];
+        if (hit) found = hit;
+      }
+      cache[rid] = found;
+      return found;
+    }
+    function who2(rid, classId, item) { var sid = realId(String(rid || ''), item); return sid ? whoFor(people, sid, classId) : null; }
     Object.keys(obj(r.dailyAwards)).forEach(function (sid) {
       Object.keys(obj(r.dailyAwards[sid])).forEach(function (cid) {
         Object.keys(obj(r.dailyAwards[sid][cid])).forEach(function (date) {
           var award = r.dailyAwards[sid][cid][date];
-          var who = whoFor(people, sid, cid); if (!who) return;
+          var who = who2(sid, cid, null); if (!who) return;
           var when = timeOf(obj(award).savedAt) || Date.parse(date + 'T12:00:00') || 0;
           dailyParts(award).forEach(function (p) {
             out.push(mk(who, 'daily', when, p.category ? p.category + (p.rating ? ' — ' + p.rating : '') : 'Daily Points', starText(p.points), 'Posted', { key: date + ':' + p.category }));
@@ -197,23 +253,23 @@
       var item = obj(r.pointRequests[id]);
       var source = String(item.source || '');
       if (source !== 'rashi-recording') return; /* the other tools show their own events */
-      var who = whoFor(people, String(item.rewardStudentId || ''), item.classId); if (!who) return;
+      var who = who2(item.rewardStudentId, item.classId, item); if (!who) return;
       var st = String(item.status || 'pending');
       var amount = Number(st === 'approved' ? (item.actualAmount != null ? item.actualAmount : item.amount) : item.amount) || 0;
       out.push(mk(who, 'rashi', timeOf(st === 'approved' ? (item.reviewedAt || item.createdAt) : item.createdAt),
         String(item.reason || 'Recorded reading'), 'Recorded reading · ' + starText(amount),
-        st === 'approved' ? 'Approved' : st === 'rejected' ? 'Rejected' : 'Waiting for approval', { key: id }));
+        st === 'approved' ? 'Approved' : st === 'rejected' ? 'Rejected' : 'Waiting for approval', { key: id, fullId: 'rashi:' + id }));
     });
     Object.keys(obj(r.pointAdjustments)).forEach(function (id) {
       var item = obj(r.pointAdjustments[id]);
-      var who = whoFor(people, String(item.studentId || ''), item.classId); if (!who) return;
+      var who = who2(item.studentId, item.classId, item); if (!who) return;
       var amount = Number(item.amount || 0); if (!amount) return;
       out.push(mk(who, 'points', timeOf(item.createdAt), String(item.reason || 'Teacher adjustment'), starText(amount), item.undoneBy ? 'Undone' : 'Posted', { key: id }));
     });
     Object.keys(obj(r.redemptionsByStudent)).forEach(function (sid) {
       Object.keys(obj(r.redemptionsByStudent[sid])).forEach(function (key) {
         var item = obj(r.redemptionsByStudent[sid][key]);
-        var who = whoFor(people, sid, item.classId); if (!who) return;
+        var who = who2(sid, item.classId, item); if (!who) return;
         var cost = Number(item.cost || 0);
         var name = (obj(obj(r.rewards)[item.rewardId]).name) || item.rewardName || 'Reward';
         var st = String(item.status || 'pending');
@@ -260,6 +316,6 @@
   }
 
   return { TOOLS: TOOLS, TOOL_BY_ID: TOOL_BY_ID, posukRows: posukRows, chazaraRows: chazaraRows, shorashimRows: shorashimRows,
-    chayusRows: chayusRows, quizRows: quizRows, rewardRows: rewardRows, applyFilters: applyFilters, sortNewest: sortNewest,
+    chayusRows: chayusRows, rashiListRows: rashiListRows, rashiProgressRows: rashiProgressRows, quizRows: quizRows, rewardRows: rewardRows, applyFilters: applyFilters, sortNewest: sortNewest,
     dedupe: dedupe, rowHref: rowHref, posukLabel: posukLabel };
 });
