@@ -82,7 +82,7 @@ tbody tr.row:focus{outline:2px solid #2563eb;outline-offset:-2px}
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../student-report/quiz-history.js?v=20261026-simple-csv"></script>
 <script src="../chayus-meter/history.js?v=20261126-history"></script>
-<script src="core.js?v=20261126-activity2"></script>
+<script src="core.js?v=20261126-activity3"></script>
 <script>
 (function(){
 'use strict';
@@ -101,7 +101,7 @@ const obj=v=>v&&typeof v==='object'?v:{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const get=async p=>{try{return (await db.ref(p).once('value')).val()}catch(e){return undefined}};
 const PAGE=200;
-let user=null,access=null,classes=[],people={},allRows=[],shown=PAGE,filtered=[],notes=[];
+let rashiAdminAsked=false,user=null,access=null,classes=[],people={},allRows=[],shown=PAGE,filtered=[],notes=[];
 
 /* ---------- Which classes: same rule as the Student Report ---------- */
 async function classesFor(acc,u){
@@ -131,30 +131,49 @@ async function loadClass(c){
  const ids=Object.entries(c.members).filter(([id,m])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&(!m||m.active!==false)).map(([id])=>id);
  const shRoot=legacy?'posukPractice/shorashimLearning/students/':'posukPractice/shorashimLearning/classes/'+c.id+'/students/';
  const needsTools=ids.length>0;
+ const classPeople={};
  const [quizRoot,chayus]=await Promise.all([
   needsTools?(async()=>{const q=legacy?'b3Quiz':'b3Quiz/classes/'+c.id;const [launches,responses,completions]=await Promise.all([get(q+'/launches'),get(q+'/responses'),get(q+'/completions')]);return {launches,responses,completions}})():null,
   (async()=>{try{if(!needsTools||!user||!window.ChayusHistory||!(await chayusOn(c,legacy)))return null;return await ChayusHistory.fetchHistory({idToken:await user.getIdToken(),classId:c.id,days:90,projectId:firebase.app().options.projectId})}catch(e){console.warn('Chayus history',e);return null}})()
  ]);
  await Promise.all(ids.map(async id=>{
   const m=obj(c.members[id]);
-  const [profile,att,chzEv,sh]=await Promise.all([
+  const [profile,att,chzEv,sh,rashiP]=await Promise.all([
    m.name?null:get('b3Games/students/'+id+'/profile'),
-   get('posukPractice/attempts/'+id),get('posukPractice/chazara/events/'+id),get(shRoot+id)
+   get('posukPractice/attempts/'+id),get('posukPractice/chazara/events/'+id),get(shRoot+id),get('rashiLetters/progress/'+id)
   ]);
   const name=String(m.name||(profile&&profile.name)||id);
   const who={sid:id,name,classId:c.id,className:c.name};
+  classPeople[id]={name,classId:c.id,className:c.name};
   if(!people[id])people[id]={name,classId:c.id,className:c.name,classNames:{}};
   people[id].classNames[c.id]=c.name;
-  rows.push(...H.posukRows(who,att),...H.chazaraRows(who,chzEv),...H.shorashimRows(who,sh),...H.chayusRows(who,chayus));
+  rows.push(...H.posukRows(who,att),...H.chazaraRows(who,chzEv),...H.shorashimRows(who,sh),...H.chayusRows(who,chayus),...H.rashiProgressRows(who,rashiP));
   if(quizRoot&&window.B3QuizHistory){
    try{rows.push(...H.quizRows(who,B3QuizHistory.buildHistory({root:quizRoot,studentId:id,classId:c.id,joinedAt:0,since:0})))}catch(e){console.warn('Quiz history',e)}
   }
  }));
+ /* Recorded Rashi readings: the same server list the Rashi teacher page uses (class-scoped by the server). */
+ try{
+  /* The owner's list is not limited to one class, so ask once; a teacher's list is limited by the server to the class asked for. */
+  if(needsTools&&user&&!(access.role==='admin'&&rashiAdminAsked)){
+   if(access.role==='admin')rashiAdminAsked=true;
+   const list=await rashiList(c.id);
+   const known=new Set(classes.map(x=>x.id));
+   rows.push(...H.rashiListRows(list,classPeople).map(r=>known.has(r.classId)?r:{...r,classId:c.id,className:c.name}));
+  }
+ }catch(e){console.warn('Rashi recordings',e);notes.push('Rashi recordings could not be loaded for '+c.name+'.')}
  return rows;
+}
+async function rashiList(classId){
+ const token=await user.getIdToken();
+ const res=await fetch('https://us-central1-'+firebase.app().options.projectId+'.cloudfunctions.net/studentRewardsAutoAward',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'rashi-list-pending',classId})});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(data.error||('HTTP '+res.status));
+ return data;
 }
 /* Student Rewards ledger: the owner reads it directly, teachers through the same backend call the Rewards page uses. */
 async function loadRewards(){
- const ownerPaths=['dailyAwards','pointRequests','pointAdjustments','redemptionsByStudent','rewards','classes'];
+ const ownerPaths=['dailyAwards','pointRequests','pointAdjustments','redemptionsByStudent','rewards','classes','students'];
  if(access.role==='admin'){
   try{
    const vals=await Promise.all(ownerPaths.map(async p=>(await db.ref('studentRewards/'+p).once('value')).val()));
@@ -169,7 +188,7 @@ async function loadRewards(){
  return data.root||{};
 }
 async function loadAll(){
- notes=[];people={};allRows=[];
+ notes=[];people={};allRows=[];rashiAdminAsked=false;
  $('status').textContent='Loading activity from every tool…';
  const parts=await Promise.all(classes.map(c=>loadClass(c).catch(e=>{console.error(e);notes.push('Could not load '+c.name+'.');return []})));
  parts.forEach(p=>allRows.push(...p));
@@ -192,10 +211,17 @@ async function loadAll(){
 const fmtTime=r=>{if(!r.when)return '—';const d=new Date(r.when);return r.tool==='chayus'?d.toLocaleDateString():d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})};
 function pillClass(s){return /^(scored|counted|learned|completed|approved|posted|level reached|delivered|fulfilled|recorded)$/i.test(s)?'g':/wait|pending|progress|disputed|not scored/i.test(s)?'y':/reject|removed|undone|declin|cancel|refund/i.test(s)?'r':''}
 function filters(){return {student:$('fStudent').value,classId:$('fClass').value,tool:$('fTool').value||TOOL_LIST.join(','),from:$('fFrom').value,to:$('fTo').value,text:$('fText').value}}
+/* A tool page may name its class a little differently (et / ET / b3_et / the class name): match them all. */
+function resolveClass(want){
+ want=String(want||'').trim().toLowerCase();if(!want||want==='all')return '';
+ const norm=x=>String(x||'').toLowerCase().replace(/^b3[_-]/,'');
+ const hit=classes.find(c=>c.id.toLowerCase()===want)||classes.find(c=>norm(c.id)===norm(want))||classes.find(c=>String(c.name).toLowerCase()===want);
+ return hit?hit.id:'';
+}
 function fillSelects(){
  const keepS=$('fStudent').value,keepC=$('fClass').value;
  $('fClass').innerHTML='<option value="">All classes</option>'+classes.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');
- $('fClass').value=keepC||params.get('class')||'';
+ $('fClass').value=keepC||resolveClass(params.get('class'));
  fillStudents(keepS);
  $('fTool').innerHTML='<option value="">'+(TOOL_LIST.length?'All of these':'All tools')+'</option>'+H.TOOLS.filter(t=>!TOOL_LIST.length||TOOL_LIST.includes(t.id)).map(t=>'<option value="'+t.id+'">'+esc(t.icon+' '+t.label)+'</option>').join('');
  if(FIXED_TOOL){$('fTool').value=FIXED_TOOL;$('fToolWrap').style.display='none'}
