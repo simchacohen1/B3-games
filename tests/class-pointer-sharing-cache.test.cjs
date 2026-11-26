@@ -42,6 +42,6 @@ test('the classroom loads the updated PeerJS reconnection handling', () => {
 test('student pages refresh the shared gate for locked-classroom presentation controls',()=>{
   for(const page of [...pages,'halacha/index.html','class-pointer-prototype/student-view.html']) {
     const html=fs.readFileSync(path.join(root,page),'utf8');
-    if(html.includes('game-gate.js'))assert.match(html,/game-gate\.js\?v=20261021-follow-unblock/,page);
+    if(html.includes('game-gate.js'))assert.match(html,/game-gate\.js\?v=20261126-gate-streams1/,page);
   }
 });
