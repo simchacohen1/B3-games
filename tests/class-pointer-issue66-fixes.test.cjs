@@ -30,7 +30,7 @@ test('one Stop button while live, in every view (issue 66, bug 2)',()=>{
 });
 
 test('reminder appears for an unused whiteboard and never closes it by itself',()=>{
-  assert.match(dash,/syncReminder\(isLive&&docOpen\(\)&&lastDoc==='Whiteboard'\)/);
+  assert.match(dash,/syncReminder\(isLive&&\(\(docOpen\(\)&&lastDoc==='Whiteboard'\)/);
   assert.match(dash,/visibilitychange/);
   assert.match(dash,/IDLE_MS=5\*60\*1000/);
   const block=dash.slice(dash.indexOf('Reminder: whiteboard still on'),dash.indexOf('function syncLive()'));
