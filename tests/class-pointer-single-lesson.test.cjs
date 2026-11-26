@@ -28,6 +28,7 @@ function fixture(initial){
   vm.runInContext(source('dashboard-session.js'),context);
   return {rows,ops,listeners,events,pagehide,context,
     async open(room=mine){await auth({uid:'t1'},true,{authorized:true,role:'teacher',classIds:['one']});await context.window.ClassPointerDashboard.publish(room)},
+    async openAs(access,room=mine){await auth({uid:'t1'},true,{authorized:true,classIds:['one'],...access});await context.window.ClassPointerDashboard.publish(room)},
     push(next){for(const cb of listeners[SESSIONS]||[])cb({val:()=>next})}};
 }
 const now=Date.now();
@@ -82,4 +83,52 @@ test('the teacher window shows "This lesson was taken over" and the student page
   const room=source('classroom.js'),share=source('activity-share.js');
   assert.match(room,/class-pointer-taken-over/);assert.match(room,/This lesson was taken over/);assert.match(room,/Take this class back/);
   assert.match(share,/next\.roomId!==presenceTarget\)\{presenceTarget=next\.roomId;presenceDelay=0;presenceFailures=0;admitted=false;/);
+});
+
+const adminAccess={role:'admin',classIds:['*']},principalAccess={role:'teacher',accountType:'principal'};
+
+test('an administrator or principal cannot start a lesson in a class whose own teacher is live, and gets a clear message',async()=>{
+  for(const access of [adminAccess,principalAccess]){
+    const f=fixture({[older]:live(older,60000)});
+    await assert.rejects(()=>f.openAs(access),/own teacher is already teaching it/);
+    assert.ok(!f.rows[mine],'nothing was written for the visitor');
+    assert.ok(f.rows[older],'the teacher lesson is untouched');
+  }
+});
+
+test('an administrator can open a class whose teacher is not live (old, offline, or absent)',async()=>{
+  const f=fixture({[older]:live(older,60000,{teacherOfflineAt:now-600000}),[newer]:live(newer,15000000)});
+  await f.openAs(adminAccess);
+  assert.equal(f.rows[mine].leadTeacher,false);
+  const g=fixture({});await g.openAs(adminAccess);assert.equal(g.rows[mine].leadTeacher,false);
+});
+
+test('the class teacher’s lesson is marked lead, and takes over a newer administrator lesson',async()=>{
+  const f=fixture({});await f.openAs({role:'teacher',accountType:'teacher'});
+  assert.equal(f.rows[mine].leadTeacher,true);
+  // A newer administrator lesson (race or old page) never takes the teacher's lesson over.
+  f.push({[mine]:live(mine,5000,{leadTeacher:true}),[newer]:live(newer,500,{leadTeacher:false})});
+  assert.deepEqual(f.events,[]);
+  // The administrator's lesson, though newer, ends when it sees the teacher's older one; the notice says why.
+  const g=fixture({});await g.openAs(adminAccess);
+  g.push({[mine]:live(mine,500,{leadTeacher:false}),[older]:live(older,60000,{leadTeacher:true})});
+  assert.deepEqual(g.events,['class-pointer-taken-over']);
+});
+
+test('a teacher opening after an administrator takes the class; two administrators or two teachers stay newest-wins',async()=>{
+  const f=fixture({});await f.openAs(adminAccess);
+  f.push({[mine]:live(mine,5000,{leadTeacher:false}),[newer]:live(newer,500,{leadTeacher:true})});
+  assert.deepEqual(f.events,['class-pointer-taken-over']);
+  const g=fixture({});await g.openAs(adminAccess);
+  g.push({[mine]:live(mine,5000,{leadTeacher:false}),[newer]:live(newer,500,{leadTeacher:false})});
+  assert.deepEqual(g.events,['class-pointer-taken-over']);
+  const h=fixture({});await h.openAs({role:'teacher'});
+  h.push({[mine]:live(mine,500,{leadTeacher:true}),[older]:live(older,5000,{leadTeacher:true})});
+  assert.deepEqual(h.events,[]);
+});
+
+test('students prefer the class teacher’s lesson over an administrator’s, whichever is newer',()=>{
+  const src=source('activity-share.js');
+  assert.match(src,/\(b\[1\]\.leadTeacher!==false\)-\(a\[1\]\.leadTeacher!==false\)/);
+  assert.match(source('classroom.js'),/own teacher/);
 });
