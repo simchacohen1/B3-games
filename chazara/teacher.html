@@ -355,4 +355,5 @@ $('recordingsPanel').parentElement.insertBefore($('recordingsPanel'),$('teacherA
 $('showFullDashboard').onclick=()=>{fullDashboardLoaded=true;$('teacherApp').classList.remove('review-only');$('showFullDashboard').classList.add('hidden');$('showPendingOnly').classList.remove('hidden');if(auth.currentUser&&teacherAccess)loadClassScope(auth.currentUser,teacherAccess)};
 $('showPendingOnly').onclick=()=>{$('teacherApp').classList.add('review-only');$('showFullDashboard').classList.remove('hidden');$('showPendingOnly').classList.add('hidden');$('recordingReviewFilter').value='needs';renderRecordings()};
 
-</script></body></html>
+</script><script src="../activity-history/tab.js?v=20261126-activity2" data-tool="chazara" defer></script>
+</body></html>
