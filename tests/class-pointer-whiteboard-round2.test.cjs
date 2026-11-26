@@ -364,11 +364,74 @@ test('auto-save is wired: it runs by itself, waits while a file is opened, and m
   assert.match(saved,/'✓ Saved'/);
 });
 
-test('auto-save: a refreshed board that is exactly what was last saved carries on in the same file',()=>{
-  // The class copy comes back as a new board after a refresh; without this link it would be saved as a second file.
-  assert.match(saved,/ftt-board-last:/);
-  assert.match(saved,/if\(\(api\.id\?api\.id\(\):null\)===key\)writeLink\(saved\.id,json\)/);
-  assert.match(saved,/if\(!fromTemplate&&!blank\(data\)\)\{const link=readLink\(json\)/);
-  // Only an exact match counts, and only for a board that is not a template copy.
-  assert.match(saved,/link\.hash===hash\(json\)/);
+test('a refresh brings the board back as a new board: if it is what was last saved, it carries on in the same file',async()=>{
+  const first=harness();first.state.data=withMark('s1');
+  const saved1=await first.auto.flush();assert.equal(saved1.ok,true);
+  const path=first.jsonPuts()[0].path;
+  // The page is reloaded: a new page, the same device storage, the same files, the board back as it was.
+  const again=harness({existing:Object.fromEntries(first.objects),drafts:first.store});again.state.data=withMark('s1');
+  const result=await again.auto.flush();
+  assert.equal(result.ok,true);assert.equal(result.id,saved1.id);assert.equal(again.jsonPuts().length,0,'nothing is written for a board that is already saved');
+  // More work after the refresh goes to the SAME file.
+  again.state.data=withMark('s2');await again.auto.flush();
+  assert.deepEqual(again.jsonPuts().map(put=>put.path),[path]);
+});
+
+test('a different board after a refresh gets its own file, and a template copy is never linked',async()=>{
+  const first=harness();first.state.data=withMark('s1');await first.auto.flush();
+  const again=harness({existing:Object.fromEntries(first.objects),drafts:first.store});again.state.data=withMark('other');
+  await again.auto.flush();
+  assert.equal(again.jsonPuts().length,1);assert.notEqual(again.jsonPuts()[0].path,first.jsonPuts()[0].path);
+});
+
+test('students may keep 200 files',()=>{assert.equal(Core.LIMITS.studentFiles,200);assert.equal(Core.LIMITS.teacherBoards,200)});
+
+test('when My files is full the student is told so, the work stays on the device, and it saves as soon as there is room',async()=>{
+  const existing={};for(let n=0;n<200;n+=1)existing['studentFiles/et/stu1/file'+n+'.json']={customMetadata:{}};
+  const h=harness({existing});h.state.data=withMark('s1');
+  const result=await h.auto.flush();
+  assert.equal(result.ok,false);assert.match(result.error,/already have 200 saved files/);
+  const banner=walk(h.body).find(node=>node.attrs?.role==='alert');
+  assert.ok(banner&&!banner.hidden,'a banner stays on the page');
+  const words=walk(banner).map(node=>node.textContent||'').join(' ');
+  assert.match(words,/My files is full \(200 files\)/);assert.match(words,/only on this computer/);
+  assert.ok(walk(banner).find(node=>node.tag==='button'&&node.textContent==='Open My files'));
+  const chip=walk(h.body).find(node=>node.attrs?.role==='status');
+  assert.match(chip.textContent,/My files full/);
+  assert.equal(Object.keys(h.store).filter(key=>key.startsWith('ftt-board-draft:')).length,1,'the copy on the device is kept');
+  // A file is deleted: the very next save goes through and the banner goes away.
+  h.objects.delete('studentFiles/et/stu1/file0.json');
+  const after=await h.auto.flush();
+  assert.equal(after.ok,true);assert.equal(h.jsonPuts().length,1);
+  assert.ok(banner.hidden,'the banner is gone once it is saved');
+  assert.equal(Object.keys(h.store).filter(key=>key.startsWith('ftt-board-draft:')).length,0);
+});
+
+test('a new board never pushes an older unsaved board off the device',async()=>{
+  const h=harness({deny:true});
+  h.state.data=withMark('a1');h.state.id='b0';await h.auto.flush();
+  h.state.data=withMark('b1');h.state.id='b1';await h.auto.flush();
+  const keys=Object.keys(h.store).filter(key=>key.startsWith('ftt-board-draft:'));assert.equal(keys.length,1);
+  const stored=JSON.parse(h.store[keys[0]]);
+  assert.equal(JSON.parse(stored.json).strokes[0].id,'b1');
+  assert.equal(stored.more.length,1);assert.equal(JSON.parse(stored.more[0].json).strokes[0].id,'a1');
+});
+
+test('after one unsaved board is answered, the next one is offered',async()=>{
+  const key='ftt-board-draft:studentFiles/et/stu1/';
+  const value=JSON.stringify({at:Date.now()-1000,json:JSON.stringify(withMark('new')),b:'x:1',more:[{at:Date.now()-5000,json:JSON.stringify(withMark('old')),b:'x:0'}]});
+  const h=harness({drafts:{[key]:value}});h.state.data=blankBoard;
+  await h.auto.flush();await wait();await wait();
+  let dialog=walk(h.body).find(node=>node.attrs?.role==='alertdialog');assert.ok(dialog);
+  walk(dialog).find(node=>node.tag==='button'&&node.textContent==='Not now').click();
+  await wait();await wait();
+  dialog=walk(h.body).filter(node=>node.attrs?.role==='alertdialog').pop();
+  assert.ok(dialog,'the older one is offered next');
+  walk(dialog).find(node=>node.tag==='button'&&node.textContent==='Bring it back').click();await wait();
+  assert.equal(h.state.imported.at(-1).strokes[0].id,'old');
+});
+
+test('My files tells the auto-save when a file is deleted, so a full board saves at once',()=>{
+  assert.match(saved,/detail:\{from:'delete'\}/);
+  assert.match(saved,/ftt-myfiles-changed',event=>\{if\(full&&event\?\.detail\?\.from!=='autosave'\)\{failedAt=0;void run\(true\)\}/);
 });
