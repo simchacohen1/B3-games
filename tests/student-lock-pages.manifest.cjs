@@ -71,6 +71,7 @@ const EXEMPT_PAGES = {
   "record-mishnayos/teacher.html": "teacher",
   "record_pesukim/teacher.html": "teacher",
   "shorashim/teacher.html": "teacher",
+  "activity-history/index.html": "teacher activity history (teacher sign-in)",
   "student-report/index.html": "teacher report (teacher sign-in)",
   "student-rewards/teacher.html": "teacher",
   "teacher-home.html": "teacher home",
