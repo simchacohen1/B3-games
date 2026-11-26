@@ -26,7 +26,7 @@
     {id:"more-learning",icon:"🕍",title:"Learning Beis Midrash",subtitle:"Halacha and Sefer HaMitzvos",teacherSubtitle:"Halacha, Sefer HaMitzvos, and Mishnayos",extra:"",tiles:[
       {id:"halacha",title:"Halacha",icon:"📔",href:"halacha/index.html?v=20261007-teacher-sync",teacherHref:"halacha/teacher.html"},
       {id:"sefer-hamitzvos",title:"Sefer HaMitzvos",icon:"📖",href:"sefer-hamitzvos/index.html"},
-      {id:"chayus-meter",title:"Chayus Meter",icon:"🔥",href:"chayus-meter/index.html"},
+      {id:"chayus-meter",title:"Chayus Meter",icon:"🔥",href:"chayus-meter/index.html",teacherHref:"chayus-meter/teacher.html"},
       {id:"mishnayos-practice",title:"Mishnayos Practice (classic)",icon:"🕍",href:"mishnayos/student.html",teacherHref:"mishnayos/teacher.html",studentHome:false}]},
     {id:"class",icon:"🏡",title:"Class Village",subtitle:"Your gallery and rewards",extra:"",tiles:[
       {id:"class-gallery",title:"Class Gallery",icon:"🖼️",href:"class-gallery/index.html"},

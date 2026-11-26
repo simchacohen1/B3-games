@@ -147,11 +147,11 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
+    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','chayus-class-history','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const act=String(req.body?.action||'');
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':'chazara');
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':act.startsWith('chayus-')?(['et','wt'].includes(classId)?'chazara':'chayus-meter'):'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -163,6 +163,7 @@ async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
+ if(String(action).startsWith('chayus-'))return; // read-only; the handler uses the selected class roster
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='posuk-grade'||action==='posuk-delete'||action==='posuk-word-marks')return; // posuk-review-core checks the student against this scope
  if(action==='repair-shorashim-recording'){
@@ -1874,6 +1875,12 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json(result);
         }
         await authorizeChazaraAction(teacher,body);
+        if(action==="chayus-class-history"){
+          // Read only: each student's recorded Chayus Meter days (level, counted minutes, points) for the selected class.
+          if(!teacher.scope||!teacher.scope.selected)return res.status(400).json({error:'Choose a class.'});
+          const history=await chayusPoints.classHistory({get:async p=>(await rtdb.ref(p).get()).val(),students:teacher.scope.students,days:body.days,nowMs:Date.now()});
+          return res.status(200).json({ok:true,classId:teacher.scope.selected,...history});
+        }
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});
