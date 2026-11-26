@@ -919,6 +919,8 @@
       if(!force&&(Date.now()-lastSaveAt<GAP||Date.now()-failedAt<RETRY)){say(failedAt&&Date.now()-failedAt<RETRY?(onDevice?'⚠ Saved on this device only':'⚠ Not saved yet'):'● Changes not saved yet',failedAt?'warn':'busy');return{ok:false,reason:'waiting'}}
       say('Saving…','busy');
       try{
+        // With no connection an upload would just wait for minutes: say so at once. The copy on this device is already kept, and the save is tried again when the connection is back.
+        if(typeof navigator!=='undefined'&&navigator.onLine===false)throw Core.plain('You are offline. Your work is kept on this computer and will save when you are back online.');
         const saved=await write(api,data);
         // The board may have been replaced while it was uploading: that file stays, but it is not the new board's file.
         if((api.id?api.id():null)===key){current={id:saved.id,name:saved.name,folderId:saved.folderId,subject:saved.subject,template:false};fromTemplate=null;savedJson=json}
@@ -967,6 +969,7 @@
       if(started||typeof setInterval!=='function')return;started=true;
       setInterval(()=>{void run(false)},POLL);
       // A file was deleted in My files: if the board was waiting for room, save it now instead of at the next retry.
+      window.addEventListener?.('online',()=>{failedAt=0;void run(true)});
       window.addEventListener?.('ftt-myfiles-changed',event=>{if(full&&event?.detail?.from!=='autosave'){failedAt=0;void run(true)}});
       // Leaving the page: keep what is there on this device at once, and try to save it too.
       const leaving=()=>{if(lastJson&&lastJson!==savedJson){let blankNow=true;try{blankNow=blank(JSON.parse(lastJson))}catch(_){}if(!blankNow)writeDraft(lastJson)}};

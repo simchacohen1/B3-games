@@ -234,13 +234,14 @@ function harness({teacher=false,signedIn=true,deny=false,existing={},drafts={}}=
   const lessonApi={exportWhiteboard:async()=>state.data,importWhiteboard:async data=>{state.imported.push(data);return true},exportPng:png,boardId:()=>state.id};
   const window={FTTSavedWorkCore:Core,firebase,B3_FIREBASE_CONFIG:{},ClassPointerBoards:teacher?undefined:studentApi,ClassPointerPdf:teacher?lessonApi:undefined,
     ClassPointerDashboard:teacher?{ready:Promise.resolve({user:{uid:'teacherA'}})}:undefined,addEventListener(){},dispatchEvent(){}};
-  const context={window,document,firebase,URL,Blob,Date,Intl,Promise,Object,JSON,Error,String,CustomEvent:class{constructor(type,init){this.type=type;this.detail=init?.detail}},queueMicrotask,setTimeout,
+  const nav={onLine:true};
+  const context={navigator:nav,window,document,firebase,URL,Blob,Date,Intl,Promise,Object,JSON,Error,String,CustomEvent:class{constructor(type,init){this.type=type;this.detail=init?.detail}},queueMicrotask,setTimeout,
     localStorage:{getItem:key=>key in store?store[key]:null,setItem:(key,value)=>{store[key]=String(value)},removeItem:key=>{delete store[key]}},
     location:{href:'https://site.example/class-pointer-prototype/classroom.html?'+(teacher?'dashboard=teacher&class=et':'dashboard=student&room=x')},
     sessionStorage:{getItem:key=>key==='b3Games_studentId'?'stu1':null},confirm:()=>true,
     fetch:async()=>({ok:true,status:200,blob:async()=>new Blob(['{}'])})};
   vm.runInNewContext(saved,context);
-  return{auto:window.FTTSavedWork.auto,api:window.FTTSavedWork,state,puts,objects,store,body,jsonPuts:()=>puts.filter(put=>put.path.endsWith('.json'))};
+  return{nav,auto:window.FTTSavedWork.auto,api:window.FTTSavedWork,state,puts,objects,store,body,jsonPuts:()=>puts.filter(put=>put.path.endsWith('.json'))};
 }
 const withMark=(id='s1')=>({version:1,kind:'student-board',strokes:[{id,tool:'rect',color:'#1f2937',size:.006,points:[{x:.1,y:.1},{x:.3,y:.3}]}],images:[],text:null,activity:null});
 const blankBoard={version:1,kind:'student-board',strokes:[],images:[],text:null,activity:null};
@@ -434,4 +435,15 @@ test('after one unsaved board is answered, the next one is offered',async()=>{
 test('My files tells the auto-save when a file is deleted, so a full board saves at once',()=>{
   assert.match(saved,/detail:\{from:'delete'\}/);
   assert.match(saved,/ftt-myfiles-changed',event=>\{if\(full&&event\?\.detail\?\.from!=='autosave'\)\{failedAt=0;void run\(true\)\}/);
+});
+
+test('with no connection the save does not hang: it says so at once, keeps the copy on the device, and saves when back online',async()=>{
+  const h=harness();h.nav.onLine=false;h.state.data=withMark('s1');
+  const result=await h.auto.flush();
+  assert.equal(result.ok,false);assert.match(result.error,/offline/i);assert.equal(h.puts.length,0);
+  assert.match(walk(h.body).find(node=>node.attrs?.role==='status').textContent,/Saved on this device only/);
+  assert.equal(Object.keys(h.store).filter(key=>key.startsWith('ftt-board-draft:')).length,1);
+  h.nav.onLine=true;
+  assert.equal((await h.auto.flush()).ok,true);assert.equal(h.jsonPuts().length,1);
+  assert.match(saved,/addEventListener\?\.\('online',\(\)=>\{failedAt=0;void run\(true\)\}\)/);
 });
