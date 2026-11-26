@@ -805,6 +805,11 @@
       const key=draftKey();if(!key||json.length>DRAFT_MAX)return false;
       try{localStorage.setItem(key,JSON.stringify({at:Date.now(),json}));return true}catch(_){return false}
     }
+    // Which file this device last saved a board to, and what the board looked like then. After a refresh the class copy of the board comes back as a new board; if it is exactly what was saved, it carries on in the same file instead of making another.
+    const linkKey=()=>prefixKey?'ftt-board-last:'+prefixKey:'';
+    const hash=text=>{let n=5381;for(let i=0;i<text.length;i+=1)n=((n*33)^text.charCodeAt(i))>>>0;return text.length+':'+n};
+    function writeLink(id,json){const key=linkKey();if(key)try{localStorage.setItem(key,JSON.stringify({id,hash:hash(json),at:Date.now()}))}catch(_){}}
+    function readLink(json){const key=linkKey();if(!key)return null;try{const link=JSON.parse(localStorage.getItem(key)||'null');return link&&typeof link.id==='string'&&link.hash===hash(json)&&Date.now()-Number(link.at)<DRAFT_KEEP?link:null}catch(_){return null}}
     function clearDraft(){const key=draftKey();if(key)try{localStorage.removeItem(key)}catch(_){}}
     function readDraft(){
       const key=draftKey();if(!key)return null;
@@ -861,8 +866,13 @@
       if(!data){say('');return{ok:true,blank:true}}
       const key=api.id?api.id():null;
       // A different board from the one that was being saved: it starts its own file.
-      if(key!==boardKey){boardKey=key;current=null;savedJson='';lastJson='';failedAt=0}
-      const json=JSON.stringify(data);lastJson=json;
+      const json=JSON.stringify(data);
+      if(key!==boardKey){
+        boardKey=key;current=null;savedJson='';lastJson='';failedAt=0;
+        // The same board as was last saved on this device (a refresh brought it back): keep using that file.
+        if(!fromTemplate&&!blank(data)){const link=readLink(json);if(link){current={id:link.id,name:'',folderId:'',subject:'',template:false};savedJson=json}}
+      }
+      lastJson=json;
       if(blank(data)){
         if(!offered)offerRestore(api);
         if(!savedJson)say('');
@@ -877,6 +887,7 @@
         // The board may have been replaced while it was uploading: that file stays, but it is not the new board's file.
         if((api.id?api.id():null)===key){current={id:saved.id,name:saved.name,folderId:saved.folderId,subject:saved.subject,template:false};fromTemplate=null;savedJson=json}
         lastSaveAt=Date.now();failedAt=0;clearDraft();say('✓ Saved');
+        if((api.id?api.id():null)===key)writeLink(saved.id,json);
         if(saved.created)try{window.dispatchEvent(new CustomEvent('ftt-myfiles-changed',{detail:{from:'autosave'}}))}catch(_){}
         return{ok:true,id:saved.id};
       }catch(error){
@@ -933,7 +944,7 @@
         const api=board();let data=null;try{data=api.canSave?await api.read():null}catch(_){}
         boardKey=api.id?api.id():null;savedJson=data?JSON.stringify(data):'';lastJson=savedJson;lastSaveAt=Date.now();failedAt=0;offered=true;
       },
-      noteSaved(data){try{savedJson=JSON.stringify(data);lastSaveAt=Date.now();failedAt=0;boardKey=board().id?.()??boardKey;clearDraft();say('✓ Saved')}catch(_){}}
+      noteSaved(data){try{savedJson=JSON.stringify(data);if(current?.id)writeLink(current.id,savedJson);lastSaveAt=Date.now();failedAt=0;boardKey=board().id?.()??boardKey;clearDraft();say('✓ Saved')}catch(_){}}
     };
   })();
   auto.start();

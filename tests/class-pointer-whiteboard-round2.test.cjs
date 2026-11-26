@@ -326,7 +326,8 @@ test('when saving cannot happen, nothing is lost: a copy stays on this device fo
 test('after a successful save the copy on the device is removed',async()=>{
   const h=harness({drafts:{}});
   h.state.data=withMark('s1');await h.auto.flush();
-  assert.deepEqual(Object.keys(h.store),[]);
+  assert.deepEqual(Object.keys(h.store).filter(key=>key.startsWith('ftt-board-draft:')),[]);
+  assert.equal(Object.keys(h.store).filter(key=>key.startsWith('ftt-board-last:')).length,1);
 });
 
 test('a board that was not saved before the page closed is offered back, and only to its own owner',async()=>{
@@ -361,4 +362,13 @@ test('auto-save is wired: it runs by itself, waits while a file is opened, and m
   assert.match(saved,/auto\.noteSaved\(data\)/);
   assert.match(saved,/window\.FTTSavedWork=\{[^}]*auto,/);
   assert.match(saved,/'✓ Saved'/);
+});
+
+test('auto-save: a refreshed board that is exactly what was last saved carries on in the same file',()=>{
+  // The class copy comes back as a new board after a refresh; without this link it would be saved as a second file.
+  assert.match(saved,/ftt-board-last:/);
+  assert.match(saved,/if\(\(api\.id\?api\.id\(\):null\)===key\)writeLink\(saved\.id,json\)/);
+  assert.match(saved,/if\(!fromTemplate&&!blank\(data\)\)\{const link=readLink\(json\)/);
+  // Only an exact match counts, and only for a board that is not a template copy.
+  assert.match(saved,/link\.hash===hash\(json\)/);
 });
