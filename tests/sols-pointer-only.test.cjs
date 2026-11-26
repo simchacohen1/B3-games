@@ -89,9 +89,9 @@ test('the sols.tools build puts the rule first in the one script every page load
 
 // A teacher opens a deeper page (e.g. /daily-checklist/teacher.html) in a NEW tab. The page's own sign-in first says "nobody"
 // and only afterwards receives the teacher's remembered Google login. That first answer must not send the teacher home.
-function runGate({path='/daily-checklist/teacher.html',full=false,session={},defaultUser=null,remembered='never'}={}){
+function runGate({path='/daily-checklist/teacher.html',full=false,session={},defaultUser=null,remembered='never',busy=false,laterUser=null}={}){
  const vm=require('node:vm');
- const log={replaced:null,reloaded:0,visible:'unset'},timers=[],store={solsFullSite:full?'1':null};
+ const log={replaced:null,reloaded:0,visible:'unset'},timers=[],intervals=[],store={solsFullSite:full?'1':null};
  let defaultCb=null,remCb=null;
  const style={};
  const win={
@@ -99,18 +99,20 @@ function runGate({path='/daily-checklist/teacher.html',full=false,session={},def
   location:{pathname:path,replace(u){log.replaced=u},reload(){log.reloaded++}},
   localStorage:{getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v},removeItem:k=>{delete store[k]}},
   sessionStorage:{getItem:k=>session[k]||null},
-  setTimeout:(f,ms)=>{timers.push({f,ms});return timers.length},setInterval:()=>1,clearInterval(){},MutationObserver:function(){this.observe=()=>{}},
+  setTimeout:(f,ms)=>{timers.push({f,ms});return timers.length},setInterval:(f)=>{intervals.push(f);return intervals.length},clearInterval(){},MutationObserver:function(){this.observe=()=>{}},
  };
  const apps=[{options:{}}];
  win.firebase={apps,auth:()=>({onAuthStateChanged:cb=>{defaultCb=cb}}),
   app(name){if(!name)return apps[0];if(name!=='FTTRememberedTeacher'||!win.__rem)throw new Error('no app');return win.__rem},
   initializeApp(opts,name){win.__rem={auth:()=>({onAuthStateChanged:cb=>{remCb=cb}})};return win.__rem}};
  vm.createContext(win);win.window=win;
+ win.__b3SignInBusy=busy;
  vm.runInContext(source,win);
  defaultCb&&defaultCb(defaultUser);           // the page's own sign-in answers first
  if(remembered==='user'&&remCb)remCb({email:'teacher@example.org'});
  if(remembered==='nobody'&&remCb)remCb(null);
  if(remembered==='never')timers.filter(t=>t.ms===4000).forEach(t=>t.f());   // it never answers: fall back after the wait
+ if(laterUser){defaultCb(laterUser);log.reloadedWhileBusy=log.reloaded;win.__b3SignInBusy=false;intervals.forEach(f=>f());}   // a student signs in on the page
  log.hooked=!!remCb;log.store=store;return log;
 }
 
@@ -140,4 +142,27 @@ test('a student tab never waits on or uses the remembered teacher login',()=>{
 
 test('signed in on the page itself: no bounce',()=>{
  assert.equal(runGate({defaultUser:{email:'t@example.org'},remembered:'pending'}).replaced,null);
+});
+
+// Bug on sols.tools: a student typed name and passcode, pressed the button, and the page reloaded in the middle of signing in
+// (the first sign-in in a browser changes the view from limited to full). The form came back empty; the second try worked.
+test('a student signing in for the first time: the page is not reloaded until the sign-in has finished',()=>{
+ const r=runGate({path:'/',remembered:'nobody',busy:true,laterUser:{email:null}});
+ assert.equal(r.reloadedWhileBusy,0,'no reload while the sign-in is still being finished');
+ assert.equal(r.reloaded,1,'the whole-site view is applied once the sign-in is done');
+ assert.equal(r.store.solsFullSite,'1');
+});
+
+test('without a sign-in in progress the view still changes at once when someone signs in',()=>{
+ const r=runGate({path:'/',remembered:'nobody',busy:false,laterUser:{email:null}});
+ assert.equal(r.reloadedWhileBusy,1);
+});
+
+test('the home page raises the sign-in-busy flag for the whole student sign-in and always lowers it',()=>{
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ const fn=html.slice(html.indexOf('async function studentSignIn()'),html.indexOf('let actingStudentRestoreInFlight'));
+ assert.ok(fn.indexOf('globalThis.__b3SignInBusy=true')>0&&fn.indexOf('globalThis.__b3SignInBusy=true')<fn.indexOf('checkStudentAccess('),'raised before the passcode check');
+ assert.match(fn,/finally\{[^}]*globalThis.__b3SignInBusy=false/,'lowered in finally');
+ assert.match(fn,/setLoginMsg\("Signing in…"\)/,'shows Signing in…');
+ assert.match(source,/__b3SignInBusy\)\s*return/,'the gate honours the flag');
 });
