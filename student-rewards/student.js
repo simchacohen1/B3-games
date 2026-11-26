@@ -482,6 +482,7 @@ async function contributeClassReward(rewardId,inputId,buttonEl){
   }catch(err){C.toast(err.message||String(err),'error')}
   finally{state.busy=false;render()}
 }
+function withTimeout(p,ms,msg){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))])}
 async function redeem(rewardId){
   if(teacherPreview){
     const reward=state.root.rewards[rewardId],cost=Number(reward?.cost)||0;
@@ -501,13 +502,15 @@ async function redeem(rewardId){
   try{
     const user=auth.currentUser;
     if(!user)throw new Error('Please sign in again.');
-    const token=await user.getIdToken();
-    const r=await fetch(C.REDEEM_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({rewardId})});
-    const j=await r.json();
+    const token=await withTimeout(user.getIdToken(),15000,'Could not check your sign-in. Check your connection and try again.');
+    const r=await fetch(C.REDEEM_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({rewardId}),signal:AbortSignal.timeout(25000)});
+    const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(j.error||'Could not request reward');
     C.toast('Reward requested!');
-    await load();
-  }catch(err){C.toast(err.message||String(err),'error')}
+    // Free the buttons right away; refreshing the list must never keep them frozen.
+    state.busy=false;
+    load().catch(()=>{}).finally(()=>renderTab());
+  }catch(err){C.toast(err&&err.name==='TimeoutError'?'That took too long. Check My purchases to see if it went through, then try again.':(err.message||String(err)),'error')}
   finally{state.busy=false;renderTab()}
 }
 async function cancelRequest(requestId){
@@ -525,12 +528,13 @@ async function cancelRequest(requestId){
   try{
     const user=auth.currentUser;
     if(!user)throw new Error('Please sign in again.');
-    const token=await user.getIdToken();
-    const r=await fetch(C.CANCEL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({requestId})});
+    const token=await withTimeout(user.getIdToken(),15000,'Could not check your sign-in. Check your connection and try again.');
+    const r=await fetch(C.CANCEL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({requestId}),signal:AbortSignal.timeout(25000)});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(j.error||'Could not cancel that request');
     C.toast(`Request canceled — ${cost} ★ returned.`);
-    await load();
+    state.busy=false;
+    load().catch(()=>{}).finally(()=>renderTab());
   }catch(err){C.toast(err.message||String(err),'error')}
   finally{state.busy=false;renderTab()}
 }
