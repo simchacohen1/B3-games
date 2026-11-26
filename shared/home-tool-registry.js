@@ -66,6 +66,7 @@
     {id:"chavrusa",icon:"👥",title:"Chavrusa of the Day",href:"chavrusa/index.html",grant:"chavrusa",audiences:["admin","teacher"]},
     {id:"name-picker",icon:"🎡",title:"Name Picker",href:"name-picker/index.html",grant:"name-picker",audiences:["admin","teacher"]},
     {id:"class-dashboard",icon:"📊",title:"Class Dashboard",href:"class-dashboard/index.html",audiences:["admin"]},
+    {id:"activity-history",icon:"🕘",title:"Activity History",href:"activity-history/index.html",audiences:["admin","teacher"],noPreview:true},
     {id:"student-report",icon:"📈",title:"Student Report — All Tools",teacherTitle:"Student Report",href:"student-report/index.html",audiences:["admin","teacher"],previewTool:"student-report"},
     {id:"vocab-progress",icon:"📚",title:"Vocabulary Progress",href:"word-bank/teacher.html",audiences:["teacher"],noPreview:false},
     {id:"nigri-sync",elId:"nigriSyncCard",idLast:true,cls:" nigri-hidden",icon:"🔄",title:"Sync to Nigri",href:"sync-to-nigri/index.html",audiences:["admin"]},
