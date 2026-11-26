@@ -37,6 +37,8 @@ test('students see the three lists as Choose-a-list units, and learn only that l
   const units=vm.runInContext('studentUnits()',c);
   for(const l of [1,2,3])assert.ok(units.some(u=>u.key==='list:Chumash Vocab Level '+l));
   assert.equal(units.find(u=>u.key==='list:Chumash Vocab Level 3').count,143);
+  assert.equal(units[0].key,'perek:18','own lists stay first so default list never changes');
+  assert.deepEqual(Array.from(units.slice(1).map(u=>u.key)),['list:Chumash Vocab Level 1','list:Chumash Vocab Level 2','list:Chumash Vocab Level 3']);
   assert.equal(vm.runInContext('learningCatalog()',c).length,315);
   assert.ok(vm.runInContext("getItem('shorashim:chumash-vocab-l1-001')",c));
 });
