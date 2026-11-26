@@ -1990,7 +1990,9 @@
       available:()=>!!Groups&&on&&!suspended&&!view.hidden&&mode==='boards',
       active:()=>groupsOn(),
       open:()=>openGroupsDialog(),
-      save:()=>saveGroupBoards()
+      save:()=>saveGroupBoards(),
+      // The groups and who is in each (names only), so the whiteboard's student zones can be given to a whole group.
+      list:()=>groupsOn()?gstate.groups.map(g=>({id:g.id,name:g.name,names:Groups.membersOf(gstate,g.id).map(key=>gstate.assign[key].n).filter(Boolean)})):[]
     },
     // A PNG picture of the student board that is open large.
     exportPng(){const board=focusBoard();return board&&mode==='boards'?boardPng(board):Promise.reject(Error('Open one student whiteboard first.'))},

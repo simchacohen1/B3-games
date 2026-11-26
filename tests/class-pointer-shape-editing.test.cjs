@@ -130,8 +130,8 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261125-wb1"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=20261126-lead1"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261125-wb3"/,'pdf-mode');
+ assert.match(html,/"classroom\.js\?v=20261126-zn3"/,'classroom');
+ assert.match(html,/"pdf-mode\.js\?v=20261126-zn1"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -1024,7 +1024,7 @@ test('student Select moves a pick as one piece and never off the picture; resizi
 });
 
 test('the teacher keeps a student\'s changes to that student\'s marks only',()=>{
- const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function canEditStudentMark(member,mark)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function eraseStudentMarks(member,ids)')+';({replaceStudentMarks,eraseStudentMarks})';
+ const code='const zonesOn=()=>false,zoneAllows=()=>true;'+grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function canEditStudentMark(member,mark)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function eraseStudentMarks(member,ids)')+';({replaceStudentMarks,eraseStudentMarks})';
  const store=new C.HighlightStore();
  const api=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array,toolAllowed:()=>true,writingAllowed:()=>true});
  const A={id:'presence:a',presence:true},B={id:'presence:b',presence:true};
@@ -1061,7 +1061,7 @@ test('the teacher keeps a student\'s changes to that student\'s marks only',()=>
 test('the teacher page checks permissions and ownership on student Select messages',()=>{
  const room=read('class-pointer-prototype/classroom.js');
  assert.match(room,/else if\(live\(\)&&writingAllowed\('select',member\)\)\{\s*if\(message\.action==='replace'&&replaceStudentMarks\(member,message\.changes\)\)publishHighlights\(\);\s*else if\(message\.action==='erase'&&eraseStudentMarks\(member,message\.ids\)\)publishHighlights\(\);/);
- assert.match(room,/const converted=member\.presence\?studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke:change\.stroke;\s*if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
+ assert.match(room,/const converted=member\.presence\?studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke:change\.stroke;\s*(?:if\(zonesOn\(\)[^\n]*continue;\s*)?if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
  assert.doesNotMatch(room,/replace\(change\.owner|replace\(message\.owner/);
 });
 
@@ -1130,7 +1130,7 @@ test('a student picks and drags their own mark; the teacher\'s page applies it t
  // The teacher's real handlers, with the real store, apply it.
  const store=new C.HighlightStore();
  for(const mark of marks)store.add(mark.owner==='teacher'?'teacher':mark.owner,{tool:mark.tool,color:mark.color,size:mark.size,points:mark.points});
- const code=grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function canEditStudentMark(member,mark)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';replaceStudentMarks';
+ const code='const zonesOn=()=>false,zoneAllows=()=>true;'+grabFunction(read('class-pointer-prototype/classroom.js'),'function studentMessageToDocument(message)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function canEditStudentMark(member,mark)')+';'+grabFunction(read('class-pointer-prototype/classroom.js'),'function replaceStudentMarks(member,changes)')+';replaceStudentMarks';
  const apply=vm.runInNewContext(code,{window:{ClassPointerPdf:{active:()=>false}},C,highlightStore:store,Number,Math,Array,toolAllowed:()=>true,writingAllowed:()=>true});
  const ids=new Map(store.strokes.map((s,i)=>[marks[i].id,s.id]));
  const wire=room.sent[1].changes.map(change=>({id:ids.get(change.id),stroke:change.stroke}));

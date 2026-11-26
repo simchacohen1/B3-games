@@ -217,6 +217,8 @@
       {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy',hidden:!window.FTTSavedWork?.sendCurrent&&!window.PointerPdfLibrary?.openForSend,items:sendItems},
       // Groups: students who share one board (shown while the student whiteboards are on screen).
       {id:'groups',icon:'\u{1F9D1}\u200D\u{1F91D}\u200D\u{1F9D1}',label:'Groups',title:'Groups: put the students in small groups. Each group shares one board',hidden:!window.ClassPointerBoards?.groups?.available?.(),pressed:!!window.ClassPointerBoards?.groups?.active?.(),items:groupItems},
+      // Zones: give each student their own part of the shared whiteboard (board-zones.js). Students write only in their own box.
+      {id:'zones',icon:'▦',label:'Zones',title:'Zones: give each student their own box on the whiteboard. They can only write in their own box',hidden:!window.ClassPointerZoneTools?.available?.(),pressed:!!window.ClassPointerZoneTools?.active?.(),items:()=>window.ClassPointerZoneTools?.items?.()||[]},
       {id:'poll',icon:'📊',label:'Poll',title:'Ask the class a poll',onClick:()=>window.ClassPointerPoll?.open()},
       {id:'lesson',icon:'🖥',label:'Switch presentation',title:'Switch presentation: change what students see',items:lessonItems},
       {id:'more',icon:'⋯',label:'More',title:'More: full screen, spotlight',items:moreItems}
@@ -226,7 +228,7 @@
   // Everything the buttons and menus show, as one string: the toolbar is redrawn only when it changes.
   function signature(){
     const panel=window.ClassPointerStudentsPanel;
-    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.ClassPointerPdf?.openUpload,!!window.PointerPdfLibrary?.openForSend,!!window.ClassPointerBoards?.groups?.available?.(),!!window.ClassPointerBoards?.groups?.active?.(),
+    return [JSON.stringify(window.ClassPointerPdf?.pickedShape?.()||null),B.lessonKind?.()||'',expanded(),live(),stopLabel(),!!panel,!!panel?.isOpen?.(),panel?.waiting?.()||0,!!$('spotlight')?.checked,!!window.FTTSavedWork,!!window.ClassPointerPdf?.openUpload,!!window.PointerPdfLibrary?.openForSend,!!window.ClassPointerBoards?.groups?.available?.(),!!window.ClassPointerBoards?.groups?.active?.(),window.ClassPointerZoneTools?.signature?.()||'',
       SOURCES.map(s=>$(s[0])?usable(s[0]):'-').join(),VIEW.map(v=>$(v[0])?usable(v[0]):'-').join(),$('viewZoomLabel')?.textContent||'',$('viewMove')?.getAttribute('aria-pressed')||''].join('|');
   }
 

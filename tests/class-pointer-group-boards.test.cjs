@@ -364,7 +364,7 @@ test('the teacher\'s classroom page loads the groups rules before the boards, wi
   const html=read('class-pointer-prototype/classroom.html');
   assert.ok(html.indexOf('board-groups-core.js')>0&&html.indexOf('board-groups-core.js')<html.indexOf('student-boards.js'));
   assert.match(html,/board-groups-core\.js\?v=20261124-groups1/);
-  assert.match(html,/student-boards\.js\?v=20261125-wb3/);
+  assert.match(html,/student-boards\.js\?v=20261126-zn1/);
   // Students never need the groups rules: their board only shows the group the teacher names.
   assert.doesNotMatch(read('class-pointer-prototype/activity-share.js'),/board-groups-core/);
 });
@@ -382,7 +382,7 @@ test('the gallery\'s own top bar is hidden on the teacher page, so the drawing t
   assert.match(bar,/hidden:!window\.ClassPointerBoards\?\.groups\?\.available\?\.\(\)/,'only while the student whiteboards are on screen');
   assert.match(bar,/label:active\?'Change groups':'Make groups'/);
   assert.match(bar,/label:'Save group boards'/);
-  assert.match(read('class-pointer-prototype/classroom.html'),/classroom-annotate\.js\?v=20261125-wb3/);
+  assert.match(read('class-pointer-prototype/classroom.html'),/classroom-annotate\.js\?v=20261126-zn1/);
 });
 
 test('the toolbar\'s Groups button works from the real boards: available with whiteboards, active with groups, opens the window, saves',async()=>{

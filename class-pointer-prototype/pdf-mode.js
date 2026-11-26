@@ -270,7 +270,10 @@
   function addTextStroke(spot,text){
     const made=flow(text,{size:spot.size,color:spot.color,bold:spot.bold===true,font:spot.font,align:spot.align||undefined,center:spot.point,top:spot.top});
     if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
-    made.strokes.forEach(stroke=>B.submitStroke(stroke));
+    // A student's words that would stick out of their own box are not added (the lines inside it are).
+    const fit=made.strokes.filter(zoneAllowsStudent);
+    fit.forEach(stroke=>B.submitStroke(stroke));
+    if(fit.length<made.strokes.length){B.status(fit.length?'Only the words inside your box were added.':'Write inside your own box.');return !!fit.length}
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
   function replaceTextStroke(stroke,text,size,bold,font,align){
@@ -290,6 +293,11 @@
   // in boardPictures and the lesson marks, and is copied back into the list when the teacher changes page or saves.
   const Pages=window.ClassPointerPages||null;
   let wbPages=null,wbAt=0,wbSwitching=false,pagesBar=null,pagesPanel=null,pagesPanelOpen=false,pagesSig='',pagesTimer=0;
+  // Student zones (board-zones-core.js, board-zones.js). Teacher: `zones` are the boxes of the page being shown (each page keeps
+  // its own, in wbPages and in saved files) and `zonesLocked` turns them all off for students. Student: `myZones` is what the
+  // teacher told this page ({locked, zones:[{x,y,w,h,mine,label}]}); a student writes only inside the boxes that are theirs.
+  const Z=window.ClassPointerZones||null;
+  let zones=[],zonesLocked=false,myZones=null,zoneLayer=null,zoneSig='',zoneListeners=new Set();
   // A read-only video of the teacher board lets activity pages watch without
   // navigating away or participating in the document editing protocol.
   let boardPresentation=null,boardPresentationTimer=null,boardBackground=null;
@@ -785,13 +793,13 @@
       if(grip){edit={kind:'text',handle:grip.id,stroke:picked,group,frame,preview:new Map(),swap:null,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
     }
     const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
-    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
-    const hit=isTeacher?teacherMarkAt(event,p,true,true):[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&markHits(mark,p,true));
+    if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,zone:studentZoneOf(picked),pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
+    const hit=isTeacher?teacherMarkAt(event,p,true,true):[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&zoneAllowsStudent(mark)&&markHits(mark,p,true));
     // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
     const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
     selectedId=hit?hit.id:null;
     // Words move as a whole block, every line together.
-    if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,again,pid:event.pointerId};content.setPointerCapture(edit.pid)}
+    if(hit&&G&&at){edit={kind:'move',stroke:hit,group:textBlock(hit),preview:new Map(),start:at,moved:false,again,zone:studentZoneOf(hit),pid:event.pointerId};content.setPointerCapture(edit.pid)}
     drawInk();return !!hit;
   }
   // A picture keeps its shape while a corner is dragged: the opposite corner stays, the picture grows or shrinks, and none of it leaves the board.
@@ -824,11 +832,15 @@
       if(made.strokes.length)edit.swap={ids:edit.group.map(item=>item.id),strokes:made.strokes};
       drawInk();return;
     }
-    if(edit.kind==='resize')edit.preview=new Map([[edit.stroke.id,edit.stroke.tool==='picture'?resizePicture(edit.stroke,edit.handle,at.x,at.y):G.resizePoints(edit.stroke,edit.handle,at.x,at.y)]]);
-    else{
-      // One shift for the whole group, held back so that no part of it leaves the board.
+    if(edit.kind==='resize'){
+      const grown=edit.stroke.tool==='picture'?resizePicture(edit.stroke,edit.handle,at.x,at.y):G.resizePoints(edit.stroke,edit.handle,at.x,at.y);
+      // A student's mark never grows out of their own box.
+      edit.preview=new Map([[edit.stroke.id,edit.zone?grown.map(q=>Z.clampTo(edit.zone,q)):grown]]);
+    }else{
+      // One shift for the whole group, held back so that no part of it leaves the board (or a student's own box).
       const all={points:edit.group.flatMap(item=>item.points)},moved=G.movePoints(all,at.x-edit.start.x,at.y-edit.start.y);
-      const dx=moved[0].x-all.points[0].x,dy=moved[0].y-all.points[0].y;
+      let dx=moved[0].x-all.points[0].x,dy=moved[0].y-all.points[0].y;
+      if(edit.zone){const fit=Z.fitMove(edit.zone,all.points,dx,dy);dx=fit.dx;dy=fit.dy}
       edit.preview=new Map(edit.group.map(item=>[item.id,item.points.map(q=>({x:q.x+dx,y:q.y+dy}))]));
     }
     drawInk();
@@ -977,7 +989,8 @@
     return{left:r.left-s.left-stage.clientLeft,top:r.top-s.top-stage.clientTop,w:r.width,h:r.height};
   }
   const toolId=isTeacher?'teacherTool':'studentTool',colorId=isTeacher?'teacherColor':'studentColor',sizeId=isTeacher?'teacherSize':'studentSize';
-  function cancelDraft(){if(dragId!==null&&content.hasPointerCapture?.(dragId))content.releasePointerCapture(dragId);draft=null;dragId=null;drawInk()}
+  let draftZone=null;
+  function cancelDraft(){if(dragId!==null&&content.hasPointerCapture?.(dragId))content.releasePointerCapture(dragId);draft=null;dragId=null;draftZone=null;drawInk()}
   function editLatestText(){
     const stroke=[...(B.highlights?.()||[])].reverse().find(item=>item.tool==='text'&&item.owner==='teacher');
     if(!stroke){B.status('There is no teacher text to edit yet.');return}
@@ -1011,12 +1024,16 @@
     const tool=$(toolId).value;
     if(B.navigating()||notReady()||event.button!==0||!C.highlightTools.includes(tool)||!B.live()||!B.writingAllowed(tool))return;
     const p=normalized(event);if(!p)return;
+    // A student with zones: a press outside their own box does nothing, and a line that is dragged out stops at the edge of it.
+    const zone=zoneStart(p);if(zone===false){event.preventDefault();return}
+    draftZone=zone;
     event.preventDefault();dragId=event.pointerId;
     draft={tool,color:$(colorId).value||(C.isHighlightShape(tool)?'#ffcc00':B.ownColor()),size:Number($(sizeId).value),points:[p,p],...(shapeFill&&C.FILLABLE.includes(tool)?{fill:true}:{})};
     content.setPointerCapture(dragId);drawInk();
   });
   function extend(event){
-    if(!draft||event.pointerId!==dragId)return;const p=normalized(event);if(!p)return;
+    if(!draft||event.pointerId!==dragId)return;let p=normalized(event);if(!p)return;
+    if(draftZone)p=Z.clampTo(draftZone,p);
     if(!['highlight','pen'].includes(draft.tool)){draft.points=[draft.points[0],p];return}
     const last=draft.points[draft.points.length-1];
     if(Math.hypot((p.x-last.x)*W,(p.y-last.y)*H)>4&&draft.points.length<256)draft.points.push(p);
@@ -1142,6 +1159,7 @@
       bytes=data;docName=board?P.cleanName(opts.name||'Whiteboard'):'Browser tab snapshot';docLabel=board?'whiteboard':'webpage';docId=crypto.randomUUID();if(board)boardUid=docId;
       boardSize=board?{w:width,h:height}:null;
       if(board&&Pages){wbPages=[newWbPage()];wbAt=0}
+      zones=[];zonesLocked=false;syncZones();
       // The whole board at a glance; a captured tab keeps fitting the width.
       fitWhole=!!board;updateControls();syncFit();relayout();scroller.scrollTop=0;scroller.scrollLeft=0;
       showNote('');B.resetMarks();B.setPdf(true,board?'whiteboard':'webpage');updateControls();
@@ -1422,6 +1440,7 @@
     for(const item of pictureEdits)item.el.remove();
     pictureEdits=[];boardPictures=[];boardSize=null;if(pictureBar)pictureBar.hidden=true;
     wbPages=null;wbAt=0;pagesPanelOpen=false;syncPagesBar();
+    zones=[];zonesLocked=false;syncZones();
   }
   // source: a picture file, or a data: URL from a saved whiteboard.
   function loadPicture(source){
@@ -1825,7 +1844,7 @@
   // ---------- Whiteboard pages (slides) ----------
   // The teacher can add, copy, delete and reorder pages, jump between them, and see a small picture of each. Only the
   // teacher's whiteboard has pages here; students see the page the teacher shows, exactly as they see pictures and marks.
-  function newWbPage(){return{id:Pages.newId(),pictures:[],strokes:[],thumb:''}}
+  function newWbPage(){return{id:Pages.newId(),pictures:[],strokes:[],thumb:'',zones:[]}}
   const cloneStrokes=list=>JSON.parse(JSON.stringify(list||[]));
   // Copy what is on the lesson screen into the list entry of the page being shown.
   function capturePage(){
@@ -1833,6 +1852,7 @@
     const page=wbPages[wbAt];
     page.pictures=[...boardPictures,...pictureEdits.map(item=>({image:item.image,x:item.x,y:item.y,w:item.w,h:item.h,after:item.after}))];
     page.strokes=cloneStrokes(B.highlights?.());
+    page.zones=cloneStrokes(zones);
   }
   // Put a page of the list on the lesson screen for everyone: its pictures first, then its marks.
   async function loadPage(index){
@@ -1842,6 +1862,7 @@
     await publishBoard();
     if(!isBoardOpen())return;
     B.restoreMarks(page.strokes);
+    zones=Z?Z.cleanList(page.zones):[];syncZones();
     if(boardPresentation){try{boardBackground=new Image();boardBackground.src=composeBoard()}catch(_){}}
     updateControls();
   }
@@ -1882,7 +1903,7 @@
     if(wbPages.length>=Pages.MAX_PAGES){B.status('A whiteboard can have up to '+Pages.MAX_PAGES+' pages.');return Promise.resolve(false)}
     return guardedPageChange(async()=>{
       const from=wbPages[wbAt],page=newWbPage();
-      if(copy){page.pictures=from.pictures.slice();page.strokes=cloneStrokes(from.strokes)}
+      if(copy){page.pictures=from.pictures.slice();page.strokes=cloneStrokes(from.strokes);page.zones=cloneStrokes(from.zones)}
       wbPages=Pages.insert(wbPages,wbAt+1,page);wbAt=wbPages.indexOf(page);
       await loadPage(wbAt);
       B.status((copy?'Page copied. ':'New blank page. ')+'This is page '+(wbAt+1)+' of '+wbPages.length+'.');
@@ -1991,6 +2012,83 @@
   }
   function syncPagesBar(){renderPages(false)}
 
+  // ---------- Student zones ----------
+  // The boxes are drawn in a layer over the board (the same 0..1 positions as the marks). The teacher sees every box with
+  // who has it; a student sees the boards that are theirs lit, and everything else dimmed (they can still see all of it).
+  const zoneOwners=zone=>zone.owners.map(o=>o.n||'').filter(Boolean).join(', ');
+  function zoneNode(tag,css){const node=document.createElement(tag);if(css)node.style.cssText=css;return node}
+  function renderZones(){
+    if(!Z)return;
+    const teaching=isTeacher&&isBoardOpen();
+    const list=teaching?zones.map((z,i)=>({...z,label:zoneOwners(z),number:i+1})):(!isTeacher&&myZones?myZones.zones:[]);
+    const locked=teaching?zonesLocked:!!myZones?.locked;
+    const sig=JSON.stringify([teaching,list,locked,isTeacher]);
+    if(sig===zoneSig&&(!list.length||zoneLayer?.isConnected))return;
+    zoneSig=sig;
+    if(!list.length){zoneLayer?.remove();zoneLayer=null;return}
+    if(!zoneLayer){zoneLayer=zoneNode('div');zoneLayer.className='board-zones';zoneLayer.dataset.stageUi='true';zoneLayer.setAttribute('aria-hidden','true')}
+    if(zoneLayer.parentNode!==content)content.appendChild(zoneLayer);
+    zoneLayer.classList.toggle('board-zones-locked',locked);zoneLayer.replaceChildren();
+    const ns='http://www.w3.org/2000/svg',s=document.createElementNS(ns,'svg');
+    s.setAttribute('viewBox','0 0 1 1');s.setAttribute('preserveAspectRatio','none');
+    const rect=(z,cls)=>{const r=document.createElementNS(ns,'rect');r.setAttribute('x',z.x);r.setAttribute('y',z.y);r.setAttribute('width',z.w);r.setAttribute('height',z.h);r.setAttribute('class',cls);return r};
+    if(!teaching){
+      // A student: dim the whole board except their own boxes.
+      const open=list.filter(z=>z.mine&&!locked);
+      const dim=document.createElementNS(ns,'path');
+      dim.setAttribute('d','M0 0H1V1H0Z'+open.map(z=>'M'+z.x+' '+z.y+'h'+z.w+'v'+z.h+'h'+(-z.w)+'Z').join(''));
+      dim.setAttribute('fill-rule','evenodd');dim.setAttribute('class','board-zone-dim');s.append(dim);
+    }
+    for(const z of list)s.append(rect(z,teaching?'board-zone-box'+(z.owners.length?' given':''):'board-zone-box'+(z.mine?' mine':' other')));
+    zoneLayer.append(s);
+    for(const z of list){
+      const label=zoneNode('div');
+      label.className='board-zone-label'+(teaching?'':z.mine?' mine':' other');
+      label.style.left=(z.x*100)+'%';label.style.top=(z.y*100)+'%';label.style.maxWidth=(z.w*100)+'%';
+      label.textContent=teaching?'Zone '+z.number+' · '+(z.label||'nobody yet'):(z.mine?'Your box'+(locked?' (locked)':''):(z.label||''));
+      if(teaching||z.mine||z.label)zoneLayer.append(label);
+    }
+  }
+  // Teacher: the zones changed (or the page did). Redraw, tell every student, and tell the zone panel.
+  function syncZones(){
+    renderZones();
+    if(isTeacher){B.setZones?.(isBoardOpen()?zones:null,zonesLocked);for(const fn of zoneListeners)try{fn()}catch(_){}}
+  }
+  const zoneApi={
+    list:()=>zones.map(z=>({...z,owners:z.owners.map(o=>({...o}))})),
+    locked:()=>zonesLocked,
+    available:()=>!!Z&&isTeacher&&isBoardOpen(),
+    // Replace this page's zones with a list (checked), and tell the class. Returns false when nothing could be set.
+    set(list,locked){
+      if(!Z||!isBoardOpen())return false;
+      zones=Z.cleanList(list);if(typeof locked==='boolean')zonesLocked=locked;
+      syncZones();return true;
+    },
+    onChange(fn){zoneListeners.add(fn);return()=>zoneListeners.delete(fn)},
+    // The place on the screen of a point of the board, and a screen point as a board point (board-zones.js draws zones with this).
+    point:event=>normalized(event),
+    rect:()=>content.getBoundingClientRect(),
+    bounds:()=>{const r=scroller.getBoundingClientRect();return{left:r.left,top:r.top,right:r.right,bottom:r.bottom}}
+  };
+  // Student: what the teacher said about this page's zones (message 'lesson-zones' from classroom.js).
+  function setStudentZones(message){
+    if(isTeacher||!Z)return;
+    const next=Z.cleanForStudent(message);
+    myZones=next.zones.length?next:null;
+    if(!myZones&&draft)cancelDraft();
+    renderZones();
+  }
+  // Student: may a press start at p? false: no (and say why); a zone: stay inside it; null: the board is free.
+  function zoneStart(p){
+    if(isTeacher||!Z||!Z.studentActive(myZones))return null;
+    const zone=Z.studentZoneAt(myZones,p);
+    if(!zone){B.status(myZones.locked?'Your teacher has locked the zones for now.':'That part of the board is locked. Write inside your own box.');return false}
+    return zone;
+  }
+  const zoneAllowsStudent=stroke=>isTeacher||!Z||Z.studentAllows(myZones,stroke);
+  // The student's own box that holds this mark (or null: no zones, or the teacher).
+  const studentZoneOf=mark=>isTeacher||!Z||!Z.studentActive(myZones)?null:Z.studentZoneAt(myZones,mark.points[0]);
+
   // ---------- Save and restore (used by "Save whiteboard") ----------
   const SAVED_PICTURE=700000;
   // A loaded picture as a data: URL of at most maxChars (shrunk until it fits), or null.
@@ -2027,12 +2125,15 @@
   async function exportWhiteboard(){
     if(!isBoardOpen())return null;
     const size={w:boardSize.w,h:boardSize.h};
+    // Zones are saved with the board (and so with a template): where each box is, who has it, and whether they are locked.
+    const keep=list=>Z&&list&&list.length?{zones:Z.cleanSaved(list)}:{};
+    const lock=zonesLocked&&(zones.length||wbPages?.some(page=>page.zones?.length))?{zonesLocked:true}:{};
     if(!Pages||!wbPages||wbPages.length===1){
-      return{version:1,kind:'lesson-whiteboard',size,pictures:savedPictures([...boardPictures,...pictureEdits]),strokes:savedStrokes(B.highlights())};
+      return{version:1,kind:'lesson-whiteboard',size,pictures:savedPictures([...boardPictures,...pictureEdits]),strokes:savedStrokes(B.highlights()),...keep(zones),...lock};
     }
     capturePage();
-    const pages=wbPages.map(page=>({pictures:savedPictures(page.pictures),strokes:savedStrokes(page.strokes)}));
-    return{...Pages.wrap('lesson-whiteboard',pages,wbAt),size};
+    const pages=wbPages.map(page=>({pictures:savedPictures(page.pictures),strokes:savedStrokes(page.strokes),...keep(page.zones)}));
+    return{...Pages.wrap('lesson-whiteboard',pages,wbAt),size,...lock};
   }
   // Opens the whiteboard exactly as the Whiteboard button does, then puts the saved pictures and marks back for
   // everyone. Saved data is checked as strictly as anything from the network. A one-page (version 1) file opens as one page.
@@ -2052,13 +2153,15 @@
         const data=image&&imageToData(image,C.PICTURE_MAX_CHARS-2000);
         if(data){const k=Math.min(1,1/p.w,1/p.h),w=p.w*k,h=p.h*k,x=P.clamp(p.x,0,1-w),y=P.clamp(p.y,0,1-h);legacy.push({owner:'teacher',tool:'picture',color:'#1f2937',size:.016,points:[{x,y},{x:x+w,y:y+h}],image:data})}
       }
-      pages.push({id:Pages?Pages.newId():'pg',pictures:[],strokes:[...legacy,...saved.strokes],thumb:''});
+      pages.push({id:Pages?Pages.newId():'pg',pictures:[],strokes:[...legacy,...saved.strokes],thumb:'',zones:Z?Z.cleanList(saved.zones):[]});
     }
     if(Pages){wbPages=pages;wbAt=data.current}
     boardPictures=pages[data.current].pictures.slice();
     if(boardPictures.length)await publishBoard();
     if(!isBoardOpen())return false;
-    B.restoreMarks(pages[data.current].strokes);updateControls();
+    B.restoreMarks(pages[data.current].strokes);
+    zones=pages[data.current].zones.slice();zonesLocked=data.zonesLocked===true&&zones.length>0;syncZones();
+    updateControls();
     return true;
   }
   if(isTeacher){
@@ -2125,12 +2228,13 @@
     getLayout:()=>({spread:layoutOpts.spread,rtl:layoutOpts.rtl,shift:layoutOpts.shift}),
     setLayout:opts=>changeLayout(opts),
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
-    close:closePdf,openSnapshot,reset:studentReset,isOpen:()=>!!lay,
+    close:closePdf,openSnapshot,reset:()=>{myZones=null;renderZones();studentReset()},isOpen:()=>!!lay,
     pastePicture,openUpload,uploadFiles,arrange,boardPictureCount:()=>boardPictures.length+pictureEdits.length+pictureCount(),
     pagesInfo,exportPagePngs,showPage,addPage,newSlides,
     // Which whiteboard is open (a new one is a new id), so the automatic save never writes one board over another.
     boardId:()=>isBoardOpen()?boardUid:null,
     exportWhiteboard,importWhiteboard,exportPng,boardRatio,
+    zones:zoneApi,setStudentZones,
     presentationStream:()=>boardPresentation
   };
 })();

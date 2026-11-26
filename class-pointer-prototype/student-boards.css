@@ -159,3 +159,16 @@ body.boards-on #studentDock{display:none!important}
 .board-page-thumb.current{border-color:#60a5fa}
 .board-page-thumb canvas{display:block;width:128px;height:72px}
 .board-page-thumb .board-page-num{position:absolute;left:4px;top:4px;min-width:20px;padding:1px 6px;border-radius:9px;background:#101827cc;color:#fff;font:800 12px system-ui;text-align:center}
+/* Student zones on the shared whiteboard (board-zones.js, pdf-mode.js). Drawn over the board, never in the saved picture. */
+.board-zones{position:absolute;inset:0;pointer-events:none;z-index:4}
+.board-zones svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.board-zone-dim{fill:#0f172a;fill-opacity:.16}
+.board-zone-box{fill:none;stroke:#64748b;stroke-width:2;stroke-dasharray:7 5;vector-effect:non-scaling-stroke}
+.board-zone-box.given{stroke:#16a34a;stroke-dasharray:none;fill:#22c55e;fill-opacity:.07}
+.board-zone-box.mine{stroke:#16a34a;stroke-width:3;stroke-dasharray:none;fill:#22c55e;fill-opacity:.06}
+.board-zone-box.other{stroke:#94a3b8;stroke-width:1.5;stroke-dasharray:4 4;fill:none}
+.board-zones-locked .board-zone-box{stroke:#b91c1c;fill:#ef4444;fill-opacity:.05}
+.board-zone-label{position:absolute;padding:1px 8px;border-radius:0 0 7px 0;opacity:.88;background:#334155;color:#fff;font:700 clamp(10px,1.2vw,15px) system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
+.board-zone-label.mine{background:#15803d}
+.board-zone-label.other{background:#64748bcc}
+.board-zones-locked .board-zone-label{background:#b91c1c}
