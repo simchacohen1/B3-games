@@ -92,7 +92,8 @@
   function openPanel(){
     if(!available()){B.status('Open a whiteboard first, then add zones.');return}
     stopDrawing();closePanel();
-    dialog=el('div','position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:flex;align-items:center;justify-content:center;padding:18px');
+    // The class bar and tabs sit above ordinary windows, so the window starts below them and scrolls inside.
+    dialog=el('div','position:fixed;inset:0;z-index:2147483500;background:#0b1837a8;display:flex;align-items:flex-start;justify-content:center;padding:128px 18px 18px');
     dialog.setAttribute('role','dialog');dialog.setAttribute('aria-label','Student zones');dialog.dataset.stageUi='true';
     ['pointerdown','pointerup','click','dblclick','wheel','keydown','keyup'].forEach(type=>dialog.addEventListener(type,event=>event.stopPropagation()));
     document.body.append(dialog);
@@ -103,7 +104,7 @@
     if(!dialog)return;
     if(!available()){closePanel();return}
     const list=listNow(),locked=lockedNow(),here=students(),box='padding:6px;border:2px solid #94a3b8;border-radius:9px;font:600 15px system-ui';
-    const panel=el('div','background:white;color:#142642;border-radius:15px;padding:18px;width:min(760px,95vw);max-height:90vh;overflow:auto;box-shadow:0 16px 55px #0005;display:grid;gap:12px;font:15px system-ui');
+    const panel=el('div','background:white;color:#142642;border-radius:15px;padding:18px;width:min(760px,95vw);max-height:calc(100vh - 150px);overflow:auto;box-shadow:0 16px 55px #0005;display:grid;gap:12px;font:15px system-ui');
     const note=el('p','margin:0;min-height:1.3em;font-weight:700;color:#475569');note.setAttribute('role','status');
     const say=(text,bad)=>{note.style.color=bad?'#b91c1c':'#475569';note.textContent=text||''};
     const replaceOk=()=>!list.length||confirm('This page already has '+list.length+' zone'+(list.length===1?'':'s')+'. Replace them?');
