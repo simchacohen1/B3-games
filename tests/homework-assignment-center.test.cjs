@@ -246,7 +246,7 @@ test('preview Firebase config and bootstrap stay isolated from production', () =
   assert.match(deploy, /FUNCTIONS_DISCOVERY_TIMEOUT = '30'/);
   assert.doesNotMatch(deploy, /--project\s+['"]?b3-games/i);
   assert.doesNotMatch(deploy, /deploy['"]?,\s*['"]--only['"],\s*['"]hosting['"]/);
-  const stagingPages = ['index.html', 'weekly-quiz/index.html', 'chazara/index.html', 'shorashim/index.html', 'record_pesukim/student.html', 'rashi-letters/student.html', 'yiddish/index.html', 'game-show/player.html', 'class-gallery/index.html', 'student-rewards/index.html', 'halacha/index.html', 'teacher-home.html', 'student-report/index.html', 'assignment-center/teacher.html', 'assignment-center/student.html'];
+  const stagingPages = ['index.html', 'weekly-quiz/index.html', 'chazara/index.html', 'shorashim/index.html', 'record_pesukim/student.html', 'rashi-letters/student.html', 'yiddish/index.html', 'game-show/player.html', 'class-gallery/index.html', 'student-rewards/index.html', 'halacha/index.html', 'teacher-home.html', 'student-report/index.html', 'assignment-center/teacher.html', 'assignment-center/student.html', 'chayus-meter/index.html', 'davening_student_app_et/index.html', 'davening_student_app_wt/index.html'];
   const injector = require('../scripts/inject-preview-bootstrap.cjs');
   assert.deepEqual([...injector.PAGES].sort(), [...new Set([...stagingPages, 'assignment-center/student.html', 'assignment-center/teacher.html'])].sort(),
     'the preview copy covers exactly the pages that need the staging guard');

@@ -10,6 +10,9 @@ $siteId = 'fun-torah-tools-staging'
 $channelId = 'homework-406-preview'
 if ($ChannelName) {
   if ($ChannelName -notmatch '^[a-z0-9][a-z0-9-]{2,40}$') { throw 'Channel name may only use lowercase letters, numbers and dashes.' }
+  # Only these two channel names are recognised by the site's staging guard. Any other name would be built with the
+  # PRODUCTION Firebase config. Other branches must use scripts/deploy-staging-preview.ps1, which always builds with staging config.
+  if ($ChannelName -notin @('homework-406-preview', 'pr-597-homework-notes')) { throw "Channel '$ChannelName' is not allowed here: this script's preview copy would use the production Firebase config under that name. Use scripts/deploy-staging-preview.ps1 instead." }
   $channelId = $ChannelName
 }
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path

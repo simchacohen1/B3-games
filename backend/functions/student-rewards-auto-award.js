@@ -5,6 +5,7 @@ const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
+const chayusPoints=require('./chayus-points-core.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
@@ -1233,6 +1234,39 @@ const posukReview=posukReviewCore.createPosukReview({
   fileExists:async path=>{const [exists]=await admin.storage().bucket('b3-games.firebasestorage.app').file(path).exists();return exists;}
 });
 
+// Chayus Meter: one point per level, at most 10 a day (chayus-points-core.cjs holds the rules). The student's own
+// page reports counted seconds; no audio is ever sent.
+const chayusRewardIdCache=new Map();
+async function chayusRewardStudentId(studentId){
+  const hit=chayusRewardIdCache.get(studentId);
+  if(hit&&hit.until>Date.now())return hit.id;
+  const id=await resolveRewardStudentId(studentId);
+  if(id)chayusRewardIdCache.set(studentId,{id,until:Date.now()+10*60*1000});
+  return id;
+}
+const chayusStore={
+  get:async path=>(await rtdb.ref(path).get()).val(),
+  tx:(path,fn)=>rtdb.ref(path).transaction(fn)
+};
+async function chayusMeter(req,res,body,action){
+  const practice=await requirePracticeStudent(req,'chayus-meter');
+  if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+  const rewardStudentId=await chayusRewardStudentId(practice.studentId);
+  if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
+  // Quick off-switch: set studentRewards/settings/chayusPointsEnabled to false in the database to stop all Chayus points.
+  const enabled=(await rtdb.ref(`${SR_ROOT}/settings/chayusPointsEnabled`).get()).val()!==false;
+  const result=await chayusPoints.report({
+    enabled,store:chayusStore,studentId:practice.studentId,
+    reportedSeconds:action==='chayus-report'?body.countedSeconds:null,
+    award:({requestId,level,name,day})=>awardMilestoneImmediately({
+      requestId,rewardStudentId,studentId:practice.studentId,source:chayusPoints.SOURCE,amount:1,
+      reason:`Chayus Meter — Level ${level}: ${name}`,
+      record:{chayusDay:day,chayusLevel:level},reviewedBy:'Chayus Meter (automatic)'
+    })
+  });
+  return res.status(result.ok?200:(result.status||400)).json(result.ok?result:{error:result.error});
+}
+
 async function resolveRewardStudentId(posukStudentId){
   // Filter in code: the database has no ".indexOn": "b3StudentId" rule, and
   // the Admin SDK refuses unindexed orderByChild queries.
@@ -1786,6 +1820,7 @@ exports.studentRewardsAutoAward = onRequest(
           if(!result.ok) return res.status(409).json({error:result.error});
           return res.status(200).json(result);
         }
+        if(action==="chayus-report"||action==="chayus-status")return await chayusMeter(req,res,body,action);
         if(action==="posuk-submit"){
           const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
           if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
