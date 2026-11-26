@@ -432,6 +432,8 @@
   var classWatch = { id: "", sources: [], timer: null };
   function watchClassLive(classId, classPath) {
     if (typeof EventSource !== "function" || isGuestPreview() || classId === "et" || classId === "wt") return;
+    // A hidden tab's background checks must not reopen the streams it released (they reopen when the tab is visible).
+    if (document.visibilityState === "hidden") return;
     if (classWatch.id === classId && classWatch.sources.length) return;
     classWatch.id = classId;
     classWatch.sources.forEach(function (s) { try { s.close(); } catch (e) {} });

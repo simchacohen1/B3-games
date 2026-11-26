@@ -28,3 +28,8 @@ test('a failed access check retries within seconds and the access decision is un
 test('the page opens at most three database streams (settings + two class fields)',()=>{
   assert.equal((src.match(/new EventSource\(/g)||[]).length,2,'one settings stream and one per class field');
 });
+test('background checks in a hidden tab do not reopen the class streams',()=>{
+  const m=src.match(/function watchClassLive\(classId, classPath\) \{([\s\S]*?)classWatch\.id = classId;/);
+  assert.ok(m);
+  assert.match(m[1],/document\.visibilityState === "hidden"\) return;/);
+});
