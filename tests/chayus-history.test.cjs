@@ -93,8 +93,8 @@ test('fetchHistory sends only the class and day count with the teacher token, an
   assert.equal(seen.url, 'https://us-central1-fun-torah-tools-staging.cloudfunctions.net/studentRewardsAutoAward');
   assert.equal(seen.init.headers.Authorization, 'Bearer tok');
   assert.deepEqual(JSON.parse(seen.init.body), { action: 'chayus-class-history', classId: 'cls', days: 60 });
-  const no = async () => ({ ok: false, status: 403, json: async () => ({ error: 'This class or tool is not available to your account.' }) });
-  await assert.rejects(() => H.fetchHistory({ idToken: 'tok', classId: 'cls', projectId: 'p', fetchImpl: no }), /not available to your account/);
+  const no = async () => ({ ok: false, status: 401, json: async () => ({ error: 'Teacher sign-in expired. Please sign in again.' }) });
+  await assert.rejects(() => H.fetchHistory({ idToken: 'tok', classId: 'cls', projectId: 'p', fetchImpl: no }), /Chayus Meter may not be turned on/);
   await assert.rejects(() => H.fetchHistory({ classId: 'cls', projectId: 'p', fetchImpl: ok }), /sign-in required/);
 });
 

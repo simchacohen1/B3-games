@@ -31,6 +31,7 @@
     });
     let data = {};
     try { data = await response.json(); } catch (e) { data = {}; }
+    if (response.status === 401 || response.status === 403) throw new Error('Could not load this class. The Chayus Meter may not be turned on for it, or your sign-in may have expired. Try Refresh or choose another class.');
     if (!response.ok || !data.ok) throw new Error(data.error || ('Could not load Chayus Meter history (' + response.status + ').'));
     return data;
   }

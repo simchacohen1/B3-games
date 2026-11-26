@@ -68,9 +68,16 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 let classes=[],current="",history=null,roster=[],sortKey="name",sortDir=1,day="",teacherUser=null;
 const HISTORY_DAYS=60;
 async function classList(access){
- const snap=await db.ref("b3Games/workspaces/"+ws+"/classes").once("value");const all=snap.val()||{};
- const allowed=access?.role==="admin"?null:new Set(access?.classIds||[]);
- return Object.entries(all).filter(([id,r])=>r&&r.active!==false&&(!allowed||allowed.has(id))).map(([id,r])=>({id,name:String(r.name||id.toUpperCase()),members:r.members||{}}));
+ const base="b3Games/workspaces/"+ws+"/classes";
+ let all={};
+ if(access?.role==="admin")all=(await db.ref(base).once("value")).val()||{};
+ else{
+  // A teacher may only read the classes assigned to them, so read those one by one.
+  const ids=[...new Set(access?.classIds||[])].filter(id=>/^[A-Za-z0-9_-]{1,100}$/.test(id));
+  const rows=await Promise.all(ids.map(async id=>{try{return [id,(await db.ref(base+"/"+id).once("value")).val()]}catch(e){return [id,null]}}));
+  all=Object.fromEntries(rows);
+ }
+ return Object.entries(all).filter(([id,r])=>r&&r.active!==false).map(([id,r])=>({id,name:String(r.name||id.toUpperCase())}));
 }
 function drawTabs(){
  $("classTabs").innerHTML=classes.map(c=>'<button type="button" data-c="'+esc(c.id)+'" class="'+(c.id===current?"on":"")+'">'+esc(c.name)+'</button>').join("");

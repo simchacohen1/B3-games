@@ -50,6 +50,7 @@ td.none{color:#cbd5e1}
 .tool h3 small{font-weight:400;color:#64748b;font-size:12px}
 .tool ul{margin:6px 0 0;padding-left:18px}.tool li{margin:3px 0;font-size:14px}
 .tool .empty{color:#94a3b8;font-size:14px}
+.tool table{width:100%;min-width:0;table-layout:auto}.tool th,.tool td{padding:5px 6px;font-size:12px;white-space:normal}
 .attn{margin:0 22px 6px;padding:14px 16px;border-radius:14px;background:#fff7ed;border:1px solid #fed7aa}
 .attn h3{margin:0 0 6px;font-size:16px}
 .good{margin:0 22px 6px;padding:14px 16px;border-radius:14px;background:#f0fdf4;border:1px solid #bbf7d0}
@@ -236,7 +237,13 @@ async function enabledToolsFor(c,legacy){
 
 /* ---------- Loading ---------- */
 async function classIdsFor(acc,u){
- const all=obj(await get('b3Games/workspaces/'+WS+'/classes'));
+ let allRaw=await get('b3Games/workspaces/'+WS+'/classes');
+ if(allRaw===undefined){
+  // This account is not allowed to read every class (stricter database rules): read only its own classes.
+  const own=(acc.classIds||[]).filter(id=>id&&id!=='*');
+  allRaw={};await Promise.all(own.map(async id=>{const row=await get('b3Games/workspaces/'+WS+'/classes/'+id);if(row)allRaw[id]=row}));
+ }
+ const all=obj(allRaw);
  let ids;
  if(acc.role==='admin')ids=Object.keys(all);
  else{
