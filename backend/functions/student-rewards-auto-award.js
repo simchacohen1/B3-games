@@ -5,6 +5,7 @@ const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
+const balanceCore=require('./rewards-balance-core.cjs');
 const chayusPoints=require('./chayus-points-core.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
@@ -396,7 +397,7 @@ async function rashiPostPoints({requestId,rewardStudentId,studentId,amount,reaso
     const existing=(await ref.get()).val()||{};
     return {ok:true,newlyPosted:false,status:existing.status||'approved'};
   }
-  const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)+amount);
+  const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),amount);
   if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return {ok:false,error:'Could not update the point balance.'};}
   const balanceAfter=Number(bal.snapshot.val()||0);
   await ref.update({status:'approved',actualAmount:amount,balanceAfter,approvedAutomatically:true,reviewedBy:'Rashi Letters',reviewedAt:Date.now()});
@@ -437,7 +438,7 @@ async function rashiLetterMarks(teacher,body){
   let balanceAfter=null;
   if(delta!==0){
     if(!rewardStudentId){await restore('Missing reward student ID');throw Object.assign(new Error('Could not find this student in Student Rewards.'),{code:409});}
-    const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)+delta);
+    const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),delta);
     if(!bal.committed){await restore('Balance update did not commit');throw Object.assign(new Error('Could not update the point balance.'),{code:409});}
     balanceAfter=Number(bal.snapshot.val()||0);
   }
@@ -483,7 +484,7 @@ async function rashiDelete(teacher,body){
   const rewardStudentId=String((lock.snapshot.val()||{}).rewardStudentId||'');
   let takenBack=0;
   if(before.paid>0&&rewardStudentId){
-    const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)-before.paid);
+    const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),-before.paid);
     if(!bal.committed){await reqRef.update({status:before.status,reviewStartedAt:null,gradeFromStatus:null,lastError:'Balance update did not commit'});throw Object.assign(new Error('Could not update the point balance.'),{code:409});}
     takenBack=before.paid;
   }
@@ -982,7 +983,7 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
     createdAt:Date.now(),
     balanceAfter,
   };
-  await contributionRef.set(contribution).catch(err=>console.warn('Could not save class reward contribution history',err));
+  for(let attempt=0;attempt<4;attempt++){try{await contributionRef.set(contribution);break}catch(err){console.error('Could not save class reward contribution history (attempt '+(attempt+1)+')',err,JSON.stringify(contribution));if(attempt<3)await new Promise(r=>setTimeout(r,300*(attempt+1)))}}
 
   const latestRoot=(await rtdb.ref(SR_ROOT).get()).val()||{};
   const latestGoal=classRewardGoalFromRoot(latestRoot,studentId,classId,rewardId);
@@ -1185,18 +1186,14 @@ async function approvePendingRequest(requestId,reviewedBy){
   const amount=Number(item.amount || 0);
   let applied=0;
   const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-  const bal=await balRef.transaction(cur=>{
-    const old=Number(cur || 0);
-    const next=Math.max(0,old+amount);
-    applied=next-old;
-    return next;
-  });
+  const bal=await balanceCore.change(balRef,amount,{clamp:true});
   if(!bal.committed){
     await ref.update({status:"pending",lastError:"Balance update did not commit",reviewStartedAt:null});
     return {ok:false,error:"Could not update the point balance."};
   }
+  applied=bal.applied;
   const balanceAfter=Number(bal.snapshot.val() || 0);
-  await ref.update({status:"approved",actualAmount:applied,balanceAfter,reviewedBy,reviewedAt:Date.now(),lastError:null});
+  await ref.update({status:"approved",actualAmount:applied,balanceAfter,balanceBefore:bal.before,reviewedBy,reviewedAt:Date.now(),lastError:null});
   await mirrorChazaraPointStatus(item,"approved");
   return {ok:true,status:"approved",actualAmount:applied,balanceAfter,studentName:item.studentName || rewardStudentId};
 }
@@ -1221,10 +1218,11 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
   const tx=await ref.transaction(cur=>cur?undefined:seed);
   if(!tx.committed){const existing=(await ref.get()).val()||{};return{ok:true,newlyAwarded:false,requestId,status:existing.status||'approved',amount:Number(existing.actualAmount??existing.amount??amount)}}
   let applied=0;
-  const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+  const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),amount,{clamp:true});
   if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return{ok:false,error:'Could not add the reward points.'}}
+  applied=bal.applied;
   const balanceAfter=Number(bal.snapshot.val()||0);
-  await ref.update({status:'approved',actualAmount:applied,balanceAfter,approvedAutomatically:true,reviewedBy:reviewedBy||'Verified teacher action',reviewedAt:Date.now()});
+  await ref.update({status:'approved',actualAmount:applied,balanceAfter,balanceBefore:bal.before,approvedAutomatically:true,reviewedBy:reviewedBy||'Verified teacher action',reviewedAt:Date.now()});
   return{ok:true,newlyAwarded:true,requestId,status:'approved',amount:applied,balanceAfter};
 }
 
@@ -1571,13 +1569,12 @@ async function reverseRecordingPointsForTeacherRejection(studentId,eventId,event
 
   let applied=0;
   const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-  const bal=await balRef.transaction(cur=>{
-    const old=Number(cur||0),next=Math.max(0,old+requested);applied=next-old;return next;
-  });
+  const bal=await balanceCore.change(balRef,requested,{clamp:true});
   if(!bal.committed){
     await reversalRef.update({status:"error",lastError:"Balance reversal did not commit"});
     return {ok:false,error:"Could not remove the linked reward points."};
   }
+  applied=bal.applied;
   const balanceAfter=Number(bal.snapshot.val()||0);
   await reversalRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedAt:Date.now(),lastError:null});
   await eventRef.update({
@@ -1711,13 +1708,12 @@ async function handleRemoval(studentId,eventId){
     }
     let applied=0;
     const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-    const bal=await balRef.transaction(cur=>{
-      const old=Number(cur||0),next=Math.max(0,old+requested);applied=next-old;return next;
-    });
+    const bal=await balanceCore.change(balRef,requested,{clamp:true});
     if(!bal.committed){
       await reversalRef.update({status:"error",lastError:"Balance reversal did not commit"});
       return {ok:false,error:"Could not remove the linked reward points."};
     }
+    applied=bal.applied;
     const balanceAfter=Number(bal.snapshot.val()||0);
     await reversalRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedAt:Date.now(),lastError:null});
     await eventRef.update({removalPointRequestId:requestId,removalPointRequestStatus:"approved",pointReversedAt:Date.now(),pointReversalAmount:applied});
