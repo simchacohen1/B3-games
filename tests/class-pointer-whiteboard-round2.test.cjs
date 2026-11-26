@@ -447,3 +447,26 @@ test('with no connection the save does not hang: it says so at once, keeps the c
   assert.equal((await h.auto.flush()).ok,true);assert.equal(h.jsonPuts().length,1);
   assert.match(saved,/addEventListener\?\.\('online',\(\)=>\{failedAt=0;void run\(true\)\}\)/);
 });
+
+test('after a refresh the older saved version comes back: the newer unsaved copy is still offered, and nothing with unsaved work is replaced',async()=>{
+  const first=harness();first.state.data=withMark('s1');await first.auto.flush();
+  const drafts={...first.store,'ftt-board-draft:studentFiles/et/stu1/':JSON.stringify({at:Date.now()-1000,json:JSON.stringify(withMark('newer')),b:'old:b3'})};
+  const again=harness({existing:Object.fromEntries(first.objects),drafts});again.state.data=withMark('s1');
+  await again.auto.flush();await wait();await wait();
+  const dialog=walk(again.body).find(node=>node.attrs?.role==='alertdialog');
+  assert.ok(dialog,'the newer copy is offered');
+  walk(dialog).find(node=>node.tag==='button'&&node.textContent==='Bring it back').click();await wait();
+  assert.equal(again.state.imported.at(-1).strokes[0].id,'newer');
+  // A board that is not the saved one (it has work of its own) is never offered a replacement.
+  const busy=harness({existing:Object.fromEntries(first.objects),drafts});busy.state.data=withMark('mine');
+  await busy.auto.flush();await wait();await wait();
+  assert.equal(walk(busy.body).find(node=>node.attrs?.role==='alertdialog'),undefined);
+});
+
+test('once the same work is saved, an older device copy of it is removed too',async()=>{
+  const failed=harness({deny:true});failed.state.data=withMark('s1');await failed.auto.flush();
+  assert.equal(Object.keys(failed.store).filter(key=>key.startsWith('ftt-board-draft:')).length,1);
+  const later=harness({drafts:failed.store});later.state.data=withMark('s1');
+  assert.equal((await later.auto.flush()).ok,true);
+  assert.equal(Object.keys(later.store).filter(key=>key.startsWith('ftt-board-draft:')).length,0);
+});

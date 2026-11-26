@@ -827,7 +827,7 @@
       const ref=mineRef();
       return storeDrafts([{at:Date.now(),json,b:ref},...loadDrafts().filter(item=>item.b!==ref)]);
     }
-    function clearDraft(){const ref=mineRef();storeDrafts(loadDrafts().filter(item=>item.b!==ref))}
+    function clearDraft(json){const ref=mineRef();storeDrafts(loadDrafts().filter(item=>item.b!==ref&&(!json||item.json!==json)))}
     function dropDraft(draft){storeDrafts(loadDrafts().filter(item=>!(item.b===draft.b&&item.at===draft.at)))}
     function readDraft(){return loadDrafts()[0]||null}
     // Which file this device last saved a board to, and what the board looked like then. After a refresh the class copy of the board comes back as a new board; if it is exactly what was saved, it carries on in the same file instead of making another.
@@ -906,7 +906,7 @@
         if(!fromTemplate&&!blank(data)){
           // On a page that has only just opened nobody has been looked up yet: find out whose files these are first.
           if(!prefixKey)try{prefixKey=(await who()).prefix}catch(_){}
-          const link=readLink(json);if(link){current={id:link.id,name:'',folderId:'',subject:'',template:false};savedJson=json}}
+          const link=readLink(json);if(link){current={id:link.id,name:'',folderId:'',subject:'',template:false};savedJson=json;if(!offered)void offerRestore(api)}}
       }
       lastJson=json;
       if(blank(data)){
@@ -924,7 +924,7 @@
         const saved=await write(api,data);
         // The board may have been replaced while it was uploading: that file stays, but it is not the new board's file.
         if((api.id?api.id():null)===key){current={id:saved.id,name:saved.name,folderId:saved.folderId,subject:saved.subject,template:false};fromTemplate=null;savedJson=json}
-        lastSaveAt=Date.now();failedAt=0;clearDraft();hideFull();say('✓ Saved');
+        lastSaveAt=Date.now();failedAt=0;clearDraft(json);hideFull();say('✓ Saved');
         if((api.id?api.id():null)===key)writeLink(saved.id,json);
         if(saved.created)try{window.dispatchEvent(new CustomEvent('ftt-myfiles-changed',{detail:{from:'autosave'}}))}catch(_){}
         return{ok:true,id:saved.id};
@@ -946,11 +946,14 @@
       // Only the person signed in on this device is offered their own copy (it is kept under their own id).
       try{prefixKey=(await who()).prefix}catch(_){return}
       const draft=readDraft();if(!draft||!api.canOpen)return;
+      // A copy that is the board already saved is nothing to bring back.
+      if(draft.json===savedJson){dropDraft(draft);return offerRestore(api)}
       let data=null;try{data=JSON.parse(draft.json)}catch(_){dropDraft(draft);return offerRestore(api)}
       if(!data||data.kind!==api.kind||blank(data)){dropDraft(draft);return offerRestore(api)}
       // The board may have been used while the sign-in was checked: then keep it as it is.
       let now=null;try{now=await api.read()}catch(_){}
-      if(!now||!blank(now))return;
+      // Only a board with nothing on it, or one that is exactly what is already saved, can be replaced: never one with unsaved work.
+      if(!now||!(blank(now)||(savedJson&&JSON.stringify(now)===savedJson)))return;
       const box=h('div','ftt-autosave-restore');box.setAttribute('role','alertdialog');box.setAttribute('aria-label','Restore your whiteboard');
       box.style.cssText='position:fixed;left:14px;bottom:52px;z-index:2147483000;max-width:min(92vw,360px);padding:12px 14px;border-radius:14px;background:#fff;color:#1f2937;font:600 14px system-ui,sans-serif;box-shadow:0 8px 30px #0006;border:2px solid #2563eb';
       const when=new Date(draft.at).toLocaleString([],{weekday:'short',hour:'numeric',minute:'2-digit'});
@@ -986,7 +989,7 @@
         const api=board();let data=null;try{data=api.canSave?await api.read():null}catch(_){}
         boardKey=api.id?api.id():null;savedJson=data?JSON.stringify(data):'';lastJson=savedJson;lastSaveAt=Date.now();failedAt=0;offered=true;
       },
-      noteSaved(data){try{savedJson=JSON.stringify(data);if(current?.id)writeLink(current.id,savedJson);lastSaveAt=Date.now();failedAt=0;boardKey=board().id?.()??boardKey;clearDraft();say('✓ Saved')}catch(_){}}
+      noteSaved(data){try{savedJson=JSON.stringify(data);if(current?.id)writeLink(current.id,savedJson);lastSaveAt=Date.now();failedAt=0;boardKey=board().id?.()??boardKey;clearDraft(savedJson);say('✓ Saved')}catch(_){}}
     };
   })();
   auto.start();
