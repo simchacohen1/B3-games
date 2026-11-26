@@ -457,14 +457,26 @@ function bindNavigation(){
     const requested=btn.dataset.track;if(requested&&requested!==currentTrack){currentTrack=requested;selectedItemKey=null;}
     goScreen(btn.dataset.go);
   }));
-  document.querySelectorAll('.backBtn').forEach(b=>b.onclick=()=>goScreen('studentHome'));
+  document.querySelectorAll('.backBtn').forEach(b=>b.onclick=()=>goScreen(backTargetFor(b)));
+  document.querySelectorAll('[data-review-mode]').forEach(btn=>btn.addEventListener('click',()=>openReviewMode(btn.dataset.reviewMode)));
   document.querySelectorAll('[data-learning-perek]').forEach(btn=>btn.onclick=()=>chooseLearningPerek(btn.dataset.learningPerek));
   const changePerek=document.getElementById('changeLearningPerekBtn');
   if(changePerek)changePerek.onclick=()=>goScreen('shorashimPerekScreen');
   const weekSelect=document.getElementById('bookletWeekSelect');
   if(weekSelect)weekSelect.onchange=()=>{bookletWeek=weekSelect.value==='all'?'all':Number(weekSelect.value);selectedItemKey=null;renderLearningScreen();};
 }
-function goScreen(id){if(!followAllowsScreen(id))return;if(id!=='reviewScreen')document.body.classList.remove('shorashim-review-active');if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='shorashimPerekScreen')renderPerekChoices();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
+function backTargetFor(btn){const t=btn.dataset.back;if(!t)return 'studentHome';if(t==='auto-learn')return currentTrack==='shorashim'?'shorashimPerekScreen':'affixHomeScreen';return t;}
+function openReviewMode(mode){
+  if(!followAllowsScreen('reviewScreen'))return;
+  const ids={regular:'regularChazaraChoice','no-hints':'noHintsChazaraChoice',practice:'practiceOnlyChoice'};
+  const labels={regular:'🎙️ Record Chazara — pictures allowed — 2 points','no-hints':'🏆 No Hints Challenge — no pictures or drawings — 3 points',practice:'🔁 Practice Only — no recording, no points'};
+  currentTrack='shorashim';
+  document.getElementById(ids[mode]||ids.regular)?.click();
+  const banner=document.getElementById('reviewModeBanner');if(banner)banner.textContent=labels[mode]||labels.regular;
+  goScreen('reviewScreen');
+  document.body.classList.add('sh-hub-review');
+}
+function goScreen(id){if(!followAllowsScreen(id))return;if(id!=='reviewScreen'){document.body.classList.remove('shorashim-review-active');document.body.classList.remove('sh-hub-review');}if(activeScreenId==='gamesScreen'&&id!=='gamesScreen')cleanupGameRuntime();if(id!=='learnScreen'&&window.__shorashimRedesignMode){window.__shorashimRedesignMode=false;window.__shorashimRedesignKey=null;window.__shorashimEditorDirty=false;selectedItemKey=null;}document.querySelectorAll('#studentView .screen').forEach(s=>s.classList.remove('active'));const el=document.getElementById(id);if(el)el.classList.add('active');activeScreenId=id;window.scrollTo(0,0);lastInteraction=Date.now();if(id==='shorashimPerekScreen')renderPerekChoices();if(id==='learnScreen')renderLearningScreen();if(id==='reviewScreen'){renderReviewAvailability();renderDailyStatus();}if(id==='gamesScreen')renderGamesLock();if(id==='galleryScreen')renderGallery();}
 function bindModes(){document.getElementById('studentModeBtn').onclick=()=>showMode('student');document.getElementById('teacherModeBtn').onclick=()=>showMode('teacher');}
 function showMode(mode){const studentMode=mode==='student';document.getElementById('studentView').classList.toggle('hidden',!studentMode);document.getElementById('teacherView').classList.toggle('hidden',studentMode);document.getElementById('studentModeBtn').classList.toggle('active',studentMode);document.getElementById('teacherModeBtn').classList.toggle('active',!studentMode);if(!studentMode)renderTeacher();}
 function bindStudentDialog(){const dlg=document.getElementById('addStudentDialog');document.getElementById('addStudentBtn').onclick=()=>dlg.showModal();document.getElementById('confirmAddStudent').onclick=e=>{e.preventDefault();const inp=document.getElementById('newStudentName'),name=inp.value.trim();if(!name)return;if(!db.students[name])db.students[name]=blankStudent();currentStudent=name;inp.value='';dlg.close();saveDB();populateStudents();renderAll();};}
