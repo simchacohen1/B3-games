@@ -132,6 +132,9 @@
                   "teacherOfflineAt": {
                     ".validate": "newData.isNumber()"
                   },
+                  "leadTeacher": {
+                    ".validate": "newData.isBoolean()"
+                  },
                   "permissionRevision": {
                     ".validate": "newData.isNumber()"
                   },

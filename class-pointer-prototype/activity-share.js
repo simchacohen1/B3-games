@@ -1202,7 +1202,7 @@
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
         &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000&&!teacherGone(v))
-        .sort((a,b)=>b[1].createdAt-a[1].createdAt||(a[0]<b[0]?1:-1))[0]?.[1]||null;
+        .sort((a,b)=>((b[1].leadTeacher!==false)-(a[1].leadTeacher!==false))||b[1].createdAt-a[1].createdAt||(a[0]<b[0]?1:-1))[0]?.[1]||null;
     }
     // No database event arrives when the grace period runs out, so look again at that moment.
     function watchGrace(next){

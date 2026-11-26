@@ -36,7 +36,7 @@
         await armOffline(ref);
         if(row&&row.roomId===ref.key)await ref.child(OFFLINE).remove();
         // The record is gone (for example removed by an older copy of this page): put it back.
-        else await ref.set({roomId:ref.key,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:sharingOn});
+        else await ref.set({roomId:ref.key,teacherUid:context.user.uid,leadTeacher:context.lead!==false,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:sharingOn});
       });
     }catch(error){
       // Still offline or the sign-in is refreshing: try a few more times, then wait for the next reconnect.
@@ -80,17 +80,20 @@
   const GRACE_MS=120000,MAX_AGE_MS=14400000;
   let takenOver=false,guardOff=null,serverOffset=0;
   const liveRow=(row,key,now)=>!!row&&row.roomId===key&&Number.isFinite(row.createdAt)&&now-row.createdAt<MAX_AGE_MS&&row.createdAt-now<60000&&!(Number.isFinite(row.teacherOfflineAt)&&now-row.teacherOfflineAt>=GRACE_MS);
-  const newerThan=(row,key,mine,mineKey)=>row.createdAt>mine.createdAt||(row.createdAt===mine.createdAt&&key>mineKey);
+  // A class's own teacher (leadTeacher) always outranks an administrator or principal who has access to every class:
+  // the visitor's lesson never replaces the teacher's, whichever was opened last. Within one rank the newest wins.
+  const isLead=row=>row.leadTeacher!==false;
+  const newerThan=(row,key,mine,mineKey)=>isLead(row)!==isLead(mine)?isLead(row):(row.createdAt>mine.createdAt||(row.createdAt===mine.createdAt&&key>mineKey));
   function newerLiveLesson(rows,mineKey,now){
     const mine=rows?.[mineKey];
     if(!mine||!Number.isFinite(mine.createdAt))return null;
-    return Object.entries(rows).filter(([key,row])=>key!==mineKey&&liveRow(row,key,now)&&newerThan(row,key,mine,mineKey)).sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]||null;
+    return Object.entries(rows).filter(([key,row])=>key!==mineKey&&liveRow(row,key,now)&&newerThan(row,key,mine,mineKey)).sort((a,b)=>(isLead(b[1])-isLead(a[1]))||b[1].createdAt-a[1].createdAt)[0]||null;
   }
-  function markTakenOver(byRoom){
+  function markTakenOver(byRoom,byLead,mineLead){
     if(takenOver)return;
     takenOver=true;
     try{guardOff?.()}catch{}guardOff=null;
-    try{document.dispatchEvent(typeof CustomEvent==='function'?new CustomEvent('class-pointer-taken-over',{detail:{by:byRoom}}):new Event('class-pointer-taken-over'))}catch{}
+    try{document.dispatchEvent(typeof CustomEvent==='function'?new CustomEvent('class-pointer-taken-over',{detail:{by:byRoom,byLead:byLead===true,mineLead:mineLead!==false}}):new Event('class-pointer-taken-over'))}catch{}
   }
   function guardSingleLesson(context,ref){
     try{guardOff?.()}catch{}guardOff=null;
@@ -99,7 +102,7 @@
     const handler=snapshot=>{
       if(activeRef!==ref){try{sessions.off('value',handler)}catch{}return}
       const other=newerLiveLesson(snapshot.val()||{},ref.key,Date.now()+serverOffset);
-      if(other)markTakenOver(other[0]);
+      if(other)markTakenOver(other[0],isLead(other[1]),context.lead);
     };
     guardOff=()=>sessions.off('value',handler);
     sessions.on('value',handler,()=>{});
@@ -196,7 +199,7 @@
           });
         }
         if(!teacherUid)teacherUid=user.uid;
-        resolve({db,ref,user,row});
+        resolve({db,ref,user,row,lead:!(access.role==='admin'||access.accountType==='principal')});
       }catch(error){reject(error)}
     });
   });
@@ -236,6 +239,12 @@
     const context=await ready;
     if(!C.validRoom(room))throw Error('The classroom connection is not ready.');
     if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid){teacherSessionChanged();throw Error(SIGNIN_CHANGED)};
+    // An administrator or principal cannot start a lesson in a class whose own teacher is already teaching it.
+    if(context.lead===false){
+      const rows=(await context.ref.child('classPointerSessions').once('value')).val()||{},now=Date.now()+serverOffset;
+      if(Object.entries(rows).some(([key,row])=>liveRow(row,key,now)&&isLead(row)))
+        throw Error('This class’s own teacher is already teaching it. Students always see their own teacher’s lesson, so nothing you share here would reach them. Try again after the teacher ends the lesson, or choose another class.');
+    }
     const ref=context.ref.child('classPointerSessions/'+room);activeRef=ref;
     const policyRef=context.db.ref(permissionPath(room));activePolicyRef=policyRef;
     // A dropped connection marks this lesson offline; it never deletes it (see the note above).
@@ -244,7 +253,7 @@
     await armOffline(ref).catch(()=>{});
     if(current!==revision){await disarmOffline(ref);return}
     sharingOn=false;
-    await ref.set({roomId:room,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
+    await ref.set({roomId:room,teacherUid:context.user.uid,leadTeacher:context.lead!==false,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:false});
     // A lesson that cannot be marked offline must not open: students would trust it for hours after a crash.
     try{await armOffline(ref)}catch(error){await ref.remove().catch(()=>{});if(activeRef===ref){activeRef=null;activePolicyRef=null}throw error}
     if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),disarmOffline(ref)]);return}
