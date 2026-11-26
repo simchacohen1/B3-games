@@ -132,6 +132,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
   .wr-check{ font-weight:900; }
   .wr-n{ margin-left:4px; font-size:.78rem; opacity:.8; }
   .wr-empty{ color:#7a6a3d; font-size:.88rem; }
+  .hidden{ display:none!important; }
   /* Recordings redesign: two tabs, one clean card per recording */
   .how-marks{ margin:0 0 12px; }
   .how-marks summary{ display:inline-block; cursor:pointer; color:var(--rimon-dark); font-weight:700; font-size:.9rem; text-decoration:underline; }
@@ -435,7 +436,7 @@ function drawRecTab(){
   if(recTab==='waiting'){
     const rows=recWaitingNow();
     html+='<label class="rec-opt"><input type="checkbox" id="recOpenOnly"'+(recState.onlyOpen?' checked':'')+'> Only show items I have opened for sending'+(recState.onlyOpen?' (showing '+rows.length+' of '+recState.allCount+')':'')+'</label>';
-    html+=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="rec-empty-tab">'+(recState.allCount?'No waiting readings are for items you have opened.':'✅ Nothing is waiting to be marked.')+'</div>';
+    html+=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="rec-empty-tab">'+(recState.onlyOpen&&recState.allCount>recState.waiting.length?'No waiting readings are for items you have opened.':'✅ Nothing is waiting to be marked.')+'</div>';
   }else{
     const rows=recMarkedNow();
     html+=rows.length?'<div class="rec-opt">Tap letters to change a mark. Points are adjusted for you (a student is never paid twice).</div>'+rows.map(r=>rashiCardHtml(r,true)).join(''):'<div class="rec-empty-tab">Nothing has been marked yet today.</div>';
