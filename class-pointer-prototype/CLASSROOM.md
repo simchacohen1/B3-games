@@ -133,7 +133,7 @@ How it travels: positions are 0..1 across and down the captured screen. `screen-
 - **Privacy:** a student's files are readable only with that student's own sign-in for that class. Other students and teachers cannot list or open them. Deleting a class folder never deletes files; they show under "Other".
 - **Sign-in:** students need the Firebase sign-in made on the home page (`signInWithCustomToken`, kept per tab). If it is missing, or belongs to a different student than the tab, Save says to sign in on the home page first. Activity pages get it from `game-gate.js`; `saved-work.js` loads the Firebase Auth and Storage parts itself the first time they are needed.
 - **Safety on open:** a saved whiteboard must parse as JSON, be `version: 1`, be the right `kind` and fit the size limit before it is handed to the whiteboard code, which checks every mark again. PDFs are only ever given to pdf.js. Names are always written as text.
-- **Limits:** student whiteboard 3 MB, teacher whiteboard 10 MB, picture 2 MB, PDF 25 MB (rules and page agree); 50 files per student and 200 whiteboards per teacher (page only, rules cannot count); 60 folders per class, names up to 40 letters.
+- **Limits:** student whiteboard 3 MB, teacher whiteboard 10 MB, picture 2 MB, PDF 25 MB (rules and page agree); 200 files per student and 200 whiteboards per teacher (page only, rules cannot count); 60 folders per class, names up to 40 letters.
 - **Tests:** `tests/class-pointer-saved-work.test.cjs`, `-ui.test.cjs`, `tests/class-pointer-home-saved-files.test.cjs`; rules in `tests/storage-rules-emulator.test.cjs` (needs the Firebase emulator).
 
 ## Send a whiteboard to every student (issue #835)

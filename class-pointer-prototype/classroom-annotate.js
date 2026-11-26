@@ -210,6 +210,8 @@
       // (every student gets their own editable copy).
       {id:'quick-save',icon:'💾',label:'Save',title:'Save this whiteboard in My files',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.saveCurrent?.()},
       {id:'quick-files',icon:'📂',label:'My files',title:'Open your saved whiteboards',hidden:!window.FTTSavedWork,onClick:()=>window.FTTSavedWork?.open?.()},
+      // New Slides: a fresh, blank whiteboard for the class (the one on screen is saved first).
+      {id:'quick-new',icon:'🆕',label:'New Slides',title:'New Slides: start a new, blank whiteboard for the class. This one is saved in My files first.',hidden:!(B.lessonKind?.()==='whiteboard'&&window.ClassPointerPdf?.newSlides),onClick:()=>void window.ClassPointerPdf?.newSlides?.()},
       // Upload: pictures (jpg, png, gif, webp) and PDFs go on the whiteboard (a PDF: one page on each slide).
       {id:'quick-upload',icon:'⬆️',label:'Upload',title:'Upload pictures (jpg, png, gif, webp) or a PDF onto the whiteboard',hidden:!(B.lessonKind?.()==='whiteboard'&&window.ClassPointerPdf?.openUpload),onClick:()=>window.ClassPointerPdf?.openUpload?.()},
       {id:'quick-send',icon:'📤',label:'Send',title:'Send to class: every student gets their own copy',hidden:!window.FTTSavedWork?.sendCurrent&&!window.PointerPdfLibrary?.openForSend,items:sendItems},

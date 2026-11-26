@@ -109,17 +109,17 @@ test('when the rules are not published yet, saving says so plainly',async()=>{
   assert.equal(await fails(h.api.store.readPdf({id:'abc'})),'Saving is not turned on yet. Ask your teacher.');
 });
 
-test('a student may keep 50 files: a new one is refused, saving over an old one still works',async()=>{
+test('a student may keep 200 files: a new one is refused, saving over an old one still works',async()=>{
   const existing={};
-  for(let i=0;i<50;i++)existing['studentFiles/et/stu1/f'+i+'.json']={customMetadata:{displayName:'Board '+i}};
+  for(let i=0;i<200;i++)existing['studentFiles/et/stu1/f'+i+'.json']={customMetadata:{displayName:'Board '+i}};
   existing['studentFiles/et/stu1/f0.png']={};
   const h=harness({existing});
-  assert.match(await fails(h.api.store.saveBoard({name:'One more',data:{version:1,kind:'student-board'}})),/already have 50 saved files/);
-  assert.match(await fails(h.api.store.savePdf({name:'a.pdf',type:'application/pdf',size:100},{name:'A'})),/already have 50 saved files/);
+  assert.match(await fails(h.api.store.saveBoard({name:'One more',data:{version:1,kind:'student-board'}})),/already have 200 saved files/);
+  assert.match(await fails(h.api.store.savePdf({name:'a.pdf',type:'application/pdf',size:100},{name:'A'})),/already have 200 saved files/);
   await h.api.store.saveBoard({id:'f3',name:'Board 3',data:{version:1,kind:'student-board'}});
   assert.equal(h.puts.length,1);
   const files=await h.api.store.list();
-  assert.equal(files.length,50,'pictures are not listed as files');
+  assert.equal(files.length,200,'pictures are not listed as files');
 });
 
 test('PDF upload: PDFs only, 25 MB at most, progress is reported',async()=>{
@@ -319,7 +319,7 @@ test('when saving is off or My files is full the copy is not kept; a full My fil
   assert.equal(await off.api.keepTeacherCopy(PICTURE),false);
   assert.equal(texts(off.body).length,0,'no confusing message when saving is not turned on');
   const existing={};
-  for(let i=0;i<50;i++)existing['studentFiles/et/stu1/f'+i+'.json']={customMetadata:{displayName:'Board '+i}};
+  for(let i=0;i<200;i++)existing['studentFiles/et/stu1/f'+i+'.json']={customMetadata:{displayName:'Board '+i}};
   const full=harness({existing});
   assert.equal(await full.api.keepTeacherCopy(PICTURE),false);
   assert.ok(texts(full.body).some(text=>/My files is full/.test(text)));
