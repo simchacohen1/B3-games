@@ -247,6 +247,26 @@ document.addEventListener('class-pointer-teacher-signed-out',()=>{
   if(!isTeacher)return;activityTeacherAuthorized=false;activityTeacherEpoch++;stopSharing();window.ClassPointerPdf?.close(true);
   $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;$('openWhiteboard').disabled=true;
 });
+// Another teacher window opened a newer lesson for this class: students moved to it and this lesson ends (one live lesson per class).
+let takenOverNow=false,takenOverNotice=null;
+function showTakenOver(){
+  if(!takenOverNotice){
+    takenOverNotice=document.createElement('div');takenOverNotice.id='cpTakenOverNotice';takenOverNotice.setAttribute('role','alert');
+    takenOverNotice.style.cssText='position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;background:#0f172acc;font:16px/1.5 system-ui,sans-serif';
+    const box=document.createElement('div');box.style.cssText='max-width:480px;margin:16px;padding:24px;border-radius:16px;background:#fff;color:#172033;text-align:center;box-shadow:0 12px 40px #0006';
+    const h=document.createElement('h2');h.textContent='This lesson was taken over';h.style.cssText='margin:0 0 8px;font-size:22px';
+    const p=document.createElement('p');p.className='cp-taken-text';p.style.cssText='margin:0 0 16px';
+    const back=document.createElement('button');back.type='button';back.textContent='Take this class back';back.style.cssText='min-height:44px;padding:0 18px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font:800 16px system-ui;cursor:pointer';
+    back.addEventListener('click',()=>{back.disabled=true;takenOverNow=false;endPromise.then(()=>{takenOverNotice.hidden=true;back.disabled=false;return startClass()})});
+    box.append(h,p,back);takenOverNotice.appendChild(box);document.body.appendChild(takenOverNotice);
+  }
+  takenOverNotice.querySelector('.cp-taken-text').textContent='Another Class Pointer window (or teacher) opened this class after you, so the students moved to that lesson and this one has ended. Only one lesson can be live for a class at a time.';
+  takenOverNotice.hidden=false;
+}
+document.addEventListener('class-pointer-taken-over',()=>{
+  if(!isTeacher||!started&&!openingClass)return;
+  takenOverNow=true;endClass();showTakenOver();
+});
 document.addEventListener('class-pointer-teacher-restored',()=>{
   if(!isTeacher)return;activityTeacherAuthorized=true;
   $('shareScreen').disabled=!started||!activityTeacherAuthorized;$('openBrowserTab').disabled=!started||!activityTeacherAuthorized;$('openWhiteboard').disabled=!started;
@@ -613,7 +633,7 @@ function endClass(){
   endPromise=Promise.resolve().then(()=>window.ClassPointerDashboard?.end()).then(()=>{
     closingClass=false;
     button.disabled=false;button.textContent='↻ Start another class';
-    status('Class ended. Click Start another class to reopen it.');
+    status(takenOverNow?'This lesson was taken over by another window. Click Start another class to take the class back.':'Class ended. Click Start another class to reopen it.');
   }).catch(error=>{
     closingClass=false;
     button.disabled=true;button.textContent='Classroom cleanup failed';

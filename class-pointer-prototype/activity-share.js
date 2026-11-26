@@ -1034,7 +1034,7 @@
       // The sharing tab never joins the class itself; the student's own tab does that.
       if(persistentShareWindow)return;
       if(!next){presenceTarget='';presenceDelay=0;stopPresence();return}
-      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
+      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;admitted=false;classLink('wait','Your teacher’s class moved to a new lesson. Joining it…');schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
     // The teacher locked Class Pointer for this class (Locks panel): leave the lesson and stop sharing at once. When it opens
@@ -1238,7 +1238,8 @@
     // Say which, instead of showing a scary error to every student of a class that simply does not use Class Pointer.
     function explainRefusal(error,forClass){
       const code=error?.code||error?.message||'database refused';
-      if(!/permission_denied/i.test(String(code))){classLink('bad','Can’t connect – your class’s lesson list could not be read ('+code+'). Retrying.');return}
+      const denied=/permission_denied/i.test(String(code));
+      if(!denied){classLink('bad','Can’t connect – your class’s lesson list could not be read ('+code+'). Retrying.');return}
       const generic=()=>{if(forClass===classId)classLink('bad','Can’t connect – the lesson list is blocked for your sign-in (PERMISSION_DENIED). Either Class Pointer is not turned on for your class ('+forClass+'), or you are signed in for a different class. Sign out and sign in again, or tell your teacher.')};
       try{
         firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+forClass+'/toolGrants/class-pointer').once('value').then(snapshot=>{

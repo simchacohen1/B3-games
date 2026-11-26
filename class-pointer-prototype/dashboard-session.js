@@ -25,11 +25,15 @@
   function armOffline(ref){return ref.child(OFFLINE).onDisconnect().set(firebase.database.ServerValue.TIMESTAMP)}
   function disarmOffline(ref){return ref.child(OFFLINE).onDisconnect().cancel()}
   async function restoreSession(ref,context,attempt){
-    if(ending||activeRef!==ref||endRequested===ref)return;
+    if(ending||activeRef!==ref||endRequested===ref||takenOver)return;
     try{
       await writeSession(ref,async()=>{
-        await armOffline(ref);
         const row=(await ref.once('value')).val();
+        const rows=(await context.ref.child('classPointerSessions').once('value')).val()||{};
+        // Another live lesson exists for this class (this one was taken over while offline): never come back as a second lesson.
+        const other=Object.entries(rows).find(([key,value])=>key!==ref.key&&liveRow(value,key,Date.now()+serverOffset));
+        if(other){markTakenOver(other[0]);return}
+        await armOffline(ref);
         if(row&&row.roomId===ref.key)await ref.child(OFFLINE).remove();
         // The record is gone (for example removed by an older copy of this page): put it back.
         else await ref.set({roomId:ref.key,teacherUid:context.user.uid,createdAt:firebase.database.ServerValue.TIMESTAMP,studentScreenSharing:sharingOn});
@@ -65,47 +69,58 @@
       if(row&&row.roomId===last&&row.teacherUid===context.user.uid&&Number.isFinite(row[OFFLINE]))await Promise.all([old.remove(),context.db.ref(permissionPath(last)).remove()]);
     }catch{/* best effort: students already ignore a lesson whose teacher stayed offline */}
   }
-  // ---------- Two lessons open for one class ----------
-  // Student pages follow only the NEWEST live lesson of their class. If a second teacher window or account opens a
-  // lesson for the same class, every student joins that one and this teacher sees an empty class ("1 of 16 joined",
-  // sharing ON but nothing reaches the students). This watcher notices a newer competing lesson, says so, and offers
-  // a one-click takeover: the lesson's start time is refreshed, so it becomes the newest again. Nothing is deleted.
-  let competeBanner=null,competeOff=null;
-  function hideCompeting(){if(competeBanner)competeBanner.hidden=true}
-  function showCompeting(ref,otherRoom,sameTeacher){
-    if(typeof document==='undefined'||!document.body)return;
-    if(!competeBanner){
-      competeBanner=document.createElement('div');competeBanner.id='cpCompetingLessonBanner';competeBanner.setAttribute('role','alert');
-      competeBanner.style.cssText='position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:2147483000;max-width:min(680px,calc(100% - 24px));display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:#fef2f2;color:#7f1d1d;border:2px solid #dc2626;box-shadow:0 8px 28px #0003;font:600 15px/1.4 system-ui,sans-serif';
-      const text=document.createElement('span');text.className='cp-compete-text';text.style.cssText='flex:1 1 300px';
-      const take=document.createElement('button');take.type='button';take.className='cp-compete-take';take.textContent='Make students join THIS lesson';
-      take.style.cssText='min-height:44px;padding:0 16px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font:800 15px system-ui;cursor:pointer';
-      competeBanner.append(text,take);document.body.appendChild(competeBanner);
-    }
-    competeBanner.querySelector('.cp-compete-text').textContent=(sameTeacher?'Another window of yours':'Another teacher account')+' has also opened Class Pointer for this class (lesson …'+otherRoom.slice(-4)+'). Students join the newest lesson, so they are connected to that one, not this one (this lesson …'+ref.key.slice(-4)+').';
-    const button=competeBanner.querySelector('.cp-compete-take');
-    button.onclick=()=>{button.disabled=true;writeSession(ref,()=>ref.update({createdAt:firebase.database.ServerValue.TIMESTAMP})).catch(()=>{}).finally(()=>{button.disabled=false})};
-    competeBanner.hidden=false;
+  // ---------- One live lesson per class ----------
+  // Student pages follow only the NEWEST live lesson of their class. Two lessons open for one class used to split it:
+  // some students joined the newer lesson while the teacher who had turned sharing ON sat in the older one.
+  // Now there is exactly one live lesson per class and the teacher who opened it last is in control:
+  //  - opening a lesson removes dead leftovers (lessons whose teacher went offline, or over 4 hours old) of this class;
+  //  - every open lesson watches the class; if a NEWER live lesson appears, this one is "taken over": it ends itself
+  //    and its window says so (event class-pointer-taken-over). It never recreates itself, so two windows cannot fight;
+  //  - a teacher taking the class back does so only by explicitly starting a lesson again.
+  const GRACE_MS=120000,MAX_AGE_MS=14400000;
+  let takenOver=false,guardOff=null,serverOffset=0;
+  const liveRow=(row,key,now)=>!!row&&row.roomId===key&&Number.isFinite(row.createdAt)&&now-row.createdAt<MAX_AGE_MS&&row.createdAt-now<60000&&!(Number.isFinite(row.teacherOfflineAt)&&now-row.teacherOfflineAt>=GRACE_MS);
+  const newerThan=(row,key,mine,mineKey)=>row.createdAt>mine.createdAt||(row.createdAt===mine.createdAt&&key>mineKey);
+  function newerLiveLesson(rows,mineKey,now){
+    const mine=rows?.[mineKey];
+    if(!mine||!Number.isFinite(mine.createdAt))return null;
+    return Object.entries(rows).filter(([key,row])=>key!==mineKey&&liveRow(row,key,now)&&newerThan(row,key,mine,mineKey)).sort((a,b)=>b[1].createdAt-a[1].createdAt)[0]||null;
   }
-  function watchCompetingLessons(context,ref){
-    try{competeOff?.()}catch{}
+  function markTakenOver(byRoom){
+    if(takenOver)return;
+    takenOver=true;
+    try{guardOff?.()}catch{}guardOff=null;
+    try{document.dispatchEvent(typeof CustomEvent==='function'?new CustomEvent('class-pointer-taken-over',{detail:{by:byRoom}}):new Event('class-pointer-taken-over'))}catch{}
+  }
+  function guardSingleLesson(context,ref){
+    try{guardOff?.()}catch{}guardOff=null;
     const sessions=context.ref.child('classPointerSessions');
-    if(typeof sessions?.on!=='function')return; // a warning is optional: it must never stop a lesson from opening
+    if(typeof sessions?.on!=='function')return; // the guard is extra safety: it must never stop a lesson from opening
     const handler=snapshot=>{
-      if(activeRef!==ref){hideCompeting();try{sessions.off('value',handler)}catch{}return}
-      const rows=snapshot.val()||{},mine=rows[ref.key],now=Date.now();
-      if(!mine||!Number.isFinite(mine.createdAt)){hideCompeting();return}
-      const other=Object.entries(rows)
-        .filter(([key,row])=>key!==ref.key&&row&&row.roomId===key&&Number.isFinite(row.createdAt)&&row.createdAt>mine.createdAt&&now-row.createdAt<14400000&&!(Number.isFinite(row.teacherOfflineAt)&&now-row.teacherOfflineAt>=120000))
-        .sort((a,b)=>b[1].createdAt-a[1].createdAt)[0];
-      if(other)showCompeting(ref,other[0],other[1].teacherUid===context.user.uid);else hideCompeting();
+      if(activeRef!==ref){try{sessions.off('value',handler)}catch{}return}
+      const other=newerLiveLesson(snapshot.val()||{},ref.key,Date.now()+serverOffset);
+      if(other)markTakenOver(other[0]);
     };
-    competeOff=()=>sessions.off('value',handler);
+    guardOff=()=>sessions.off('value',handler);
     sessions.on('value',handler,()=>{});
+  }
+  // Remove what can no longer be a live lesson of this class. Other teachers' LIVE lessons are never touched here:
+  // they end themselves when they see this newer one.
+  async function sweepDeadLessons(context,ref){
+    const sessions=context.ref.child('classPointerSessions'),rows=(await sessions.once('value')).val()||{},now=Date.now()+serverOffset,jobs=[];
+    for(const [key,row] of Object.entries(rows)){
+      if(key===ref.key||!C.validRoom(key))continue;
+      const off=Number.isFinite(row?.teacherOfflineAt)?now-row.teacherOfflineAt:null;
+      const stub=!row||typeof row!=='object'||!row.roomId;
+      const dead=stub?(off===null||off>=GRACE_MS):(row.roomId!==key||!Number.isFinite(row.createdAt)||now-row.createdAt>=MAX_AGE_MS||(off!==null&&off>=GRACE_MS));
+      if(dead)jobs.push(sessions.child(key).remove(),context.db.ref(permissionPath(key)).remove());
+    }
+    await Promise.all(jobs.map(job=>Promise.resolve(job).catch(()=>{})));
   }
   // Closing or reloading the teacher page ends the lesson for students at once (no grace period).
   if(typeof window.addEventListener==='function')window.addEventListener('pagehide',event=>{
     if(event?.persisted||!activeRef)return;
+    try{activeRef.child(OFFLINE).onDisconnect().cancel().catch(()=>{})}catch{}
     try{activeRef.remove().catch(()=>{})}catch{}
     try{activePolicyRef?.remove().catch(()=>{})}catch{}
   });
@@ -234,7 +249,10 @@
     try{await armOffline(ref)}catch(error){await ref.remove().catch(()=>{});if(activeRef===ref){activeRef=null;activePolicyRef=null}throw error}
     if(current!==revision){await Promise.all([ref.remove(),policyRef.remove(),disarmOffline(ref)]);return}
     watchConnection(context);
-    watchCompetingLessons(context,ref);
+    takenOver=false;
+    try{const offset=(await context.db.ref('.info/serverTimeOffset').once('value')).val();if(Number.isFinite(offset))serverOffset=offset}catch{}
+    await sweepDeadLessons(context,ref).catch(()=>{});
+    guardSingleLesson(context,ref);
     void clearAbandoned(context,room);
   },async requestScreenSharing(){
     const ref=activeRef;if(!ref)throw Error('Open a classroom before sending students.');
