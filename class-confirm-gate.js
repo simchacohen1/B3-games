@@ -157,7 +157,7 @@
         sel.setAttribute('aria-label', 'Choose a class');
         sel.style.cssText = 'width:100%;padding:12px;font-size:17px;border-radius:10px;border:2px solid #94a3b8';
         var ph = doc.createElement('option'); ph.value = ''; ph.textContent = 'Choose a class\u2026'; sel.appendChild(ph);
-        if (opts.allowAll) { var oa = doc.createElement('option'); oa.value = ALL; oa.textContent = 'All my classes'; sel.appendChild(oa); }
+        if (opts.allowAll) { var oa = doc.createElement('option'); oa.value = ALL; oa.textContent = 'All classes'; sel.appendChild(oa); }
         ids.forEach(function (id) {
           if (!SAFE.test(id)) return;
           var o = doc.createElement('option'); o.value = id; o.textContent = labelOf(id, names); sel.appendChild(o);
@@ -180,7 +180,12 @@
   // asks (the page reloads); resolves when the link already names a class.
   function requireInUrl(get, access, workspace, allowAll) {
     var q = (new URLSearchParams(root.location.search).get('class') || '').trim();
-    if (q) return Promise.resolve(q);
+    if (q) {
+      // A class named in the link is the teacher's class for the whole site (only if it is theirs).
+      var mine = access && (access.role === 'admin' || (access.classIds || []).indexOf(q) >= 0);
+      if (mine && (SAFE.test(q) || (allowAll && q === ALL))) { setSite(q); api.effective = q; }
+      return Promise.resolve(q);
+    }
     var base = 'b3Games/workspaces/' + (workspace || 'b3-2026') + '/classes';
     var idsP = access && access.role === 'admin'
       ? get(base).then(function (all) {
