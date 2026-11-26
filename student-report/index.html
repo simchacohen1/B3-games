@@ -224,7 +224,7 @@ function sumQuiz(hist){
 }
 
 /* Report tool -> the activity id used for class access on the Learning Island home page. */
-const TOOL_IDS={posuk:'posuk-practice-scroll',chazara:'chazara',shorashim:'shorashim',rashi:'rashi-letters',gematria:'gematria',yiddish:'yiddish',halacha:'halacha',quiz:'weekly-quiz',chayus:'chayus-meter'};
+const TOOL_IDS={posuk:'posuk-practice-scroll',chazara:'chazara',shorashim:'shorashim',rashi:'rashi-letters',gematria:'gematria',yiddish:'yiddish',halacha:'halacha',quiz:'weekly-quiz'};
 /* Tools turned on for this class, decided the same way as the Learning Island home page:
    the class's tool grants, or the site settings for the legacy ET/WT classes. */
 async function enabledToolsFor(c,legacy){
@@ -260,6 +260,12 @@ async function loadChayus(c){
   return await ChayusHistory.fetchHistory({idToken:await user.getIdToken(),classId:c.id,days:90,projectId:firebase.app().options.projectId});
  }catch(e){console.warn('Chayus Meter',e);return {error:String(e&&e.message||e)}}
 }
+async function chayusEnabledFor(c,legacy){
+ try{
+  if(legacy){const st=await api.readOnce();return api.isGameEnabledForClass(st,c.id,'chayus-meter')}
+  return window.B3StudentTools.granted(c,'chayus-meter');
+ }catch(e){console.warn('Chayus Meter access',e);return false}
+}
 function sumChayus(d,id,since){
  if(!d.chayus||d.chayus.error||!window.ChayusHistory)return null;
  return ChayusHistory.summarizeStudent(d.chayus,id,since?ChayusHistory.schoolDayOf(since):'');
@@ -274,7 +280,9 @@ async function loadClass(c){
   (async()=>{try{if(!user||!window.YiddishAPI)return null;const r=await YiddishAPI.call('teacherLoad',{classId:legacy?'':c.id,idToken:await user.getIdToken()});return r&&r.storyGranted!==false?obj(r.students):null}catch(e){console.warn('Yiddish',e);return null}})()
  ]);
  const enabled=(await enabledToolsFor(c,legacy)).filter(k=>k!=='yiddish'||yid);
- const chayus=enabled.includes('chayus')?await loadChayus(c):null;
+ /* Chayus Meter is shown in the full report only. It is not one of the counted tools in 'X of N tools used'. */
+ const chayusOn=await chayusEnabledFor(c,legacy);
+ const chayus=chayusOn?await loadChayus(c):null;
  const students=await Promise.all(ids.map(async id=>{
   const m=obj(c.members[id]);
   const [profile,att,pinfo,chz,chzEv,sh,rashi,hal,rew]=await Promise.all([
@@ -287,7 +295,7 @@ async function loadClass(c){
   const name=String(m.name||(profile&&profile.name)||(pinfo&&pinfo.name)||id);
   return {id,name,raw:{att,pinfo,chz,chzEv,sh,rashi,hal,gem:obj(gem)[id],yid:yid?yid[id]:null,rew}};
  }));
- return {classId:c.id,enabled,chayus,quizRoot:quiz,students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
+ return {classId:c.id,enabled,chayusOn,chayus,quizRoot:quiz,students:students.sort((a,b)=>a.name.localeCompare(b.name)),yiddishOk:!!yid,rewardsOk:students.some(s=>s.raw.rew!==undefined&&s.raw.rew!==null)};
 }
 function summarize(s,d){
  const days=+$('period').value,since=days?Date.now()-days*DAY:0,r=s.raw,x=extras[d.classId+'/'+s.id]||{};
@@ -398,7 +406,7 @@ function openReport(id,silent){
  h+=box('🌳 Shorashim',t.shorashim,t.shorashim?'<ul>'+li('<b>'+t.shorashim.cards+'</b> cards learned'+(+$('period').value?' (+'+t.shorashim.recent+' '+esc(pl)+')':''))+li(t.shorashim.games+' games played')+li(Math.round(t.shorashim.secs/60)+' minutes of study')+'</ul>':'');
  h+=box('<span class="he">אב</span> Rashi Letters',t.rashi,t.rashi?'<ul>'+li('On unit <b>'+t.rashi.unit+'</b> of '+t.rashi.of)+li('Accuracy: <span class="'+tone(t.rashi.acc)+'">'+(t.rashi.acc===null?'—':t.rashi.acc+'%')+'</span> over '+t.rashi.attempts+' answers')+(t.rashi.weak.length?li('Tricky: <span class="he">'+esc(t.rashi.weak.join(' '))+'</span>'):'')+'</ul>':'');
  h+=box('🔢 Gematria',t.gematria,t.gematria?'<ul>'+li('⭐ <b>'+t.gematria.stars+'</b> stars · level '+t.gematria.level)+li('Accuracy: <span class="'+tone(t.gematria.acc)+'">'+(t.gematria.acc===null?'—':t.gematria.acc+'%')+'</span>')+(t.gematria.tricky.length?li('Misses most: <span class="he">'+esc(t.gematria.tricky.join(' '))+'</span>'):'')+'</ul>':'');
- if(d.enabled.includes('chayus')||t.chayus)h+=chayusBox(d,t.chayus,pl);
+ if(d.chayusOn||t.chayus)h+=chayusBox(d,t.chayus,pl);
  if(d.yiddishOk)h+=box('Yiddish',t.yiddish,t.yiddish?'<ul>'+li('<b>'+t.yiddish.learned+'</b> words learned')+li(t.yiddish.practicing+' words still practicing')+'</ul>':'');
  h+=box('📔 Halacha',t.halacha,t.halacha?'<ul>'+li('<b>'+t.halacha.done+'</b> of '+t.halacha.of+' scrapbook sections done')+'</ul>':'');
  h+=box('📝 Weekly Quiz',t.quiz,t.quiz?'<ul>'+li('Average of completed quizzes '+esc(pl)+': <b class="'+tone(t.quiz.avg)+'">'+(t.quiz.avg===null?'—':t.quiz.avg+'%')+'</b>')+li(t.quiz.completed+' of '+t.quiz.assigned+' assigned quizzes completed')+li(t.quiz.inProgress+' in progress · '+t.quiz.notStarted+' not started')+li('Points on completed quizzes: '+t.quiz.pointsEarned+' of '+t.quiz.pointsPossible)+'</ul><div class="note">Every quiz is listed in All Quizzes below.</div>':'');

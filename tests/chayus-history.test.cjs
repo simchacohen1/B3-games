@@ -126,7 +126,8 @@ test('dashboard page and student report are wired up', () => {
   assert.match(page, /recentDays\(history,r\.id,day,7\)/, 'last 7 days per student');
   const report = read('student-report/index.html');
   assert.match(report, /chayus-meter\/history\.js/);
-  assert.match(report, /chayus:'chayus-meter'/);
+  assert.match(report, /chayusEnabledFor\(c,legacy\)/);
+  assert.doesNotMatch(report, /TOOL_IDS=\{[^}]*chayus/, 'not one of the counted tools');
   assert.match(report, /chayusBox\(d,t\.chayus,pl\)/);
   assert.match(report, /\['Chayus Meter',x\.day/);
   assert.match(read('shared/home-tool-registry.js'), /chayus-meter\/teacher\.html/);
