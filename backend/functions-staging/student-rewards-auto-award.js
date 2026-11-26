@@ -698,6 +698,7 @@ function classRewardCooldown(item,live,completed){
 function modeVoterCount(voters){return Object.values(voters||{}).filter(Boolean).length;}
 function maxModeTotal(modes){return modes.reduce((m,x)=>Math.max(m,Number(x.total)||0),0);}
 
+const NO_STUDENT_CAP=Number.MAX_SAFE_INTEGER;
 function classRewardGoalFromRoot(root,studentId,classId,rewardId){
   const item=root?.classRewardCatalog?.[rewardId];
   if(!item || item.active===false) return null;
@@ -705,7 +706,7 @@ function classRewardGoalFromRoot(root,studentId,classId,rewardId){
   const live=root?.classRewardRounds?.[classId]?.[rewardId]||{};
   const perStudentCost=Math.max(1,Number(live.perStudentCost)||Number(item.costPerStudent)||100);
   const goalPoints=Math.max(1,Number(live.goalPoints)||perStudentCost*count);
-  const studentCap=Math.max(1,Number(live.maxPerStudent)||Math.min(goalPoints,Math.ceil((goalPoints/count)*2)));
+  const studentCap=NO_STUDENT_CAP; // no per-student limit: a student may give as many of his own points as he has
   const settingsAvailable=root?.settings?.classRewardAvailability?.[rewardId];
   const available=item.available!==false && settingsAvailable!==false;
   const modeVoting=isGimkitReward(item,rewardId);
@@ -859,7 +860,7 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
     let live=cur&&typeof cur==='object'?{...cur}:{};
     const perStudentCost=Math.max(1,Number(live.perStudentCost)||goal.perStudentCost);
     const goalPoints=Math.max(1,Number(live.goalPoints)||goal.goalPoints);
-    const maxPerStudent=Math.max(1,Number(live.maxPerStudent)||goal.studentCap);
+    const maxPerStudent=Number.MAX_SAFE_INTEGER; // no per-student limit
     const cooldownDays=Math.max(0,Number(item.cooldownDays)||0);
     const now=Date.now();
 

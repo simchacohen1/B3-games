@@ -28,21 +28,21 @@ test('fictional teacher and two students: live votes, changes, privacy, reconnec
   }
   await teacher.addScriptTag({url:base+'/poll-core.js'});await teacher.addScriptTag({url:base+'/poll.js'});
   await teacher.evaluate(()=>ClassPointerPoll.open());await teacher.getByRole('button',{name:'Send',exact:true}).click();
-  await expect(a.getByRole('button',{name:'👍',exact:true})).toBeVisible();await expect(a.getByPlaceholder(/Question/)).toHaveCount(0);
+  await expect(a.getByRole('button',{name:'👍 Yes',exact:true})).toBeVisible();await expect(a.getByPlaceholder(/Question/)).toHaveCount(0);
   await expect(a.locator('progress')).toHaveCount(0);
-  await a.getByRole('button',{name:'👍',exact:true}).click();
+  await a.getByRole('button',{name:'👍 Yes',exact:true}).click();
   // Once answered the poll shrinks to a small corner card that no longer blocks the page.
-  await expect(a.getByText('✅ Answer received: 👍',{exact:true})).toBeVisible();
+  await expect(a.getByText('✅ You picked: 👍 Yes',{exact:true})).toBeVisible();
   expect(await a.locator('dialog.cp-poll').evaluate(d=>d.matches(':modal'))).toBe(false);
   await a.getByRole('button',{name:'Change answer',exact:true}).click();
-  await a.getByRole('button',{name:'👎',exact:true}).click();await expect(a.getByText('✅ Answer received: 👎',{exact:true})).toBeVisible();
-  await b.getByRole('button',{name:'👍',exact:true}).click();
-  await expect(teacher.getByText(/Answered \(2\)/)).toBeVisible();await expect(teacher.getByText(/Hasn’t answered \(1\).*OFFLINE/)).toBeVisible();
+  await a.getByRole('button',{name:'👎 No',exact:true}).click();await expect(a.getByText('✅ You picked: 👎 No',{exact:true})).toBeVisible();
+  await b.getByRole('button',{name:'👍 Yes',exact:true}).click();
+  await expect(teacher.getByText('Students (2 of 3 answered)')).toBeVisible();await expect(teacher.locator('.cp-poll-roster li',{hasText:'OFFLINE'})).toContainText('waiting');await expect(teacher.locator('.cp-poll-roster li',{hasText:'STUDENT B'})).toContainText('👍 Yes');await expect(teacher.locator('.cp-poll-roster li',{hasText:'STUDENT A'})).toContainText('👎 No');
   await expect(teacher.locator('progress').nth(0)).toHaveAttribute('value','1');await expect(teacher.locator('progress').nth(1)).toHaveAttribute('value','1');
   await teacher.getByRole('checkbox',{name:'Show results to class'}).check();await expect(a.locator('progress')).toHaveCount(2);
   await teacher.getByRole('checkbox',{name:'Show results to class'}).uncheck();await expect(a.locator('progress')).toHaveCount(0);
-  await a.evaluate(()=>ClassPointerPoll.reset());await teacher.evaluate(()=>document.dispatchEvent(new Event('classpointer:roster')));await expect(a.getByText('✅ Answer received: 👎',{exact:true})).toBeVisible();
-  await teacher.getByRole('button',{name:'End poll',exact:true}).click();await expect(a.getByRole('button',{name:'👍',exact:true})).toBeDisabled();
+  await a.evaluate(()=>ClassPointerPoll.reset());await teacher.evaluate(()=>document.dispatchEvent(new Event('classpointer:roster')));await expect(a.getByText('✅ You picked: 👎 No',{exact:true})).toBeVisible();
+  await teacher.getByRole('button',{name:'End poll',exact:true}).click();await expect(a.getByRole('button',{name:'👍 Yes',exact:true})).toBeDisabled();
   await a.getByRole('button',{name:'Close',exact:true}).click();await teacher.evaluate(()=>document.dispatchEvent(new Event('classpointer:roster')));await expect(a.getByRole('dialog')).not.toBeVisible();
   await teacher.getByRole('button',{name:'New poll',exact:true}).click();await teacher.getByRole('button',{name:'Custom',exact:true}).click();
   await teacher.getByLabel('Question (optional)',{exact:true}).fill('Choose a color');await teacher.getByLabel('Answer 1',{exact:true}).fill('Red');
@@ -76,8 +76,8 @@ test('auto-close timer: default 1 minute, countdown, shrinks after answering, cl
   await teacher.getByLabel('Auto-close timer').selectOption('30');
   await teacher.getByRole('button',{name:'Send',exact:true}).click();
   await expect(a.getByRole('timer')).toContainText('0:30');
-  await a.getByRole('button',{name:'👍',exact:true}).click();
-  await expect(a.getByText('✅ Answer received: 👍',{exact:true})).toBeVisible();
+  await a.getByRole('button',{name:'👍 Yes',exact:true}).click();
+  await expect(a.getByText('✅ You picked: 👍 Yes',{exact:true})).toBeVisible();
   await context.clock.fastForward(10000);await expect(a.getByRole('timer')).toContainText('0:2');
   await context.clock.fastForward(21000);
   await expect(teacher.getByRole('button',{name:'New poll',exact:true})).toBeVisible();
@@ -86,6 +86,6 @@ test('auto-close timer: default 1 minute, countdown, shrinks after answering, cl
   await context.clock.fastForward(9000);await expect(b.locator('dialog.cp-poll')).not.toBeVisible();await expect(a.locator('dialog.cp-poll')).not.toBeVisible();
   await teacher.getByRole('button',{name:'New poll',exact:true}).click();await teacher.getByLabel('Auto-close timer').selectOption('0');
   await teacher.getByRole('button',{name:'Send',exact:true}).click();
-  await context.clock.fastForward(600000);await expect(b.getByRole('button',{name:'👍',exact:true})).toBeEnabled();
+  await context.clock.fastForward(600000);await expect(b.getByRole('button',{name:'👍 Yes',exact:true})).toBeEnabled();
   await context.close();
 });

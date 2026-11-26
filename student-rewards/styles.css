@@ -107,3 +107,20 @@
 .gimkit-mode-bar{height:11px;background:#e5e1f4;border-radius:999px;overflow:hidden}.gimkit-mode-bar i{display:block;height:100%;background:linear-gradient(90deg,#6849df,#9a82f0);border-radius:999px}
 .gimkit-mode-choice>b{font-size:11px;color:#5139bd;white-space:nowrap}.gimkit-mode-note{margin:10px 0 0;font-size:10px;line-height:1.45;color:#667085}.gimkit-last-winner{margin:8px 0 0;font-size:11px;color:#0f7657}
 @media(max-width:700px){.gimkit-mode-choice{grid-template-columns:24px 1fr}.gimkit-mode-choice>b{grid-column:2}.gimkit-mode-choice-main{grid-template-columns:1fr}.gimkit-mode-race-head{align-items:flex-start;flex-direction:column}}
+
+/* Prize Store: simple, big, clear */
+.store-balance{font-size:clamp(1.6rem,6vw,2.4rem)}
+.store-balance b{background:#fff3c4;border-radius:14px;padding:2px 14px;color:#7a4d00}
+.reward-store-section .reward-card .cost{font-size:1.25rem;font-weight:800}
+.reward-status{font-weight:700;margin:6px 0}
+.reward-status.ok{color:#117a3d}
+.reward-status.wait{color:#8a5a00}
+.bigbtn{width:100%;min-height:56px;font-size:1.15rem;font-weight:800;border-radius:16px}
+.class-goal-progress{height:22px;border-radius:12px}
+.class-goal-numbers .need{font-size:1.1rem;flex-basis:100%}
+.class-contribute{display:flex;gap:10px;align-items:stretch}
+.class-contribute input{min-height:56px;font-size:1.15rem;width:7rem}
+.class-contribute .bigbtn{flex:1}
+.reward-store-section .rewardgrid,.reward-store-section .class-goal-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.class-goal-card .class-goal-top strong{white-space:nowrap}
+.class-contribute input{flex:0 0 6.5rem;width:6.5rem;padding:0 10px}
