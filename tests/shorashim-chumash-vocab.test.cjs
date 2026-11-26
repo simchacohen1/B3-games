@@ -18,7 +18,7 @@ const ctxFor=(unit,cards={})=>{
   const ctx=vm.createContext({window:g.window,currentTrack:'shorashim',learningPerek:unit,bookletWeek:1,student:()=>s,
     db:{catalog:{shorashim:[{id:'p18',perek:18,front:'x',english:'x'}]}},
     isStudentAvailable:i=>!!i&&!i.hidden,keyFor:(t,id)=>t+':'+id,splitKey:k=>{const i=k.indexOf(':');return [k.slice(0,i),k.slice(i+1)];}});
-  ['bookletCatalog','chumashCatalog','getItem','visibleCatalog','learningCatalog','unitKeyOf','unitLabels','studentUnits','currentLearningUnit'].forEach(n=>vm.runInContext(fn(n),ctx));
+  ['bookletCatalog','chumashCatalog','chumashExtra','getItem','visibleCatalog','learningCatalog','unitKeyOf','unitLabels','studentUnits','currentLearningUnit'].forEach(n=>vm.runInContext(fn(n),ctx));
   return ctx;
 };
 
