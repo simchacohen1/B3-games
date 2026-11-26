@@ -37,7 +37,7 @@ test('reminder appears for an unused whiteboard and never closes it by itself',(
   // The only place the reminder closes the whiteboard is the teacher's own click on its Stop button.
   const stops=block.match(/stopBtn\.click\(\)/g)||[];
   assert.equal(stops.length,1);
-  assert.match(block,/reminderStop\.addEventListener\('click',\(\)=>\{reminder\.hidden=true;stopBtn\.click\(\)\}\)/);
+  assert.match(block,/reminderStop\.addEventListener\('click',\(\)=>\{reminder\.hidden=true;if\(screenLive\)tellStudents\(false\);stopBtn\.click\(\)\}\)/);
   assert.match(css,/\.cp-board-reminder\{[^}]*z-index:2147483647/);   // above the tabs row (2147483646), so its status text cannot show through
   assert.match(css,/\.cp-board-reminder\{[^}]*background:#fff7ed/);   // solid
   assert.match(css,/\.cp-board-reminder\{[^}]*bottom:16px;right:16px/);   // bottom-right corner: the top bar stays free
