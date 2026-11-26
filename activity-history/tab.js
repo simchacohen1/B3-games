@@ -14,7 +14,7 @@
     if (document.getElementById('b3HistoryTabs')) return;
     var style = document.createElement('style');
     style.textContent =
-      '#b3HistoryTabs{display:flex;gap:6px;padding:8px 12px;background:#0f172a;position:sticky;top:0;z-index:2147482000;font:700 14px system-ui,-apple-system,"Segoe UI",sans-serif}' +
+      '#b3HistoryTabs{display:flex;gap:6px;padding:8px 12px;background:#0f172a;font:700 14px system-ui,-apple-system,"Segoe UI",sans-serif}' +
       '#b3HistoryTabs button{border:1px solid #475569;background:transparent;color:#e2e8f0;border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}' +
       '#b3HistoryTabs button[aria-selected=true]{background:#f8fafc;color:#0f172a;border-color:#f8fafc}' +
       '#b3HistoryFrame{display:none;width:100%;border:0;background:#f1f5f9;height:calc(100vh - 52px)}' +
