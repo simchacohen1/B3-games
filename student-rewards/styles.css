@@ -121,3 +121,6 @@
 .class-contribute{display:flex;gap:10px;align-items:stretch}
 .class-contribute input{min-height:56px;font-size:1.15rem;width:7rem}
 .class-contribute .bigbtn{flex:1}
+.reward-store-section .rewardgrid,.reward-store-section .class-goal-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.class-goal-card .class-goal-top strong{white-space:nowrap}
+.class-contribute input{flex:0 0 6.5rem;width:6.5rem;padding:0 10px}
