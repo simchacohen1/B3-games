@@ -91,7 +91,7 @@
         if (tr !== null) parts.push('Translation ' + pct(tr) + '%');
         if (cp !== null) parts.push('Questions ' + pct(cp) + '%');
         var disputed = a.hebrewDisputeStatus && a.hebrewDisputeStatus !== 'resolved';
-        var status = disputed ? 'Disputed' : parts.length ? 'Scored' : 'Waiting for score';
+        var status = disputed ? 'Disputed' : parts.length ? 'Scored' : 'Not scored yet';
         out.push(mk(who, 'posuk', t, posukLabel(key), parts.join(' · ') || '—', status, { key: key + '/' + tid, posukKey: key }));
       });
     });
@@ -137,9 +137,10 @@
       if (!x) return;
       var when = Date.parse(day + 'T12:00:00');
       var points = Number(x.points) || 0;
-      out.push(mk(who, 'chayus', isFinite(when) ? when : 0, day,
+      var mins = Number(x.minutes) || 0;
+      out.push(mk(who, 'chayus', isFinite(when) ? when : 0, (mins % 1 === 0 ? mins : mins.toFixed(1)) + ' counted voice minutes',
         (x.level ? 'Level ' + x.level + (x.levelName ? ' · ' + x.levelName : '') : 'No level reached') + ' · ' + points + (points === 1 ? ' point' : ' points'),
-        x.level ? 'Level reached' : 'Recorded', { key: day, detail: (Number(x.minutes) || 0) + ' counted voice minutes' }));
+        x.level ? 'Level reached' : 'Recorded', { key: day }));
     });
     return out;
   }
@@ -151,7 +152,7 @@
       (z.attempts || []).forEach(function (a, i) {
         if (a.status === 'not_started') return;
         var done = a.status === 'completed';
-        out.push(mk(who, 'quiz', num(a.date) || 0, z.title || 'Weekly Quiz',
+        out.push(mk(who, 'quiz', num(a.date) || num(z.lastDate) || num(z.date) || 0, z.title || 'Weekly Quiz',
           done ? a.correct + ' / ' + a.total + ' (' + a.pct + '%)' : (a.answered || 0) + ' of ' + a.total + ' answered',
           done ? 'Completed' : 'In progress', { key: z.key + '/' + i }));
       });

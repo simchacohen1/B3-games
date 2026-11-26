@@ -12,7 +12,7 @@ test('posuk attempts become one row per try with the report scoring', () => {
   assert.equal(a.what, 'Perek 3:4');
   assert.equal(a.result, 'Reading 90% · Translation 80%');
   assert.equal(a.status, 'Scored');
-  assert.equal(rows.find(r => r.when === 2000).status, 'Waiting for score');
+  assert.equal(rows.find(r => r.when === 2000).status, 'Not scored yet');
 });
 
 test('chazara skips unsaved events and marks removed/rejected', () => {

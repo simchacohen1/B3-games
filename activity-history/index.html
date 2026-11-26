@@ -82,7 +82,7 @@ tbody tr.row:focus{outline:2px solid #2563eb;outline-offset:-2px}
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../student-report/quiz-history.js?v=20261026-simple-csv"></script>
 <script src="../chayus-meter/history.js?v=20261126-history"></script>
-<script src="core.js?v=20261126-activity"></script>
+<script src="core.js?v=20261126-activity2"></script>
 <script>
 (function(){
 'use strict';
@@ -190,7 +190,7 @@ async function loadAll(){
 
 /* ---------- Drawing ---------- */
 const fmtTime=r=>{if(!r.when)return '—';const d=new Date(r.when);return r.tool==='chayus'?d.toLocaleDateString():d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})};
-function pillClass(s){return /^(scored|counted|learned|completed|approved|posted|level reached|delivered|fulfilled|recorded)$/i.test(s)?'g':/wait|pending|progress|disputed/i.test(s)?'y':/reject|removed|undone|declin|cancel|refund/i.test(s)?'r':''}
+function pillClass(s){return /^(scored|counted|learned|completed|approved|posted|level reached|delivered|fulfilled|recorded)$/i.test(s)?'g':/wait|pending|progress|disputed|not scored/i.test(s)?'y':/reject|removed|undone|declin|cancel|refund/i.test(s)?'r':''}
 function filters(){return {student:$('fStudent').value,classId:$('fClass').value,tool:$('fTool').value||TOOL_LIST.join(','),from:$('fFrom').value,to:$('fTo').value,text:$('fText').value}}
 function fillSelects(){
  const keepS=$('fStudent').value,keepC=$('fClass').value;
