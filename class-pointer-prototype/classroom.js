@@ -249,7 +249,7 @@ document.addEventListener('class-pointer-teacher-signed-out',()=>{
 });
 // Another teacher window opened a newer lesson for this class: students moved to it and this lesson ends (one live lesson per class).
 let takenOverNow=false,takenOverNotice=null;
-function showTakenOver(){
+function showTakenOver(detail){
   if(!takenOverNotice){
     takenOverNotice=document.createElement('div');takenOverNotice.id='cpTakenOverNotice';takenOverNotice.setAttribute('role','alert');
     takenOverNotice.style.cssText='position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;background:#0f172acc;font:16px/1.5 system-ui,sans-serif';
@@ -260,12 +260,15 @@ function showTakenOver(){
     back.addEventListener('click',()=>{back.disabled=true;takenOverNow=false;endPromise.then(()=>{takenOverNotice.hidden=true;back.disabled=false;return startClass()})});
     box.append(h,p,back);takenOverNotice.appendChild(box);document.body.appendChild(takenOverNotice);
   }
-  takenOverNotice.querySelector('.cp-taken-text').textContent='Another Class Pointer window (or teacher) opened this class after you, so the students moved to that lesson and this one has ended. Only one lesson can be live for a class at a time.';
+  const ownerBack=detail&&detail.byLead===true&&detail.mineLead===false;
+  takenOverNotice.querySelector('h2').textContent=ownerBack?'The class’s own teacher started their lesson':'This lesson was taken over';
+  takenOverNotice.querySelector('.cp-taken-text').textContent=ownerBack?'Students always see their own teacher’s lesson, so your lesson in this class has ended and nothing you share reaches them. You can open it again after the teacher ends their lesson.':'Another Class Pointer window (or teacher) opened this class after you, so the students moved to that lesson and this one has ended. Only one lesson can be live for a class at a time.';
+  takenOverNotice.querySelector('button').hidden=ownerBack;
   takenOverNotice.hidden=false;
 }
-document.addEventListener('class-pointer-taken-over',()=>{
+document.addEventListener('class-pointer-taken-over',event=>{
   if(!isTeacher||!started&&!openingClass)return;
-  takenOverNow=true;endClass();showTakenOver();
+  takenOverNow=true;endClass();showTakenOver(event&&event.detail);
 });
 document.addEventListener('class-pointer-teacher-restored',()=>{
   if(!isTeacher)return;activityTeacherAuthorized=true;

@@ -130,7 +130,7 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261125-wb1"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=20261126-single2"/,'classroom');
+ assert.match(html,/"classroom\.js\?v=20261126-lead1"/,'classroom');
  assert.match(html,/"pdf-mode\.js\?v=20261125-wb3"/,'pdf-mode');
 });
 
