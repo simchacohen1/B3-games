@@ -100,4 +100,41 @@ async function report({ store, award, studentId, reportedSeconds = null, nowMs =
   };
 }
 
-module.exports = { report, levelFor, nyDay, requestIdFor, allowedGain, LEVEL_MINUTES, LEVEL_NAMES, MAX_LEVEL, MAX_POINTS_PER_DAY, MAX_DAY_SECONDS, SOURCE };
+// Read-only history for the teacher dashboard and the full student report: for each student in the class, the
+// counted seconds, level and points recorded for each of the last `days` school days. Nothing is written.
+const MAX_HISTORY_DAYS = 90;
+const DEFAULT_HISTORY_DAYS = 30;
+function dayKeys(nowMs, count) {
+  const [y, m, d] = nyDay(nowMs).split('-').map(Number);
+  const out = [];
+  for (let k = 0; k < count; k++) out.push(new Date(Date.UTC(y, m - 1, d - k)).toISOString().slice(0, 10));
+  return out;
+}
+async function classHistory({ get, students, days = DEFAULT_HISTORY_DAYS, nowMs = Date.now() }) {
+  const asked = Math.floor(Number(days));
+  const count = Math.min(MAX_HISTORY_DAYS, Math.max(1, Number.isFinite(asked) && asked > 0 ? asked : DEFAULT_HISTORY_DAYS));
+  const keys = dayKeys(nowMs, count);
+  const wanted = new Set(keys);
+  const ids = Object.keys(students || {}).filter(id => /^[A-Za-z0-9_-]{1,100}$/.test(id)).slice(0, 300);
+  const out = {};
+  await Promise.all(ids.map(async id => {
+    const rows = (await get(`${SR}/chayusDaily/${safeId(id)}`)) || {};
+    const byDay = {};
+    for (const [day, record] of Object.entries(rows)) {
+      if (!wanted.has(day) || !record || typeof record !== 'object') continue;
+      const seconds = Math.min(MAX_DAY_SECONDS, Math.max(0, Number(record.countedSeconds) || 0));
+      const level = Math.min(MAX_LEVEL, levelFor(seconds));
+      byDay[day] = {
+        countedSeconds: Math.round(seconds * 10) / 10,
+        minutes: Math.round(seconds / 6) / 10,
+        level,
+        levelName: level ? LEVEL_NAMES[level - 1] : '',
+        points: Math.min(MAX_LEVEL, Math.max(0, Math.floor(Number(record.awardedLevel) || 0)))
+      };
+    }
+    out[id] = { name: String((students[id] && students[id].name) || id), days: byDay };
+  }));
+  return { today: keys[0], days: keys, maxPoints: MAX_POINTS_PER_DAY, levelNames: LEVEL_NAMES.slice(), levelMinutes: LEVEL_MINUTES.slice(), students: out };
+}
+
+module.exports = { report, classHistory, dayKeys, levelFor, nyDay, requestIdFor, allowedGain, LEVEL_MINUTES, LEVEL_NAMES, MAX_LEVEL, MAX_POINTS_PER_DAY, MAX_DAY_SECONDS, SOURCE };
