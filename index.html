@@ -420,6 +420,8 @@ body > .subtitle::after {
 <script src="follow-teacher/student.js?v=20261020-follow-pointer1" defer></script>
 <script src="guest-mode.js?v=20261011-guest" defer></script>
 <script src="site-settings.js?v=20261020-demo-student" defer></script>
+<script src="owner-teacher-view.js?v=20261126-siteclass" defer></script>
+<script src="teacher-site-class.js?v=20261126-siteclass" defer></script>
 <script src="school-scope.js?v=20261107" defer></script>
 <script>
 // Sync to Nigri card: hidden unless the owner, or a teacher whose school has "Syncs to Nigri" on (school-scope.js).
@@ -2691,7 +2693,7 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   // ---- Owner home bar: class picker + padlock that opens Class Access in place.
   const homeClassBarAllowed=window.top===window&&pageParams.get("adminPage")!=="1"&&!isStudentPreview;
-  let homeClassUnsub=null,homeClassNames={et:"ET",wt:"WT"};
+  let homeClassUnsub=null,homeClassNames={et:"B3 ET",wt:"B3 WT"};
   let homeClassId=(()=>{try{return localStorage.getItem("b3ControlClass")||"et"}catch(e){return "et"}})();
   function homeClassAccessUrl(){return "admin.html?tab=access&embed=1&class="+encodeURIComponent(homeClassId);}
   function syncHomeClassAccess(){
@@ -2709,18 +2711,29 @@ document.addEventListener("DOMContentLoaded",function(){
     if(homeClassUnsub)return;
     const ref=db.ref("b3Games/workspaces/"+workspaceId+"/classes");
     const applyList=list=>{
-      homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"||c.id==="wt"?c.id.toUpperCase():c.name);
+      homeClassNames={};list.forEach(c=>homeClassNames[c.id]=c.id==="et"?"B3 ET":c.id==="wt"?"B3 WT":c.name);
+      // The class this owner chose last for the whole site (all teacher pages open on it).
+      try{const u=firebase.auth().currentUser,saved=window.B3SiteClass&&u?B3SiteClass.get(u.uid):"";if(saved&&homeClassNames[saved])homeClassId=saved;}catch(err){}
       if(!homeClassNames[homeClassId])homeClassId=list[0].id;
       const select=el("homeClassSelect");select.innerHTML="";
       list.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=homeClassNames[c.id];select.appendChild(o);});
       select.value=homeClassId;
       syncHomeClassAccess();
     };
-    const onValue=snapshot=>{
+    // The owner teaches his own classes: the home class picker lists only those (all of them only if none are assigned yet).
+    const ownClasses=async list=>{
+      try{
+        const view=window.B3OwnerTeacherView,t=view?await view.readTeaching(db,workspaceId,firebase.auth().currentUser):null;
+        const mine=t&&t.classIds.length?view.narrow(list,t.classIds):[];
+        if(mine.length)return mine;
+      }catch(err){}
+      return list;
+    };
+    const onValue=async snapshot=>{
       const rows=snapshot.val()||{};
       const all=Object.entries(rows).filter(([id,row])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&row&&row.active!==false);
       all.sort(([a,ar],[b,br])=>{const p=id=>id==="et"?0:id==="wt"?1:2;return p(a)-p(b)||String(ar.name||a).localeCompare(String(br.name||b));});
-      applyList(all.length?all.map(([id,row])=>({id,name:String(row.name||id)})):[{id:"et",name:"ET"},{id:"wt",name:"WT"}]);
+      applyList(all.length?await ownClasses(all.map(([id,row])=>({id,name:String(row.name||id)}))):[{id:"et",name:"ET"},{id:"wt",name:"WT"}]);
     };
     // Some databases (the staging one) allow reading one class at a time but not the whole list: then use the admin's own classes.
     const onError=async e=>{
@@ -2752,6 +2765,7 @@ document.addEventListener("DOMContentLoaded",function(){
   el("homeClassSelect").addEventListener("change",e=>{
     homeClassId=e.target.value;
     try{localStorage.setItem("b3ControlClass",homeClassId)}catch(err){}
+    try{const u=firebase.auth().currentUser;if(window.B3SiteClass&&u)B3SiteClass.set(u.uid,homeClassId);}catch(err){}
     syncHomeClassAccess();
   });
   el("homeClassLock").addEventListener("click",openHomeClassAccess);

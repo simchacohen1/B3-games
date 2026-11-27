@@ -407,13 +407,11 @@ async function load(){
 function renderTeacherViewBar(){
  const mine=B3OwnerTeacherView.teachingClassIds(teacherData[key(OWNER)]),names=mine.map(id=>classData[id]?.name||id);
  q("teacherViewInfo").textContent=mine.length
-  ?"You also teach: "+names.join(", ")+". Teacher view shows only these classes. You stay signed in, and can come back here any time."
-  :"Do you teach classes too? Open your school, add your own email ("+OWNER+") as a teacher, and assign your classes. Then you can switch to Teacher view here without signing out.";
- q("teacherViewGo").disabled=!mine.length;q("teacherViewGo").style.opacity=mine.length?"1":".5";
+  ?"You also teach: "+names.join(", ")+". Every teacher page shows only these classes. Owner Admin and Teacher Tools still show every class."
+  :"Do you teach classes too? Open your school, add your own email ("+OWNER+") as a teacher, and assign your classes. Then every teacher page shows only your classes.";
+ q("teacherViewGo").hidden=true;
 }
-q("teacherViewGo").onclick=()=>B3OwnerTeacherView.toTeacherView();
-// Being in Owner Admin means owner mode (not when shown inside another page).
-if(window.self===window.top)B3OwnerTeacherView.setMode("owner");
+
 q("addTeacher").onclick=async()=>{const email=q("teacherEmail").value.trim().toLowerCase(),name=q("teacherName").value.trim();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){q("status").textContent="Enter a valid teacher email.";return;}const ref=db.ref("b3Games/workspaces/"+WS+"/teacherInvites/"+key(email)),existing=(await ref.once("value")).val();if(existing){q("status").textContent=schoolData[existing.schoolId]&&existing.schoolId!==nav.school?"That teacher is already in "+schoolData[existing.schoolId].name+".":"Teacher already exists.";return;}const schoolId=nav.school;if(!schoolData[schoolId]){q("status").textContent="Choose the teacher's school.";return;}await ref.set({email:email,name:name||email,role:"teacher",active:false,updatedAt:firebase.database.ServerValue.TIMESTAMP,schoolId:schoolId});q("teacherEmail").value="";q("teacherName").value="";q("status").textContent="Teacher added. They can sign in once you give them a class.";await load()};
 q("addPrincipal").onclick=async()=>{
  const email=q("principalEmail").value.trim().toLowerCase(),name=q("principalName").value.trim();

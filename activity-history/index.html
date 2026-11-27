@@ -116,7 +116,7 @@ async function classesFor(acc,u){
   ids=(acc.classIds||[]).filter(Boolean);
   if(!ids.length&&u){const row=obj(await get('b3Games/workspaces/'+WS+'/teachers/'+u.uid));ids=Object.keys(obj(row.classIds)).filter(id=>id!=='*'&&row.classIds[id]===true)}
  }
- return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:String(all[id].name||id.toUpperCase()),members:obj(all[id].members),toolGrants:obj(all[id].toolGrants)}));
+ return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:id==='et'?'B3 ET':id==='wt'?'B3 WT':String(all[id].name||id.toUpperCase()),members:obj(all[id].members),toolGrants:obj(all[id].toolGrants)}));
 }
 async function chayusOn(c,legacy){
  try{

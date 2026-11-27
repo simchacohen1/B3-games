@@ -15,6 +15,9 @@
   var homeFollow = null, homePointer = null, modal = null, modalTitle = null, modalClassSelect = null;
   var accessFrame = null, followFrame = null, activePanel = '';
   var classes = [], selected = '', identity = 0, authorized = false;
+  // The one class for the whole site (teacher-site-class.js): remembered per teacher account.
+  var accountId = '', allMode = false;
+  function SC() { return window.B3SiteClass || null; }
   var lastFollowClass = '';
   // A button pressed before any class is chosen waits here ('access', 'follow'
   // or 'pointer') while the panel asks "Which class?" (issue 769).
@@ -31,6 +34,7 @@
     if (content !== undefined) node.textContent = content;
     return node;
   }
+  function siteLabel(id, name) { var sc = SC(); return sc ? sc.label(id, name) : (id==='et'?'B3 ET':id==='wt'?'B3 WT':String(name||id)); }
   function currentClass() {
     var homeSelect = document.getElementById('homeClassSelect');
     if (homeFollow && homeSelect && ID.test(homeSelect.value)) return homeSelect.value;
@@ -121,11 +125,34 @@
     });
   }
   function getPreferred() {
+    var sc = SC(), saved = sc && accountId ? sc.get(accountId) : '';
+    if (saved && saved !== 'all') return saved;
     try { return localStorage.getItem('b3ControlClass') || ''; } catch (_) { return ''; }
   }
   function remember(id) {
-    selected = id;
+    selected = id; allMode = false;
+    var sc = SC(); if (sc && accountId) sc.set(accountId, id);
     try { localStorage.setItem('b3ControlClass', id); } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('b3-site-class-change', {detail:{classId:id}})); } catch (_) {}
+  }
+  // The class button at the top of every teacher page. Switching changes it everywhere: it is
+  // remembered, and a class page reloads on the new class (a link with ?class= opens that class).
+  function chooseSiteClass(id) {
+    var sc = SC();
+    if (id === 'all') {
+      if (!sc || !accountId) return;
+      selected = ''; allMode = true; sc.set(accountId, 'all');
+      try { window.dispatchEvent(new CustomEvent('b3-site-class-change', {detail:{classId:'all'}})); } catch (_) {}
+      syncPointerButtons();
+    } else {
+      if (!classes.some(function(row) { return row.id === id; })) return;
+      updatePanelClass(id);
+    }
+    var hasClass = new URLSearchParams(location.search).get('class');
+    if (sc && (hasClass || sc.isTeacherPage(location.pathname, location.search))) {
+      var next = sc.relink(location.href, id);
+      if (next && next !== location.href) location.replace(next);
+    }
   }
   function chosenLabel() {
     var row = classes.find(function(c) { return c.id === currentClass(); });
@@ -316,7 +343,7 @@
     document.body.appendChild(bar);
     setupMove(grip);
     setInterval(dock, 500); dock();
-    select.addEventListener('change', function () { updatePanelClass(select.value); });
+    select.addEventListener('change', function () { if (select.value) chooseSiteClass(select.value); });
     lock.addEventListener('click', function(){ act('access'); });
     follow.addEventListener('click', function(){ act('follow'); });
     pointer.addEventListener('click', function(){ act('pointer'); });
@@ -348,14 +375,26 @@
       openWindow(url,'_blank',true);
     });
   }
+  // Teacher Home's own class picker (or another tab's choice) changes the class here too.
+  window.addEventListener('b3-site-class-change', function(e) {
+    var id = e && e.detail && e.detail.classId;
+    if (!authorized || !id) return;
+    if (id === 'all') { selected = ''; allMode = true; }
+    else if (classes.some(function(row) { return row.id === id; })) { selected = id; allMode = false; }
+    else return;
+    if (select) select.value = allMode ? 'all' : selected;
+    if (modalClassSelect) modalClassSelect.value = selected;
+    syncPointerButtons();
+  });
   function syncClassPicker() {
     if (!select) return;
     select.replaceChildren();
-    var blank = el('option','','Choose a class\u2026'); blank.value=''; select.appendChild(blank);
+    if (!selected && !allMode) { var blank = el('option','','Choose a class\u2026'); blank.value=''; select.appendChild(blank); }
+    var everyone = el('option','','All my classes'); everyone.value='all'; select.appendChild(everyone);
     classes.forEach(function(row){
       var opt = el('option','',row.name); opt.value=row.id;select.appendChild(opt);
     });
-    select.value = selected;
+    select.value = allMode ? 'all' : selected;
     if (modalClassSelect) {
       modalClassSelect.replaceChildren();
       var blank2 = el('option','','Choose a class\u2026'); blank2.value=''; modalClassSelect.appendChild(blank2);
@@ -415,7 +454,7 @@
   }
   function reset() {
     teacherAnnotate(false);
-    authorized = false; identity++; classes = []; selected = '';
+    authorized = false; identity++; classes = []; selected = ''; allMode = false; accountId = '';
     if (bar) bar.hidden = true;
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
     if (homePointer) {homePointer.remove();homePointer=null;}
@@ -436,11 +475,11 @@
       if (access.role === 'admin') {
         var all = (await db.ref('b3Games/workspaces/'+workspace+'/classes').once('value')).val() || {};
         rows = Object.keys(all).filter(function(id){return ID.test(id) && all[id] && all[id].active !== false;}).map(function(id){
-          return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():String(all[id].name||id)};
+          return {id:id,name:siteLabel(id,all[id].name)};
         });
       } else {
         rows = (access.classIds||[]).filter(function(id){return ID.test(id);}).map(function(id){
-          return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():id};
+          return {id:id,name:siteLabel(id,'')};
         });
       }
       if (serial !== identity) return;
@@ -451,11 +490,24 @@
       if (!rows.length) {reset();return;}
       classes=rows;
       var requested = new URLSearchParams(location.search).get('class');
-      var preferred = getPreferred();
       var ids=rows.map(function(row){return row.id;});
-      // Never start on a class quietly: only a class named in the link is
-      // pre-selected; otherwise the bar shows "Choose a class\u2026".
-      selected = ids.includes(requested) ? requested : '';
+      accountId = user.uid || '';
+      var sc = SC(), saved = sc ? sc.get(accountId) : '';
+      // The class named in the link wins and becomes the current class; otherwise the class this
+      // teacher chose last. Never a guess between several classes: with none chosen the bar says
+      // "Choose a class\u2026". A teacher with exactly one class simply has that class.
+      allMode = false;
+      if (ids.includes(requested)) { selected = requested; if (sc) sc.set(accountId, requested); }
+      else if (saved === 'all') { selected = ''; allMode = true; }
+      else if (ids.includes(saved)) selected = saved;
+      else if (rows.length === 1) { selected = rows[0].id; if (sc) sc.set(accountId, selected); }
+      else selected = '';
+      // A class added to the link from a different account's memory must not stick.
+      var injected = window.__b3SiteClassInjected;
+      if (sc && injected && requested === injected && injected !== selected && (selected || allMode)) {
+        var fixed = sc.relink(location.href, allMode ? 'all' : selected);
+        if (fixed && fixed !== location.href) { location.replace(fixed); return; }
+      }
       authorized=true;
       teacherAnnotate(true);
       setupUi();
@@ -483,7 +535,7 @@
     var tries = 0;
     function ready() {
       API = window.B3SiteSettings;
-      if (API && typeof API.onAuthStateChanged === 'function' && window.firebase) {
+      if (API && typeof API.onAuthStateChanged === 'function' && window.firebase && (window.B3SiteClass || tries > 40)) {
         clearInterval(ticker);
         API.onAuthStateChanged(onAuth);
       } else if (++tries >= 150) clearInterval(ticker);
@@ -492,6 +544,10 @@
     if (!window.B3SiteSettings && !Array.from(document.scripts).some(function(s){return /(?:^|\/)site-settings\.js(?:\?|$)/.test(s.src||'');})) {
       var script=el('script');script.src=new URL('site-settings.js?v=20261020-quickbar',base).href;
       document.head.appendChild(script);
+    }
+    if (!window.B3SiteClass) {
+      var sc=el('script');sc.src=new URL('teacher-site-class.js?v=20261126-siteclass',base).href;
+      document.head.appendChild(sc);
     }
     var ticker=setInterval(ready,100);
     ready();

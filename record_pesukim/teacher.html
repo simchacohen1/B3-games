@@ -4868,7 +4868,7 @@ function gradeNameOf(sid){ const r = gradeData.roster[sid]; return (r && r.name)
 function gradeClassLabel(sid){
   const r = gradeData.roster[sid], id = r && r.classId;
   if(!id) return '';
-  return id.length <= 3 ? id.toUpperCase() : String(r.classSection || id).replace(/^B3\s+/i, '');
+  return id==='et' ? 'B3 ET' : id==='wt' ? 'B3 WT' : id.length <= 3 ? id.toUpperCase() : String(r.classSection || id).replace(/^B3\s+/i, '');
 }
 function gradeKey(s){ return s.sid + '|' + s.id; }
 function gradeDayKey(ts){
@@ -4911,7 +4911,7 @@ function gradeNavHtml(){
   gradeData.items.forEach(s => { if(B3PosukGradingQueue.isPending(s)) waiting[s.sid] = (waiting[s.sid] || 0) + 1; });
   const boys = Object.keys(gradeData.roster).sort((a, b) => gradeNameOf(a).localeCompare(gradeNameOf(b)));
   const owner = teacherAccess.role === 'admin';
-  const classNames = gradeData.scope.map(id => id.length <= 3 ? id.toUpperCase() : id).join(' + ');
+  const classNames = gradeData.scope.map(id => id==='et' ? 'B3 ET' : id==='wt' ? 'B3 WT' : id.length <= 3 ? id.toUpperCase() : id).join(' + ');
   return '<div class="gm-bar">' +
     '<label class="gm-field">When ' + seg('range', [['today', 'Today'], ['week', 'This week'], ['all', 'All']], gradeView.range) + '</label>' +
     '<label class="gm-field">Boy <select data-boy="1"><option value="">All boys</option>' +

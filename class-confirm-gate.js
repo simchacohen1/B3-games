@@ -17,8 +17,15 @@
   var ALL = 'all';
 
   function readLast() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
-  function writeLast(id) { try { localStorage.setItem(KEY, id); } catch (e) {} }
-  function labelOf(id, names) { return (names && names[id]) || String(id).toUpperCase(); }
+  // The class confirmed here is also the teacher's class for the whole site (teacher-site-class.js).
+  function writeLast(id) {
+    if (id !== ALL) { try { localStorage.setItem(KEY, id); } catch (e) {} }
+    try {
+      var sc = root.B3SiteClass, user = root.firebase && root.firebase.auth && root.firebase.auth().currentUser;
+      if (sc && user && user.uid) sc.set(user.uid, id);
+    } catch (e) {}
+  }
+  function labelOf(id, names) { return root.B3ClassLabel ? root.B3ClassLabel(id, names && names[id]) : (id === 'et' ? 'B3 ET' : id === 'wt' ? 'B3 WT' : (names && names[id]) || String(id).toUpperCase()); }
 
   // Pure decision, unit-tested: what should the screen show?
   // allowAll is only for Chazara: it adds an "All my classes" choice (id 'all').
@@ -48,7 +55,7 @@
     var requested = opts.requested === undefined
       ? (new URLSearchParams(root.location.search).get('class') || '').trim() : opts.requested;
     var p = plan(ids, requested, readLast(), opts.allowAll);
-    if (p.mode === 'explicit') { if (p.id !== ALL) writeLast(p.id); return Promise.resolve(p.id); }
+    if (p.mode === 'explicit') { writeLast(p.id); return Promise.resolve(p.id); }
     return new Promise(function (resolve, reject) {
       if (p.mode === 'none') { reject(new Error('No classes are assigned to this account.')); return; }
       var doc = root.document, body = doc.body;
@@ -77,7 +84,7 @@
         return b;
       }
       function finish(id) {
-        if (id !== ALL) writeLast(id);
+        writeLast(id);
         held.forEach(function (h) {
           if (!h[1]) h[0].removeAttribute('inert');
           h[0].removeAttribute('aria-hidden');

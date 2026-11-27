@@ -74,8 +74,9 @@
   }
 
   // The access Teacher view gives right now, or null to keep the normal owner view.
-  async function resolve(db, workspaceId, user, store) {
-    if (getMode(store) !== 'teacher') return null;
+  // There is no switch any more: outside the admin pages the owner is always a teacher of his own
+  // classes (site-settings.js decides which pages are admin pages and never asks for this there).
+  async function resolve(db, workspaceId, user) {
     return (await readTeaching(db, workspaceId, user)).access;
   }
 

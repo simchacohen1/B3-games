@@ -521,8 +521,20 @@
   // the owner's own email in Owner Admin (see owner-teacher-view.js). Any
   // doubt (no classes, a failed load or read) keeps the normal owner access.
   // This never applies to another account and never adds access.
+  // Now the default (no switch): outside the admin pages the owner is a teacher of the classes
+  // assigned to his own email. The admin pages (Teacher Tools, Owner Admin, the owner home) keep
+  // the full owner access and every class.
+  function isOwnerAdminPage() {
+    try {
+      const base = new URL(SITE_BASE), current = new URL(location.href);
+      if (current.origin !== base.origin || current.pathname.indexOf(base.pathname) !== 0) return true;
+      const path = current.pathname.slice(base.pathname.length);
+      if (current.searchParams.get("adminPage") === "1") return true;
+      return path === "" || /^(index|admin|owner-admin|all-pages|owner-[a-z-]+)\.html$/.test(path);
+    } catch (e) { return true; }
+  }
   function ownerTeacherViewWanted() {
-    try { return localStorage.getItem("b3OwnerViewMode") === "teacher"; } catch (e) { return false; }
+    return !isOwnerAdminPage();
   }
   function loadOwnerTeacherView() {
     if (window.B3OwnerTeacherView) return Promise.resolve(window.B3OwnerTeacherView);
@@ -555,15 +567,10 @@
     if (!document.body) { document.addEventListener("DOMContentLoaded", function () { showOwnerTeacherView(access, user); }, { once:true }); return; }
     const acting = getActingStudent(), view = window.B3OwnerTeacherView;
     if (view) {
-      if (access && access.ownerTeacherView === true && !acting) view.mountBanner(SITE_BASE); else view.unmountBanner();
+      // No separate "Teacher view": the banner and the switch are gone.
+      view.unmountBanner();
+      if (view.unmountSwitch) view.unmountSwitch();
     }
-    const offerSwitch = !acting && window.top === window && isBootstrapAdmin(user) && access && access.role === "admin" && isOwnerHomePage();
-    if (!offerSwitch) { if (view && view.unmountSwitch) view.unmountSwitch(); return; }
-    const services = ensureFirebase();
-    if (!services || !services.db) return;
-    loadOwnerTeacherView().then(function (loaded) {
-      if (loaded.mountSwitch) return loaded.mountSwitch(services.db, WORKSPACE_ID, user, SITE_BASE);
-    }).catch(function () {});
   }
 
   let currentAccess = { authorized: false, role: "", classIds: [] };

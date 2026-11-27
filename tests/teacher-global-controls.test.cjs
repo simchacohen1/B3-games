@@ -68,14 +68,15 @@ test('a button press is never silent: with no class chosen it asks which class (
   assert.match(s, /link\.target = name;/);
   // Still never picks between several classes by itself.
   assert.match(s, /classes\.length === 1/);
-  assert.match(s, /selected = ids\.includes\(requested\) \? requested : '';/);
+  assert.match(s, /if \(ids\.includes\(requested\)\) \{ selected = requested;/);
+  assert.match(s, /else if \(rows\.length === 1\) \{ selected = rows\[0\]\.id;/);
 });
 
 test('pages fetch the fixed toolbar, not a cached older copy', () => {
-  const version = /teacher-global-controls\.js\?v=combo2/;
+  const version = /teacher-global-controls\.js\?v=combo3/;
   assert.match(read('gallery-share.js'), version);
   assert.match(read('teacher-global-bootstrap.js'), version);
-  assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261110-buttons1/);
+  assert.match(read('firebase-config.js'), /gallery-share\.js\?v=20261126-siteclass/);
 });
 
 test('quick buttons: inside the Class Pointer top bar there, movable and remembered everywhere else', () => {

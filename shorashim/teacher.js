@@ -1168,7 +1168,7 @@ if(CLASS_MODE){
       openTeacherApp();
     }else if(CLASS_ID&&LEGACY_CLASS_IDS.includes(CLASS_ID)&&ids.includes(CLASS_ID)){
       activeLegacyClassScope=CLASS_ID;
-      document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${CLASS_ID.toUpperCase()}`;
+      document.querySelector('.topbar h1').textContent=`Shorashim Learning Lab · ${CLASS_ID==='et'?'B3 ET':CLASS_ID==='wt'?'B3 WT':CLASS_ID.toUpperCase()}`;
       $('tab-access').classList.add('hidden');document.querySelector('[data-tab="access"]').classList.add('hidden');
       openTeacherApp();
     }else if(!CLASS_ID){

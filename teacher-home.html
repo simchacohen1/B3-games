@@ -56,6 +56,7 @@
 .teacher-tools-section{max-width:1130px}
 </style>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script><script>window.firebase||document.write('<script src="vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script><script>window.firebase&&firebase.auth||document.write('<script src="vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script><script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script><script>window.firebase&&firebase.database||document.write('<script src="vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script><script src="firebase-config.js?v=20261001-teacherauth"></script><script src="site-settings.js?v=20261020-demo-student"></script>
+<script src="teacher-site-class.js?v=20261126-siteclass"></script>
 <script src="shared/home-tool-registry.js?v=20261120-shared-tiles"></script>
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
@@ -79,6 +80,8 @@ const TOOLS={};
 R.groups.forEach(g=>g.tiles.forEach(t=>{if(!t.companion&&!TOOLS[t.id])TOOLS[t.id]=[t.title,t.teacherHref||t.href];}));
 R.teacherTools.forEach(t=>{if(t.grant&&t.audiences.includes('teacher')&&!TOOLS[t.grant])TOOLS[t.grant]=[t.title,t.href];});
 TOOLS['class-gallery']=TOOLS['class-gallery']||TOOLS.gallery;
+const classLabel=(id,name)=>window.B3ClassLabel?window.B3ClassLabel(id,name):(id==='et'?'B3 ET':id==='wt'?'B3 WT':String(name||id));
+window.addEventListener('b3-site-class-change',e=>{if(window.__homeSiteClassSync)window.__homeSiteClassSync(e.detail&&e.detail.classId);});
 function esc(s){const d=document.createElement("div");d.textContent=String(s||"");return d.innerHTML}
 const previewParams=new URLSearchParams(location.search),previewTeacherId=previewParams.get('previewTeacher');
 let renderGeneration=0,previewActive=false;
@@ -91,22 +94,30 @@ function showTeacherSignIn(message){
  q('teacherSignInStatus').textContent=message||'Use your authorized teacher or administrator Google account.';
  q('login').onclick=async()=>{q('login').disabled=true;q('teacherSignInStatus').textContent='Signing in…';try{await api.signInWithGoogle();}catch(error){showTeacherSignIn(error.message||'Could not sign in. Please try again.');}};
 }
-function setupTopBar(ids,snaps,access){
+function setupTopBar(ids,snaps,access,user){
  const bar=q('homeTopBar'),pick=q('homeClassPick'),rows=ids.map((id,i)=>({id,row:snaps[i].val()||{},ok:snaps[i].exists()&&(snaps[i].val()||{}).active!==false})).filter(x=>x.ok);
  bar.classList[rows.length?'remove':'add']('hidden');
  const keep=pick.value;
- pick.innerHTML='<option value="">All my classes</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.row.name||x.id)+'</option>').join('');
- if(rows.some(x=>x.id===keep))pick.value=keep;else if(rows.length===1)pick.value=rows[0].id;
+ pick.innerHTML='<option value="">All my classes</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(classLabel(x.id,x.row.name))+'</option>').join('');
+ // One class for the whole site: the class in the link, else the one chosen last, else a teacher's only class.
+ const SC=window.B3SiteClass,uid=previewActive?'':(user?.uid||''),saved=SC&&uid?SC.get(uid):'',linked=previewActive?'':(previewParams.get('class')||'');
+ const remember=id=>{if(SC&&uid){SC.set(uid,id||'all');try{window.dispatchEvent(new CustomEvent('b3-site-class-change',{detail:{classId:id||'all'}}));}catch(e){}}};
+ if(rows.some(x=>x.id===linked)){pick.value=linked;remember(linked);}
+ else if(rows.some(x=>x.id===keep))pick.value=keep;
+ else if(rows.some(x=>x.id===saved))pick.value=saved;
+ else if(saved==='all')pick.value='';
+ else if(rows.length===1){pick.value=rows[0].id;remember(rows[0].id);}
  const cards=document.querySelectorAll?[...document.querySelectorAll('#classes .class-card')]:[];
  const apply=()=>cards.forEach((c,i)=>{const id=rows[i]?.id;if(c.style)c.style.display=!pick.value||id===pick.value?'':'none';});
- pick.onchange=apply;apply();
+ pick.onchange=()=>{apply();remember(pick.value);};apply();
+ window.__homeSiteClassSync=id=>{const v=id==='all'?'':id;if([...pick.options].some(o=>o.value===v)){pick.value=v;apply();}};
  const current=()=>rows.find(x=>x.id===pick.value)||rows[0];
  q('homeTeacherToolsBtn').onclick=()=>{const idx=rows.indexOf(current());const sec=cards[idx]?.querySelector('.teacher-tools-section');if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});};
  q('homeApprovalsBtn').onclick=()=>{
   const cur=current();if(!cur)return;
   const grants=cur.row.toolGrants||{};
   const links=R.approvalLinks.filter(l=>grants[l.grant]===true);
-  q('approvalsSub').textContent='Review queues for '+(cur.row.name||cur.id)+'.';
+  q('approvalsSub').textContent='Review queues for '+classLabel(cur.id,cur.row.name)+'.';
   q('approvalsList').innerHTML=links.length?links.map(l=>'<a href="'+esc(previewActive?'#':R.withClass(l.href,cur.id))+'"><span aria-hidden="true">'+l.icon+'</span>'+esc(l.title)+'</a>').join(''):'<p>No review queues are enabled for this class.</p>';
   q('approvalsModal').classList.remove('hidden');
  };
@@ -153,10 +164,10 @@ async function render(user,access){
  const places=R.renderMap({audience:"teacher",isOn,hrefFor:t=>previewActive?previewHref(t.id,id):R.withClass(t.teacherHref||t.href,id)});
  const teacherCards=R.renderTeacherTools({audience:"teacher",classId:id,isOn,preview:previewActive,previewHref:tool=>previewHref(tool,id)});
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card"><h2>'+esc(classLabel(id,row.name))+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
- setupTopBar(ids,snaps,access);
+ setupTopBar(ids,snaps,access,user);
  if(previewActive){
    q('signOut').classList.add('hidden');
    q('who').textContent='Viewing as '+user.email;

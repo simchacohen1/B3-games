@@ -54,10 +54,11 @@ test('the mode is remembered per browser and defaults to owner', () => {
   assert.equal(V.getMode({ getItem() { throw new Error('blocked'); } }), 'owner', 'blocked storage means owner');
 });
 
-test('resolve: owner mode never reads the database and changes nothing', async () => {
+test('resolve: the owner is a teacher of his own classes with no switch to turn on', async () => {
   const reads = [];
-  assert.equal(await V.resolve(fakeDb({ [INVITE_PATH]: invite() }, reads), 'b3-2026', owner, memory()), null);
-  assert.deepEqual(reads, []);
+  const access = await V.resolve(fakeDb({ [INVITE_PATH]: invite() }, reads), 'b3-2026', owner);
+  assert.equal(access.role, 'teacher');
+  assert.deepEqual(reads, [INVITE_PATH]);
 });
 
 test('resolve: Teacher view gives the owner their own classes only', async () => {
@@ -99,7 +100,7 @@ test('class lists and the messages inbox are only ever cut down', () => {
 
 // ---- site-settings.js: how every Teacher Tools page decides access ---------------
 
-function settings(data, user, { mode = null, withView = true, scriptFails = false } = {}) {
+function settings(data, user, { mode = null, withView = true, scriptFails = false, url = 'https://site.test/teacher.html' } = {}) {
   const reads = [], writes = [], scripts = [];
   const db = { ref: p => ({ once: async () => { reads.push(p); return { val: () => data[p] ?? null }; }, set: async v => writes.push([p, v]), update: async v => writes.push([p, v]) }) };
   const firebase = { apps: [{}], database: () => db, auth: () => ({ currentUser: user }) };
@@ -108,9 +109,10 @@ function settings(data, user, { mode = null, withView = true, scriptFails = fals
   const localStorage = memory(mode);
   window.localStorage = localStorage;
   const document = { readyState: 'complete', addEventListener() {}, getElementsByTagName: () => [], getElementById: () => null,
-    createElement: () => ({}), head: { appendChild(tag) { scripts.push(tag.src); setTimeout(() => (scriptFails ? tag.onerror() : tag.onload()), 0); } } };
+    querySelectorAll: () => [], createElement: () => ({ style: {}, appendChild() {}, setAttribute() {} }), body: { insertBefore() {}, appendChild() {}, firstChild: null }, head: { appendChild(tag) { scripts.push(tag.src); setTimeout(() => (scriptFails ? tag.onerror() : tag.onload()), 0); } } };
   window.document = document;
-  const ctx = { window, firebase, localStorage, document, console: { log() {}, warn() {}, error() {} }, Intl, Date, URL, setTimeout };
+  const location = new URL(url); window.location = location;
+  const ctx = { window, firebase, localStorage, document, location, console: { log() {}, warn() {}, error() {} }, Intl, Date, URL, setTimeout };
   vm.createContext(ctx);
   if (withView) vm.runInContext(fs.readFileSync(path.join(ROOT, 'owner-teacher-view.js'), 'utf8'), ctx);
   const source = fs.readFileSync(path.join(ROOT, 'site-settings.js'), 'utf8').replace('  window.B3SiteSettings = {', '  window.readAccessForTest=readUserAccess;\n  window.B3SiteSettings = {');
@@ -120,15 +122,17 @@ function settings(data, user, { mode = null, withView = true, scriptFails = fals
 const plain = value => JSON.parse(JSON.stringify(value));
 const FULL = { authorized: true, role: 'admin', classIds: ['*'] };
 
-test('site-settings: the owner keeps full owner access by default, with no extra reads', async () => {
-  const t = settings({ [INVITE_PATH]: invite() }, owner);
-  assert.deepEqual(plain(await t.window.readAccessForTest(owner)), FULL);
-  assert.deepEqual(t.reads, [], 'owner mode reads nothing new');
-  assert.deepEqual(t.scripts, []);
+test('site-settings: the admin pages (Teacher Tools, Owner Admin, owner home) keep full owner access and every class', async () => {
+  for (const url of ['https://site.test/admin.html', 'https://site.test/owner-admin.html', 'https://site.test/index.html', 'https://site.test/', 'https://site.test/x/y.html?adminPage=1'.replace('x/y', 'index')]) {
+    const t = settings({ [INVITE_PATH]: invite() }, owner, { url });
+    assert.deepEqual(plain(await t.window.readAccessForTest(owner)), FULL, url);
+    assert.deepEqual(t.reads, [], 'no extra reads on an admin page');
+    assert.deepEqual(t.scripts, []);
+  }
 });
 
-test('site-settings: in Teacher view the owner is a teacher of their own classes only', async () => {
-  const t = settings({ [INVITE_PATH]: invite() }, owner, { mode: 'teacher' });
+test('site-settings: on every other page the owner is a teacher of his own classes only', async () => {
+  const t = settings({ [INVITE_PATH]: invite() }, owner);
   const access = plain(await t.window.readAccessForTest(owner));
   assert.equal(access.role, 'teacher');
   assert.deepEqual(access.classIds, ['kita_a', 'kita_b']);
@@ -187,7 +191,6 @@ test('Owner Admin has the switch and uses the shared logic', () => {
   assert.match(html, /<script src="owner-teacher-view\.js\?v=[^"]+"><\/script>/);
   assert.match(html, /id="teacherViewGo"[^>]*disabled/, 'the switch starts disabled until classes are known');
   assert.match(html, /B3OwnerTeacherView\.teachingClassIds\(teacherData\[key\(OWNER\)\]\)/);
-  assert.match(html, /B3OwnerTeacherView\.toTeacherView\(\)/);
   assert.match(html, /function isOwner\(user\)\{return user\?\.emailVerified===true&&String\(user\.email\|\|""\)\.toLowerCase\(\)===OWNER;/);
   assert.match(html, /auth\.onAuthStateChanged\(async user=>\{\s*if\(isOwner\(user\)\)/);
 });
@@ -255,13 +258,11 @@ test('switch: never shown to another account, inside a frame, or while already i
   assert.deepEqual(reads, [], 'and nothing is read for them');
 });
 
-test('switch: wired into the owner home page (site-settings) and the Admin page, owner only', () => {
+test('there is no Teacher view switch or banner any more', () => {
   const site = fs.readFileSync(path.join(ROOT, 'site-settings.js'), 'utf8');
-  assert.match(site, /const offerSwitch = !acting && window\.top === window && isBootstrapAdmin\(user\) && access && access\.role === "admin" && isOwnerHomePage\(\);/);
-  assert.match(site, /showOwnerTeacherView\(access, user\);/);
+  assert.doesNotMatch(site, /\.mountSwitch\(|\.mountBanner\(/);
   const admin = fs.readFileSync(path.join(ROOT, 'admin.html'), 'utf8');
-  assert.match(admin, /<script src="owner-teacher-view\.js\?v=[^"]+"><\/script>/);
-  assert.match(admin, /if\(owner&&window\.B3OwnerTeacherView\)B3OwnerTeacherView\.mountSwitch\(/);
+  assert.doesNotMatch(admin, /mountSwitch\(/);
 });
 
 test('Tool access overview: the Name column stays fixed when the table scrolls sideways', () => {

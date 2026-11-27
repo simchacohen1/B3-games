@@ -84,7 +84,17 @@ window.B3_DATA_MODEL = Object.freeze({
   const current = document.currentScript;
   if (!current || !current.src) return;
   const loader = document.createElement('script');
-  loader.src = new URL('gallery-share.js?v=20261110-buttons1', current.src).href;
+  loader.src = new URL('gallery-share.js?v=20261126-siteclass', current.src).href;
   loader.async = true;
   (document.head || document.documentElement).appendChild(loader);
+})();
+
+// Site-wide teacher class: only a browser where a teacher has chosen a class loads it, and it loads
+// right here, before the page's own scripts, so a teacher page opens on the remembered class.
+(function () {
+  try {
+    var me = document.currentScript;
+    if (!me || !me.src || document.readyState !== 'loading' || !localStorage.getItem('b3SiteClassLast')) return;
+    document.write('<script src="' + new URL('teacher-site-class.js?v=20261126-siteclass', me.src).href + '"><\/script>');
+  } catch (e) {}
 })();

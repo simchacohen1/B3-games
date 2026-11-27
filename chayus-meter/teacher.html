@@ -77,7 +77,7 @@ async function classList(access){
   const rows=await Promise.all(ids.map(async id=>{try{return [id,(await db.ref(base+"/"+id).once("value")).val()]}catch(e){return [id,null]}}));
   all=Object.fromEntries(rows);
  }
- return Object.entries(all).filter(([id,r])=>r&&r.active!==false).map(([id,r])=>({id,name:String(r.name||id.toUpperCase())}));
+ return Object.entries(all).filter(([id,r])=>r&&r.active!==false).map(([id,r])=>({id,name:id==='et'?'B3 ET':id==='wt'?'B3 WT':String(r.name||id.toUpperCase())}));
 }
 function drawTabs(){
  $("classTabs").innerHTML=classes.map(c=>'<button type="button" data-c="'+esc(c.id)+'" class="'+(c.id===current?"on":"")+'">'+esc(c.name)+'</button>').join("");
