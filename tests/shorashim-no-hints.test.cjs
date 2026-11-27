@@ -17,7 +17,7 @@ function review(noHints) {
     return nodes.get(id);
   } };
   const context = {
-    document, reviewNoHints: noHints, reviewFlipped: false, reviewIndex: 0,
+    document, setSpeakButton() {}, reviewNoHints: noHints, reviewFlipped: false, reviewIndex: 0,
     reviewDeck: [{ itemKey: 'one', itemType: 'shorashim', design: {} }],
     getItem: () => ({ front: 'ראה', english: 'see', examples: [] }),
     normalizeDesign: () => ({ hebrewPos: {}, englishPos: {}, arts: ['👁'], drawing: 'drawing.png' }),
