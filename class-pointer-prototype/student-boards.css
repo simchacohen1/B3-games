@@ -180,3 +180,9 @@ body.boards-on #studentDock{display:none!important}
 .board-zone-label.other{opacity:1;color:#fff}
 .board-zone-notice-wrap{position:sticky;top:0;height:0;z-index:6;overflow:visible;pointer-events:none}
 .board-zone-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);max-width:92%;padding:10px 18px;border-radius:12px;background:#1e293b;color:#fff;font:700 clamp(14px,1.8vw,20px) system-ui;text-align:center;box-shadow:0 4px 16px #0007;border:2px solid #facc15}
+
+/* One drawing toolbar on a student's own board: the old picture buttons are replaced by Select, and the strip is a tidy single row. */
+.student-board.boards-annotated .boards-bar{gap:4px 6px;padding-top:6px;padding-bottom:6px}
+.student-board.boards-annotated .boards-bar button{min-height:32px;padding:4px 9px;font-size:13px}
+.student-board.boards-annotated .boards-pictures{display:none}
+.student-board.boards-annotated .boards-title{font-size:14px;margin-right:2px}

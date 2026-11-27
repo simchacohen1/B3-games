@@ -47,8 +47,8 @@
   // A menu choice as a mark: {tool, fill}.
   const shapeKind=id=>{const filled=/f$/.test(id)&&id!=='arrow';const tool=filled?id.slice(0,-1):id;return{tool:KINDS.includes(tool)?tool:'rect',fill:filled&&CLOSED.includes(tool)}};
   const TOOLS=[
-    ['pointer','🔴','Pointer','Use the page normally: click, type and scroll. Others see a dot where you point.'],
     ['select','🖱️','Select','Click a mark to pick it. Drag to move it, drag a corner to resize it, click a color or a size to change it. Arrow keys move it 1 pixel (Shift: 10). Delete removes it. Double-click text to change it. Buttons and links on the page still work.'],
+    ['pointer','🔴','Pointer','Use the page normally: click, type and scroll. Others see a dot where you point.'],
     ['highlight','🖍','Highlight','Highlight over words.'],
     ['text','T','Text','Click where the text should go, then type.'],
     ['shape','◻','Shapes','Drag to draw a rectangle, circle, line or arrow.'],
@@ -755,7 +755,13 @@
     if(mode!=='open'||st.tool!=='select'||capture.hidden||pid!==null||e.button!==0)return;
     if(root.contains(e.target))return;
     const found=markUnder(e);
-    if(!found){if(selected){selected=null;sync()}return}
+    if(!found){
+      if(selected){selected=null;sync()}
+      // A drawing board (surface.solid) is itself a pen underneath: an empty press must do nothing there, never draw a line.
+      const s=surface();
+      if(s.solid&&!isDelegate(s)&&insideSurface(e,s)&&!root.contains(e.target)){e.preventDefault();e.stopImmediatePropagation()}
+      return;
+    }
     capture.style.pointerEvents='auto';
     e.stopImmediatePropagation();
     onCaptureDown(e);
