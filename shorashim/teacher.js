@@ -83,7 +83,7 @@ function ensurePerekUnitsAnd19(){
   const list=state.catalog.shorashim=Array.isArray(state.catalog.shorashim)?state.catalog.shorashim:[];
   let tagged=0;
   for(const item of list){
-    if(!item.perek){
+    if(!item.perek&&!/^chumash-vocab-l\d/.test(String(item.id||''))){
       item.perek=String(item.id||'').startsWith('19-')?19:18;
       tagged++;
     }
