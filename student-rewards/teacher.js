@@ -704,7 +704,6 @@ function studentDetail(s){
   ${studentSpendingHTML(s)}
   ${studentPrizesHTML(s)}
   ${studentPointsPanel(s)}
-  <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Progress by category</h2><p>${scoreFor(s)}% overall in ${esc(cls()?.name||"class")}</p></div></div><div class="categories">${Object.entries(g).map(([name,x])=>{const pct=x.p?Math.round(x.e/x.p*100):0;return `<article><span>${esc(name)}</span><b>${pct}%</b><u><i style="width:${Math.min(110,pct)}%;background:${esc(safeColor(s))}"></i></u><small>${x.e} of ${x.p} progress points</small></article>`}).join("")||`<article><span>Progress</span><b>—</b><small>No saved ratings yet</small></article>`}</div></section>
   <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Daily History</h2><p>Saved points and attendance</p></div></div><div class="historytable"><table><thead><tr><th>Date</th><th>Attendance</th><th>Points</th></tr></thead><tbody>${studentHistory(s).map(x=>`<tr><td>${esc(C.formatDate(x.date))}</td><td>${esc(x.status)}</td><td>${x.points} ★</td></tr>`).join("")||`<tr><td colspan="3">No saved days yet.</td></tr>`}</tbody></table></div></section></section>`;
 }
 // One student's own history, on the Students page: every change, who did it, prize status, Undo / Refund.
