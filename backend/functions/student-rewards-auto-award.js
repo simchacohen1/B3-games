@@ -598,6 +598,9 @@ async function studentPointHistory(studentId){
         classId:item.classId || null,
         rewardId:item.rewardId || null,
         rewardName:item.rewardName || null,
+        modeNames:item.modeNames || null,
+        refundedAt:item.refundedAt || null,
+        refundedAmount:item.refundedAmount ?? null,
         balanceAfter:item.balanceAfter ?? null,
       });
     });

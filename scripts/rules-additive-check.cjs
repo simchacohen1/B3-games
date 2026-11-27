@@ -8,6 +8,10 @@ const fs = require('node:fs');
 
 // Paths (inside "rules") where a NEW node may appear that did not exist in the live rules.
 const ALLOWED_NEW = [
+  // 2026-11-27 (owner approved): students could not read their own class contributions or file refund requests
+  // because the live rules never had these two nodes. Own-record read, and pending-only refund writes.
+  ['studentRewards', 'classRewardContributionsByStudent'],
+  ['studentRewards', 'refundRequests'],
   ['b3Private'],
   // Issue #460: isolated class-scoped rooms and invitation summaries; no broad grants at this root.
   ['multiplayerCenter'],

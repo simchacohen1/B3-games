@@ -398,7 +398,14 @@ function myActivityRows(){
     const p=p0||{};
     rows.push({kind:'purchase',key,cancelKey:p.id||key,name:state.root.rewards?.[p.rewardId]?.name||'Reward',type:'Personal reward',cost:Number(p.cost)||0,status:String(p.status||'pending'),when:historyTime(p.requestedAt)});
   }
-  for(const [key,c0] of Object.entries(state.root?.contributions||{})){
+  // The server history also lists every class contribution. If the direct read of the contribution
+  // records is blocked or empty, fall back to it so a boy never sees his contributions vanish.
+  const contributions={...(state.root?.contributions||{})};
+  for(const h of state.activityPointHistory||[]){
+    if(String(h?.source||'')!=='class-reward-contribution'||!h.id||contributions[h.id])continue;
+    contributions[h.id]={amount:Math.abs(Number(h.actualAmount??h.amount??0)),rewardName:h.rewardName,modeNames:h.modeNames,createdAt:h.createdAt,refundedAt:h.refundedAt||null,refundedAmount:h.refundedAmount};
+  }
+  for(const [key,c0] of Object.entries(contributions)){
     const c=c0||{},modes=Array.isArray(c.modeNames)&&c.modeNames.length?` — ${c.modeNames.join(', ')}`:'';
     rows.push({kind:'contribution',key,name:`${c.rewardName||'Class reward'}${modes}`,type:'Class contribution',cost:Math.abs(Number(c.amount)||0),status:c.refundedAt?'refunded':'contributed',when:historyTime(c.createdAt)});
   }

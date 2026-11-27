@@ -977,6 +977,31 @@
       "expression": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
     },
     {
+      "path": "/studentRewards/classRewardContributionsByStudent/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.studentRewardsStudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/studentRewards/classRewardContributionsByStudent",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/studentRewards/refundRequests/$studentId/$requestId",
+      "permission": ".write",
+      "expression": "auth != null && auth.token.studentRewardsStudentId == $studentId && (newData.exists() && newData.child('status').val() == 'pending' && (!data.exists() || data.child('status').val() == 'pending') || !newData.exists() && data.child('status').val() == 'pending')"
+    },
+    {
+      "path": "/studentRewards/refundRequests/$studentId",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.studentRewardsStudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
+      "path": "/studentRewards/refundRequests",
+      "permission": ".read",
+      "expression": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+    },
+    {
       "path": "/tentTrailTrivia",
       "permission": ".read",
       "expression": true
