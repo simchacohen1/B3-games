@@ -480,9 +480,12 @@
           return {id:id,name:siteLabel(id,all[id].name)};
         });
       } else {
-        rows = (access.classIds||[]).filter(function(id){return ID.test(id);}).map(function(id){
-          return {id:id,name:siteLabel(id,'')};
-        });
+        var mine = (access.classIds||[]).filter(function(id){return ID.test(id);});
+        // Each class keeps the one name it has everywhere (read-only; a class that cannot be read keeps its id).
+        var names = await Promise.all(mine.map(function(id){
+          return db.ref('b3Games/workspaces/'+workspace+'/classes/'+id+'/name').once('value').then(function(s){return s.val();}, function(){return '';});
+        }));
+        rows = mine.map(function(id, i){ return {id:id,name:siteLabel(id,names[i])}; });
       }
       if (serial !== identity) return;
       rows.sort(function(a,b) {
