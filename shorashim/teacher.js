@@ -107,6 +107,9 @@ teacherArtStyle.textContent=`
 .teacher-art-preview{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .teacher-art-chip{font-size:28px;line-height:1;border:1px solid #d7dbea;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer}
 .teacher-art-chip:hover{background:#fff3f3;border-color:#e39b9b}
+.picture-grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
+.picture-cell{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid #d7dbea;background:#fff;border-radius:10px;padding:6px 8px}
+.picture-emoji{font-size:30px;line-height:1.1}
 `;
 document.head.appendChild(teacherArtStyle);
 const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -127,9 +130,12 @@ const UNSUITABLE_ART_CHOICES=new Set([
   '👩‍👦','👩‍👧','👩‍👧‍👦','👩‍👦‍👦','👩‍👧‍👧','👨‍👧','👨‍👧‍👦'
 ]);
 
+// Pictures the teacher blocked (settings.blockedArt). A blocked picture is never offered again.
+function blockedArtList(){const b=(typeof state!=='undefined'&&state&&state.settings&&state.settings.blockedArt);return Array.isArray(b)?b:b&&typeof b==='object'?Object.values(b):[];}
 function isClassSafeArtChoice(value){
   const v=String(value||'').trim();
   if(!v) return false;
+  if(blockedArtList().includes(v)) return false;
   if(UNSUITABLE_ART_CHOICES.has(v)) return false;
 
   // A simple boy/child icon is useful for literal vocabulary such as נַעַר.
@@ -427,7 +433,7 @@ async function generateAiArtForItems(items,onProgress=()=>{}){
 async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
   // Automatically fill only missing artwork, including words a teacher already
   // approved. Never replace selected pictures and never incur API costs on login.
-  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length&&!sanitizeClassArt(i.pendingArt).length);
+  const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length);
   if(!targets.length) return 0;
   const ai=useAI?await generateAiArtForItems(targets,onProgress):new Map();
   let changed=0;
@@ -437,9 +443,9 @@ async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
     const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
     const art=sanitizeClassArt(pool);
     if(art.length){
-      // Automatic pictures wait for the teacher's approval (item.pendingArt); students only
-      // see item.art. Pictures a teacher already selected are never touched here.
-      item.pendingArt=art; item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
+      // Automatic pictures go straight to students (blocked pictures are already filtered out).
+      // Pictures a teacher already selected are never touched here.
+      item.art=art; item.artPool=pool; delete item.pendingArt; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
       item.aiArtGeneratedAt=Date.now(); changed++;
     }else item.autoArt=true;
   }
@@ -461,10 +467,11 @@ function mergeCatalogWithoutReplacingPictures(current,local){
     const existing=list[index.get(id)];
     if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
     const art=sanitizeClassArt(candidate.art);
-    const pend=sanitizeClassArt(candidate.pendingArt);
-    if(existing&&!sanitizeClassArt(existing.art).length&&!sanitizeClassArt(existing.pendingArt).length&&pend.length){
-      existing.pendingArt=pend; existing.artPool=sanitizeSuggestionPool(candidate.artPool||pend); existing.autoArt=false;
-      existing.aiArtGenerated=!!candidate.aiArtGenerated; existing.aiArtGeneratedAt=candidate.aiArtGeneratedAt||timestamp;
+    // The per-word "waiting for approval" step is off: pictures waiting from before go to students.
+    if(existing&&existing.pendingArt){
+      const waiting=sanitizeClassArt(existing.pendingArt);
+      if(!sanitizeClassArt(existing.art).length&&waiting.length){existing.art=waiting;existing.autoArt=false;}
+      delete existing.pendingArt;
     }
     if(existing&&!sanitizeClassArt(existing.art).length&&art.length){
       existing.art=art; existing.autoArt=false; existing.aiArtGenerated=!!candidate.aiArtGenerated;
@@ -492,18 +499,58 @@ function ensureChumashVocabLists(){
   }
   return added;
 }
-async function approveWaitingPictures(ids){
-  const list=state.catalog.shorashim||[],want=ids?new Set(ids.map(String)):null;
-  let n=0;
-  for(const i of list){
-    if(want&&!want.has(String(i.id)))continue;
-    const pend=sanitizeClassArt(i.pendingArt);
-    if(!pend.length)continue;
-    if(!sanitizeClassArt(i.art).length)i.art=pend;
-    i.artPool=suggestionPoolOf(i);delete i.pendingArt;n++;
+/* ===== Blocked pictures: one simple list for the whole class ===== */
+const blockedSettingsPath=()=>`${teacherSettingsPath()}/blockedArt`;
+// Pictures currently used by any word (student-visible), once each, in first-seen order.
+function usedPictureList(){
+  const seen=new Set(),out=[];
+  const add=a=>{for(const v of (Array.isArray(a)?a:[])){const x=String(v||'').trim();if(x&&!seen.has(x)&&isClassSafeArtChoice(x)&&!/^(data:|https?:)/.test(x)){seen.add(x);out.push(x);}}};
+  for(const i of (state.catalog.shorashim||[]))add(i&&i.art);
+  for(const l of [window.FTT_BOOKLET_SHORASHIM,window.FTT_CHUMASH_VOCAB])for(const i of (Array.isArray(l)?l:[]))add(i&&i.art);
+  return out;
+}
+// After a block, a word that lost a picture gets another from its own suggestions, or none.
+function refillItemArt(item,hadCount){
+  let art=sanitizeClassArt(item.art);
+  if(art.length<hadCount){
+    const extra=suggestionPoolOf(item).filter(x=>!art.includes(x));
+    art=[...art,...extra].slice(0,Math.min(hadCount,ART_STUDENT_MAX));
+    if(!art.length)art=sanitizeClassArt(smartArtCandidatesFor(item.english,item.front));
   }
-  if(n){renderCatalog();await saveCatalog();}
-  return n;
+  item.art=art;item.artPool=suggestionPoolOf(item);delete item.pendingArt;
+}
+async function setBlockedPictures(list){
+  state.settings.blockedArt=list;
+  await db.ref(blockedSettingsPath()).set(list.length?list:null);
+}
+async function blockPicture(v){
+  v=String(v||'').trim();if(!v||blockedArtList().includes(v))return;
+  const had=new Map();
+  for(const i of (state.catalog.shorashim||[]))if(i&&Array.isArray(i.art))had.set(i,i.art.filter(x=>String(x).trim()).length);
+  state.settings.blockedArt=[...blockedArtList(),v]; // from here every picture filter drops it
+  for(const i of (state.catalog.shorashim||[])){
+    if(!i)continue;
+    const touched=[i.art,i.artPool,i.pendingArt].some(a=>Array.isArray(a)&&a.includes(v));
+    if(touched)refillItemArt(i,had.get(i)||0);
+  }
+  status('☁️ Saving…','syncing');
+  await setBlockedPictures(state.settings.blockedArt);
+  await saveCatalog();
+  renderCatalog();
+}
+async function unblockPicture(v){
+  await setBlockedPictures(blockedArtList().filter(x=>x!==v));
+  status('☁️ Saved');
+  renderCatalog();
+}
+function renderPictureBlockPanel(){
+  const box=$('teacherPictureBlockPanel');if(!box)return;
+  const used=usedPictureList(),blocked=blockedArtList();
+  box.innerHTML=`<h3>🖼️ Pictures used for words</h3><p class="mini-note">Every picture used for any word, once each. <b>Block</b> removes it from every word and it is never used again, including new automatic pictures. Students' progress, points and recordings are not changed.</p>
+  <div id="pictureGrid" class="picture-grid">${used.map(v=>`<span class="picture-cell"><span class="picture-emoji">${esc(v)}</span><button type="button" class="danger small" data-block-art="${esc(v)}">Block</button></span>`).join('')||'<span class="mini-note">No pictures yet.</span>'}</div>
+  <h3>🚫 Blocked</h3><div id="blockedGrid" class="picture-grid">${blocked.map(v=>`<span class="picture-cell"><span class="picture-emoji">${esc(v)}</span><button type="button" class="ghost small" data-unblock-art="${esc(v)}">Unblock</button></span>`).join('')||'<span class="mini-note">Nothing blocked.</span>'}</div>`;
+  box.querySelectorAll('[data-block-art]').forEach(b=>b.onclick=()=>blockPicture(b.dataset.blockArt));
+  box.querySelectorAll('[data-unblock-art]').forEach(b=>b.onclick=()=>unblockPicture(b.dataset.unblockArt));
 }
 function splitKey(k){const i=k.indexOf(':');return[k.slice(0,i),k.slice(i+1)]}function itemFor(key){const[t,id]=splitKey(key);return(state.catalog[t]||[]).find(x=>x.id===id)||(t==='shorashim'&&Array.isArray(window.FTT_BOOKLET_SHORASHIM)?window.FTT_BOOKLET_SHORASHIM.find(x=>x.id===id):null)||(t==='shorashim'&&Array.isArray(window.FTT_CHUMASH_VOCAB)?window.FTT_CHUMASH_VOCAB.find(x=>x.id===id):null)||null}function fmtSec(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h?`${h}h ${m}m`:m?`${m}m`:`${sec}s`}function dateLabel(ts){if(!ts)return'Never';return new Date(ts).toLocaleString()}function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function learned(s,type){return Object.values(s.cards||{}).filter(c=>c.learnedAt&&(!type||c.itemType===type)&&itemFor(c.itemKey)&&!itemFor(c.itemKey).hidden)}function reviewDone(s){const r=s.dailyReview||{};const total=learned(s).length;const seen=r.date===today()?Object.keys(r.seen||{}).length:0;return{total,seen,complete:!!total&&r.date===today()&&seen>=total}}
@@ -562,13 +609,20 @@ async function loadAll(){
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
   const chumashAdded=ensureChumashVocabLists();
   if(chumashAdded.length)state.settings.chumashVocabSeedVersion=CHUMASH_VOCAB_SEED_VERSION;
-  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&!sanitizeClassArt(i.pendingArt).length);
+  let promoted=0;
+  for(const i of (state.catalog.shorashim||[])){ // waiting-for-approval step is off: waiting pictures go to students
+    if(!i||!i.pendingArt)continue;
+    const w=sanitizeClassArt(i.pendingArt);
+    if(!sanitizeClassArt(i.art).length&&w.length)i.art=w;
+    delete i.pendingArt;promoted++;
+  }
+  const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);
   let repaired=0;
   if(needsArt.length){
     status(`☁️ Checking matching pictures for ${needsArt.length} words…`,'syncing');
     repaired=await fillArtForShorashim(needsArt);
   }
-  if(repaired||chumashAdded.length||p18Added.length||unitMigration.tagged||unitMigration.added.length){
+  if(promoted||repaired||chumashAdded.length||p18Added.length||unitMigration.tagged||unitMigration.added.length){
     const saved=await db.ref(`${SPACE}/catalog`).transaction(current=>mergeCatalogWithoutReplacingPictures(current,state.catalog));
     if(saved.committed)state.catalog=withAllTracks(saved.snapshot.val()||state.catalog);
   }
@@ -763,6 +817,7 @@ function needsTeacherApproval(item){const n=commonnessOf(item);return currentTra
 async function toggleTeacherApproval(id){const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!item)return;item.teacherApproved=item.teacherApproved!==true;renderCatalog();await saveCatalog();}
 function renderCatalog(){
   currentTrack=$('teacherTrack').value;
+  renderPictureBlockPanel();
   refreshNamedLists();
   refreshPerekFilter();
   renderBookletControl();
@@ -777,7 +832,6 @@ function renderCatalog(){
     const art=`<div class="teacher-art-count">Students see ${selectedArt.length}/${ART_STUDENT_MAX} — click a picture to select or unselect it</div>`+pool.map(a=>{const on=selectedArt.includes(a);return `<button type="button" class="teacher-art-chip${on?' selected':''}" data-a="art" data-art="${esc(a)}" aria-pressed="${on}" title="${on?'Shown to students — click to unselect':'Click to show this picture to students'}">${esc(a)}</button>`}).join('');
     const commonness=commonnessOf(i),approvalNeeded=needsTeacherApproval(i),approvalBlock=approvalNeeded?`<div class="approval-box ${i.teacherApproved===true?'approved':'pending'}"><b>Commonness ${commonness}/10</b> — ${i.teacherApproved===true?'Approved for students':'Waiting for your approval'}<button data-a="approve" class="${i.teacherApproved===true?'ghost':'primary'}">${i.teacherApproved===true?'Remove Approval':'✓ Approve Word'}</button></div>`:(commonness?`<div class="mini-note">Commonness ${commonness}/10 • Automatically included</div>`:'');
     const duplicateKeeper=duplicateKeeperFor(i),duplicateBlock=duplicateKeeper?`<div class="approval-box pending"><b>Possible duplicate</b> — another ${esc(i.front)} with the same English meaning (${esc(i.english)}) is already in this list. <button data-a="merge-duplicate" class="danger">Merge Duplicate</button> <button data-a="dismiss-duplicate" class="ghost">Dismiss Suggestion</button></div>`:'';
-    const waiting=sanitizeClassArt(i.pendingArt),waitingBlock=currentTrack==='shorashim'&&waiting.length&&!selectedArt.length?`<div class="approval-box pending"><b>Automatic pictures waiting for your approval</b> — ${waiting.map(esc).join(' ')} <button data-a="approve-art" class="primary">✓ Approve Pictures</button></div>`:'';
     const artBlock=currentTrack==='shorashim'
       ? `<div class="teacher-art-preview">${art||'<span class="mini-note">No pictures yet</span>'}</div>`
       : '';
@@ -790,7 +844,7 @@ function renderCatalog(){
         <div class="mini-note">${currentTrack==='shorashim'?`<span class="unit-pill">${perekLabel(i)}</span> • `:''}${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
         ${approvalBlock}
         ${duplicateBlock}
-        ${waitingBlock}
+        
         ${artBlock}
       </div>
       <div class="mini-actions">
@@ -812,8 +866,6 @@ function renderCatalog(){
     row.querySelector('[data-a=hide]').onclick=()=>toggleHide(id);
     row.querySelector('[data-a=delete]').onclick=()=>deleteCatalogItem(id);
     row.querySelector('[data-a=pick]').onchange=e=>{if(e.target.checked)bulkSelected.add(String(id));else bulkSelected.delete(String(id));updateBulkBar(list);};
-    const approveArt=row.querySelector('[data-a=approve-art]');
-    if(approveArt)approveArt.onclick=()=>approveWaitingPictures([id]);
     const approve=row.querySelector('[data-a=approve]');
     if(approve)approve.onclick=()=>toggleTeacherApproval(id);
     const mergeDuplicate=row.querySelector('[data-a=merge-duplicate]');
@@ -1042,7 +1094,6 @@ $('teacherNewList').onclick=async()=>{
   status('☁️ Saving…','syncing');await db.ref(teacherSettingsPath()).set(state.settings);status('☁️ Saved');
   refreshNamedLists(name);renderCatalog();$('teacherListName').value=name;renderCatalog()
 };
-$('teacherApproveAllArt').onclick=async()=>{const chosen=$('teacherListName')?.value||'Main List',ids=(state.catalog.shorashim||[]).filter(i=>listNameOf(i)===chosen&&sanitizeClassArt(i.pendingArt).length).map(i=>i.id);if(!ids.length){alert('No automatic pictures are waiting in this list.');return;}if(!confirm(`Approve the automatic pictures for ${ids.length} word${ids.length===1?'':'s'} in “${chosen}”? Students will see them.`))return;status('☁️ Saving…','syncing');await approveWaitingPictures(ids);};
 $('teacherBulkAdd').onclick=()=>{
   $('bulkListLabel').textContent=$('teacherListName').value||'Main List';
   // The perek must be chosen in the dialog every time (#571). It starts empty and is never
