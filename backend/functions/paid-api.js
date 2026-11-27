@@ -27,12 +27,40 @@ function stable(value) {
   return value;
 }
 
+// Automatic AI grading of SPOKEN answers (Google Speech-to-Text, then Claude).
+// Switched OFF unless the owner sets this Realtime Database value to true:
+//   b3Private/settings/spokenAiGrading   (true = on; missing or anything else = off)
+// While off, these functions answer straight away without transcribing or calling
+// Claude, so they cost nothing; the pages keep the recording for the teacher to
+// mark. Only these four are covered: tapped-word answers, generation, text to
+// speech, Weekly Quiz and Shorashim art are not spoken grading and are unaffected.
+const SPOKEN_AI_GRADING = new Set(['gradeComprehension', 'gradeTranslationChunk',
+  'gradeMishnahTranslationChunk', 'gradeMishnahExplanation']);
+const SPOKEN_AI_SWITCH_PATH = 'b3Private/settings/spokenAiGrading';
+const SWITCH_CACHE_MS = 30000;
+let switchCache = { value: false, at: 0 };
+
+async function spokenAiGradingOn(db, now = Date.now()) {
+  if (now - switchCache.at < SWITCH_CACHE_MS) return switchCache.value;
+  try {
+    switchCache = { value: (await db.ref(SPOKEN_AI_SWITCH_PATH).get()).val() === true, at: now };
+  } catch (error) {
+    // If the switch cannot be read, stay off: never spend money on a guess.
+    console.error('Could not read the spoken AI grading switch', error.message);
+    switchCache = { value: false, at: now - SWITCH_CACHE_MS + 5000 };
+  }
+  return switchCache.value;
+}
+
 function paidHandler(name, category, handler) {
   return async (req, res) => {
     res.set('Cache-Control', 'no-store');
     if (req.method === 'OPTIONS') return res.status(204).send('');
     if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST.' });
     const db = admin.database();
+    if (SPOKEN_AI_GRADING.has(name) && !(await spokenAiGradingOn(db)))
+      return res.status(200).json({ aiGrading: 'off', verdict: 'teacher_review', transcript: '', score: null,
+        feedback: 'Recorded. Your teacher will listen and mark this one.' });
     const store = {
       get: async p => (await db.ref(p).get()).val(),
       tx: (p, fn) => db.ref(p).transaction(fn)
@@ -139,4 +167,4 @@ function paidHandler(name, category, handler) {
   };
 }
 
-module.exports = { paidHandler, ALLOWED_ORIGINS };
+module.exports = { paidHandler, ALLOWED_ORIGINS, SPOKEN_AI_GRADING, spokenAiGradingOn };

@@ -162,3 +162,64 @@ test('empty comprehension results cannot permanently block generation retries',a
  await handler(req,response());await handler(req,response());await handler(req,response());
  assert.equal(calls,2);
 });
+
+// Spoken AI grading switch: off unless b3Private/settings/spokenAiGrading is true.
+const SPOKEN = ['gradeComprehension', 'gradeTranslationChunk', 'gradeMishnahTranslationChunk', 'gradeMishnahExplanation'];
+const spokenReq = { method: 'POST', ip: 'test', headers, body: {} };
+for (const name of SPOKEN) {
+  test(name + ' does nothing and costs nothing while the spoken AI grading switch is off', async () => {
+    const s = student(); let calls = 0;
+    const res = response();
+    await runtime(s).paidHandler(name, 'grading', async () => { calls++; })(spokenReq, res);
+    assert.equal(calls, 0);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.value.aiGrading, 'off');
+    assert.equal(res.value.verdict, 'teacher_review');
+    assert.equal(s.values.has('b3Private/paidApiUsage/grading'), false, 'no paid usage is reserved');
+  });
+}
+test('anything other than true keeps spoken AI grading off', async () => {
+  for (const value of [false, 'true', 1, 'on', {}]) {
+    const s = student(); let calls = 0;
+    s.values.set('b3Private/settings/spokenAiGrading', value);
+    await runtime(s).paidHandler('gradeComprehension', 'grading', async () => { calls++; })(spokenReq, response());
+    assert.equal(calls, 0, String(value));
+  }
+});
+test('setting the switch to true turns spoken AI grading back on', async () => {
+  const s = student(); let calls = 0;
+  s.values.set('b3Private/settings/spokenAiGrading', true);
+  const res = response();
+  await runtime(s).paidHandler('gradeMishnahExplanation', 'grading', async (req, r) => { calls++; r.status(200).json({ verdict: 'correct' }); })(spokenReq, res);
+  assert.equal(calls, 1);
+  assert.equal(res.value.verdict, 'correct');
+});
+test('the switch does not touch tapped-word grading, generation, speech, Weekly Quiz or Shorashim art', async () => {
+  for (const [name, category] of [['gradeQuestionAnswer', 'grading'], ['gradeMishnahQuestionAnswer', 'grading'],
+    ['generateTranslationChunks', 'generation'], ['generateWeeklyQuiz', 'generation'], ['synthesizeSpeech', 'speech']]) {
+    const s = student(); let calls = 0;
+    const body = category === 'speech' ? { text: 'hello' } : {};
+    await runtime(s).paidHandler(name, category, async (req, r) => { calls++; r.status(200).json({ ok: true }); })({ ...spokenReq, body }, response());
+    assert.equal(calls, 1, name);
+  }
+});
+test('a switch that cannot be read stays off', async () => {
+  const s = student(); let calls = 0;
+  const api = (() => {
+    const admin = { apps: [{}], database: () => ({ ref: () => ({ get: async () => { throw Error('down'); } }) }), auth: () => ({}) };
+    const module = { exports: {} };
+    vm.runInNewContext(fs.readFileSync('backend/functions/paid-api.js', 'utf8'), {
+      module, require: n => n === 'firebase-admin' ? admin : require(n === './paid-api-core.cjs' ? '../backend/functions/paid-api-core.cjs' : n),
+      console: { error() {}, log() {} }, Buffer, Date, Map });
+    return module.exports;
+  })();
+  await api.paidHandler('gradeComprehension', 'grading', async () => { calls++; })(spokenReq, response());
+  assert.equal(calls, 0);
+});
+test('student pages show a teacher-will-mark message instead of a score when AI grading is off', () => {
+  for (const page of ['record_pesukim/student.html', 'record-mishnayos/student.html']) {
+    const html = fs.readFileSync(page, 'utf8');
+    for (const text of ["teacher_review: '📤 Sent to your teacher'", "verdict === 'teacher_review'", 'your teacher will mark them'])
+      assert.ok(html.includes(text), page + ' is missing: ' + text);
+  }
+});

@@ -4479,7 +4479,8 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
   comprehensionScore = score;
   comprehensionFeedback = feedback;
 
-  const badgeText = { excellent: '🌟 Excellent!', correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again' }[verdict] || '';
+  const badgeText = { excellent: '🌟 Excellent!', correct: '✅ Got it!', partial: '🤔 Almost', incorrect: '💡 Try again', teacher_review: '📤 Sent to your teacher' }[verdict] || '';
+  const teacherWillMark = verdict === 'teacher_review'; // AI grading switch is off: the teacher marks it
   const scoreText = (typeof comprehensionScore === 'number') ? ' (' + comprehensionScore + '%)' : '';
   // Show what the scorer actually heard, same as the history view already
   // does via a.comprehensionTranscript - previously only visible after
@@ -4488,7 +4489,7 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
   if(transcript){
     transcriptHtml = '<span style="width:100%;font-style:italic;color:var(--ink-soft);font-size:0.85rem;">"' + transcript + '"</span>';
   }
-  const comprehensionDisputeHtml = disputesAllowedForCurrentSelection()
+  const comprehensionDisputeHtml = (!teacherWillMark && disputesAllowedForCurrentSelection())
     ? '<div class="dispute-row" id="comprehensionDisputeRow"><button class="btn small ghost-delete" id="comprehensionDisputeBtn">⚠️ Dispute this grade</button></div>'
     : '';
   resultEl.className = 'comp-result ' + verdict;
@@ -4496,10 +4497,11 @@ async function showComprehensionResult(verdict, score, feedback, transcript){
     '<span class="comp-badge">' + badgeText + scoreText + '</span>' +
     '<span>' + comprehensionFeedback + '</span>' +
     transcriptHtml +
-    '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊 Hear feedback</button>' +
+    (teacherWillMark ? '' : '<button class="speak-btn" id="compReplayBtn" title="Hear this read aloud">🔊 Hear feedback</button>') +
     comprehensionDisputeHtml;
   resultEl.classList.remove('hidden');
-  document.getElementById('compReplayBtn').onclick = () => speakText(comprehensionFeedback);
+  const compReplayBtn = document.getElementById('compReplayBtn');
+  if(compReplayBtn) compReplayBtn.onclick = () => speakText(comprehensionFeedback);
   const comprehensionDisputeBtn = document.getElementById('comprehensionDisputeBtn');
   if(comprehensionDisputeBtn) comprehensionDisputeBtn.onclick = openComprehensionDisputeForm;
   gradingMsg.textContent = '';
@@ -5077,7 +5079,7 @@ function renderCurrentChunk(){
       else if(translationPillPhase === 'recording') classes.push('tap-recording');
       else if(translationPillPhase === 'finishing') classes.push('tap-finishing');
     }
-    if(translationGradedResults[i]) classes.push(translationGradedResults[i].verdict === 'correct' ? 'correct' : 'incorrect');
+    if(translationGradedResults[i] && translationGradedResults[i].verdict !== 'teacher_review') classes.push(translationGradedResults[i].verdict === 'correct' ? 'correct' : 'incorrect');
     else if(translationSegments[i]) classes.push('recorded');
     const safeHtml = chunk.hebrew
       .split(/(\u05C3)/)
@@ -5136,7 +5138,9 @@ function renderCurrentChunk(){
     // rather than only once every piece in the posuk has been checked.
     const gradedCount = Object.keys(translationGradedResults).length;
     const correctSoFar = Object.values(translationGradedResults).filter(r => r.verdict === 'correct').length;
-    progressEl.textContent = gradedCount === total
+    const teacherMarks = Object.values(translationGradedResults).some(r => r.verdict === 'teacher_review');
+    if(teacherMarks) progressEl.textContent = gradedCount + ' of ' + total + ' pieces recorded — your teacher will mark them.';
+    else progressEl.textContent = gradedCount === total
       ? correctSoFar + ' of ' + total + ' correct. Tap any piece again if you want to replace that recording.'
       : correctSoFar + ' of ' + total + ' correct so far — keep going, or tap any checked piece again to replace it.';
   }else if(recordedCount){
@@ -5553,6 +5557,17 @@ function showTranslationSummary(level){
   const attempted = idxs.length;
   const total = level.chunks.length;
   const pct = total ? Math.round((correctCount / total) * 100) : 0;
+
+  // AI grading switch is off: recordings are kept for the teacher to mark, so
+  // show that instead of a 0% score.
+  if(idxs.some(i => translationGradedResults[i].verdict === 'teacher_review')){
+    resultEl.className = 'comp-result translation-result-shell';
+    resultEl.innerHTML = '<div class="translation-summary-head"><span class="translation-summary-score">📤 Sent to your teacher</span>' +
+      '<span class="translation-summary-count">' + attempted + ' of ' + total + ' pieces recorded — your teacher will mark them.</span></div>';
+    resultEl.classList.remove('hidden');
+    retryBtn.classList.remove('hidden');
+    return;
+  }
 
   const overallOk = attempted === total && correctCount === total;
   const translationSummaryText = overallOk
