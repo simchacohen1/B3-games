@@ -67,8 +67,8 @@ tbody tr.row:focus{outline:2px solid #2563eb;outline-offset:-2px}
 .crumbs span.cur{color:#1f2937}.crumbs .sep{color:#94a3b8}
 .more{margin:12px auto;display:block}
 @media(max-width:700px){
- table,thead,tbody,tr,td{display:block}
- thead{display:none}
+ table.list,table.list thead,table.list tbody,table.list tr,table.list td{display:block}
+ table.list thead{display:none}
  tr.row{padding:10px 12px;border-bottom:1px solid #eef2f7}
  tr.row td{border:0;padding:2px 0}
  tr.row td:before{content:attr(data-l)': ';font-size:12px;color:#94a3b8;font-weight:700}
@@ -102,7 +102,7 @@ tbody tr.row:focus{outline:2px solid #2563eb;outline-offset:-2px}
  </div>
  <div id="detailView" style="display:none">
  <div class="crumbs" id="crumbs"></div>
- <div class="card tablebox"><table>
+ <div class="card tablebox"><table class="list">
   <thead><tr><th>Student</th><th>Class</th><th>Tool</th><th>Date &amp; time</th><th>What</th><th>Result</th><th>Status</th></tr></thead>
   <tbody id="rows"></tbody>
  </table><div id="empty" class="empty" style="display:none">No activity matches these filters.</div></div>
@@ -314,7 +314,7 @@ function drawOverview(){
  $('gridHead').innerHTML='<tr><th>Student</th>'+ids.map(id=>'<th class="hd" data-tool="'+esc(id)+'" title="Open '+esc(H.TOOL_BY_ID[id].label)+'">'+esc(H.TOOL_BY_ID[id].icon)+'<br>'+esc(H.TOOL_BY_ID[id].label)+'</th>').join('')+'<th>Total</th></tr>';
  $('gridBody').innerHTML=g.rows.map(r=>'<tr><td class="name" data-student="'+esc(r.student.id)+'">'+esc(r.student.name)+(r.student.className?'<span class="cn">'+esc(r.student.className)+'</span>':'')+'</td>'+ids.map(id=>'<td class="cell '+H.cellLevel(r.counts[id],g.avg[id])+'" data-student="'+esc(r.student.id)+'" data-tool="'+esc(id)+'">'+r.counts[id]+'</td>').join('')+'<td><b>'+r.total+'</b></td></tr>').join('');
  $('gridEmpty').style.display=g.rows.length?'none':'';
- $('status').textContent=rows.length+' activities in '+periodLabel()+(notes.length?' · '+notes.join(' '):'');
+ $('status').textContent=rows.length+(rows.length===1?' activity':' activities')+' in '+periodLabel()+(notes.length?' · '+notes.join(' '):'');
 }
 function drawDetail(){
  const f=filters();
@@ -334,7 +334,7 @@ function drawDetail(){
  }).join('');
  $('empty').style.display=slice.length?'none':'';
  $('more').style.display=filtered.length>shown?'':'none';
- $('status').textContent=filtered.length+' activities in '+periodLabel()+', newest first. Tap a row to open it.'+(notes.length?' · '+notes.join(' '):'');
+ $('status').textContent=filtered.length+(filtered.length===1?' activity':' activities')+' in '+periodLabel()+', newest first. Tap a row to open it.'+(notes.length?' · '+notes.join(' '):'');
 }
 /* Drilling down just sets the same Student / Tool filters, so the dropdowns and the crumbs always agree. */
 function drillTo(tool,student){
