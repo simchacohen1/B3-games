@@ -674,7 +674,7 @@ async function loadAll(){
   status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
   applyRequestedTeacherView();
 }
-function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
+function renderAll(){renderDashboard();renderCatalog();renderLeaderboard();if(window.renderShorashimMastery)window.renderShorashimMastery()}
 /* ===== Perakim, lists and labels: all teacher-configurable ===== */
 function refreshPerekFilter(){
   const sel=$('teacherPerekFilter');if(!sel)return;

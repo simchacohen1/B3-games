@@ -1,0 +1,24 @@
+/* Practice Activities: Tracing, Multiple Choice, Matching */
+.pa-prompt{text-align:center;font-size:64px;font-weight:900;direction:rtl;margin:10px 0 18px;line-height:1.2}
+.pa-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:820px;margin:0 auto}
+.pa-choice,.pa-tile-row{display:flex;align-items:stretch;gap:8px}
+.pa-choice-btn,.pa-tile{flex:1;min-height:64px;border:2px solid #cbd5e1;background:#fff;border-radius:16px;padding:10px 14px;font-size:22px;font-weight:800;color:#172033;display:flex;align-items:center;justify-content:center;gap:10px;text-align:center;transition:transform .12s,border-color .12s,background .12s}
+.pa-choice-btn:hover,.pa-tile:hover{border-color:#818cf8;transform:translateY(-1px)}
+.pa-speak{flex:0 0 52px;border:2px solid #cbd5e1;background:#f8fafc;border-radius:14px;font-size:22px;cursor:pointer}
+.pa-speak:hover{background:#eef2ff;border-color:#818cf8}
+.pa-pic{max-width:90px;max-height:70px;border-radius:10px;object-fit:contain}
+.pa-choice.correct .pa-choice-btn,.pa-tile.matched{background:#dcfce7;border-color:#16a34a;color:#14532d}
+.pa-choice.wrong .pa-choice-btn,.pa-tile.wrong{background:#fee2e2;border-color:#dc2626;animation:paShake .3s}
+.pa-tile.selected{background:#e0e7ff;border-color:#4f46e5}
+.pa-tile.matched{opacity:.75}
+.pa-match{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:22px;max-width:860px;margin:0 auto}
+.pa-col{display:flex;flex-direction:column;gap:12px}
+.pa-tile.he{font-size:34px;direction:rtl}
+@keyframes paShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.pa-trace-label{text-align:center;font-size:34px;font-weight:800;direction:rtl;margin:4px 0}
+.pa-trace-wrap{position:relative;width:100%;max-width:900px;margin:8px auto;aspect-ratio:900/360;border:2px solid #e2e8f0;border-radius:20px;background:#fffdf5;overflow:hidden}
+.pa-trace-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#trInk{touch-action:none;cursor:crosshair}
+.pa-trace-foot{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:8px}
+.pa-trace-foot .pa-speak{flex:0 0 46px;height:42px}
+@media(max-width:650px){.pa-prompt{font-size:48px}.pa-choices{grid-template-columns:1fr}.pa-match{grid-template-columns:1fr}}
