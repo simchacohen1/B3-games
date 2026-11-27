@@ -98,7 +98,7 @@
     if (modalClassSelect) modalClassSelect.value = '';
     chooser.replaceChildren(el('h2', '', 'Which class?'), el('p', '', 'Choose a class to continue.'));
     var last = getPreferred(), list = el('div', 'ftt-quick-classes');
-    classes.forEach(function(row) {
+    pickableClasses().forEach(function(row) {
       var btn = el('button', '', row.name + (row.id === last ? ' (last used)' : ''));
       btn.type = 'button';
       btn.addEventListener('click', function() { updatePanelClass(row.id); });
@@ -121,6 +121,12 @@
     });
   }
   function gateApi() { return window.B3ClassGate || null; }
+  // The owner's class lists show only B3 ET and B3 WT; the class already chosen always stays listed.
+  function pickableClasses() {
+    var g = gateApi(); if (!g) return classes;
+    var ok = g.pickable(classes.map(function(r) { return r.id; }));
+    return classes.filter(function(r) { return ok.indexOf(r.id) >= 0 || r.id === selected; });
+  }
   // The teacher's site-wide class (single class only; 'all' is not a class a panel can act on).
   function siteClass() {
     var g = gateApi(); if (!g) return '';
@@ -449,14 +455,14 @@
     if (!select) return;
     select.replaceChildren();
     var blank = el('option','','Choose a class\u2026'); blank.value=''; select.appendChild(blank);
-    classes.forEach(function(row){
+    pickableClasses().forEach(function(row){
       var opt = el('option','',row.name); opt.value=row.id;select.appendChild(opt);
     });
     select.value = selected;
     if (modalClassSelect) {
       modalClassSelect.replaceChildren();
       var blank2 = el('option','','Choose a class\u2026'); blank2.value=''; modalClassSelect.appendChild(blank2);
-      classes.forEach(function(row) { var opt = el('option','',row.name);opt.value=row.id;modalClassSelect.appendChild(opt); });
+      pickableClasses().forEach(function(row) { var opt = el('option','',row.name);opt.value=row.id;modalClassSelect.appendChild(opt); });
       modalClassSelect.value = selected;
     }
   }

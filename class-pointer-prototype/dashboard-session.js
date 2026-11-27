@@ -181,7 +181,9 @@
         const picker=typeof document==='undefined'?null:document.getElementById('pointerClassChoice');
         if(picker){
           const base=db.ref('b3Games/workspaces/'+ws+'/classes');
-          const ids=access.role==='admin'?Object.keys((await base.once('value')).val()||{}):(access.classIds||[]).filter(C.validId);
+          let ids=access.role==='admin'?Object.keys((await base.once('value')).val()||{}):(access.classIds||[]).filter(C.validId);
+          // The owner's picker lists only B3 ET and B3 WT (the class being taught always stays listed).
+          if(window.B3ClassGate?.pickable)ids=window.B3ClassGate.pickable(ids).concat(ids.filter(id=>id===classId&&!window.B3ClassGate.pickable(ids).includes(id)));
           picker.replaceChildren();
           for(const id of ids){
             const classRow=id===classId?row:(await base.child(id).once('value')).val();
