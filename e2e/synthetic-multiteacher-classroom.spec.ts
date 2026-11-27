@@ -448,6 +448,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await chazaraTeacherPage.goto(`${origin}/shorashim/index.html?class=${CLASS_ID}`);
   await expect(chazaraTeacherPage.locator('#signedInStudentName')).toHaveText('Teacher Preview');
   await chazaraTeacherPage.getByRole('button',{name:/^New Shorashim/}).click();
+  await chazaraTeacherPage.locator('#changeLearningPerekBtn').click();
   await expect(chazaraTeacherPage.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('0 of 1 learned');
   await chazaraTeacherContext.close();
   const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);
