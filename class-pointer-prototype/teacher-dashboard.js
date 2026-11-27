@@ -426,22 +426,37 @@ function init(){
  const IDLE_MS=5*60*1000,AWAY_MS=30*1000;
  const reminder=el('div','cp-board-reminder');reminder.hidden=true;reminder.setAttribute('role','alert');
  const reminderStop=el('button','cp-reminder-stop','Stop whiteboard'),reminderKeep=el('button','cp-reminder-keep','Keep it on');
+ const reminderText=el('span',null,'The whiteboard is still on for your students. Close it when you are done.');
  reminderStop.type='button';reminderKeep.type='button';
- reminder.append(el('span',null,'The whiteboard is still on for your students. Close it when you are done.'),reminderStop,reminderKeep);
+ reminder.append(reminderText,reminderStop,reminderKeep);
  document.body.append(reminder);
  const baseTitle=document.title;
- let boardLive=false,idleTimer=null,hiddenAt=0;
- function showReminder(){if(boardLive)reminder.hidden=false}
- function resetIdle(){clearTimeout(idleTimer);idleTimer=boardLive?setTimeout(showReminder,IDLE_MS):null}
- function syncReminder(live){
-  boardLive=live;
+ let boardLive=false,screenLive=false,idleTimer=null,hiddenAt=0;
+ /* A shared SCREEN is left on by accident the same way: the teacher walks away or goes to another window. Same 5 minutes
+    without any pointer or keyboard use of this page. The same moment tells the students (lesson.shareMayBeLeftOn) so they
+    can shrink or close the share; it is cleared when the teacher keeps sharing, stops, or pushes something new. */
+ function tellStudents(flag){try{void window.ClassPointerDashboard?.setShareMayBeLeftOn?.(flag)?.catch?.(()=>{})}catch{}}
+ function showReminder(){
+  if(!boardLive&&!screenLive)return;
+  if(screenLive){reminderText.textContent='You\u2019re still sharing. Stop?';reminderStop.textContent='Stop sharing';reminderKeep.textContent='Keep sharing';tellStudents(true)}
+  else{reminderText.textContent='The whiteboard is still on for your students. Close it when you are done.';reminderStop.textContent='Stop whiteboard';reminderKeep.textContent='Keep it on'}
+  reminder.hidden=false;
+ }
+ function resetIdle(){clearTimeout(idleTimer);idleTimer=(boardLive||screenLive)?setTimeout(showReminder,IDLE_MS):null}
+ function syncReminder(live,screen){
+  const wasScreen=screenLive;
+  boardLive=live&&screen!==true;screenLive=live&&screen===true;
+  if(wasScreen&&!screenLive)tellStudents(false);
   if(!live){reminder.hidden=true;clearTimeout(idleTimer);idleTimer=null;document.title=baseTitle;return}
   if(!idleTimer)resetIdle();
  }
- reminderStop.addEventListener('click',()=>{reminder.hidden=true;stopBtn.click()});
- reminderKeep.addEventListener('click',()=>{reminder.hidden=true;resetIdle()});
+ reminderStop.addEventListener('click',()=>{reminder.hidden=true;if(screenLive)tellStudents(false);stopBtn.click()});
+ reminderKeep.addEventListener('click',()=>{reminder.hidden=true;if(screenLive)tellStudents(false);resetIdle()});
  for(const type of ['pointerdown','pointermove','keydown','wheel'])stage?.addEventListener(type,()=>{if(boardLive&&reminder.hidden)resetIdle()},{passive:true});
+ // While a screen is shared the teacher works in that window, so any use of this page counts (not only the lesson area).
+ for(const type of ['pointerdown','keydown','wheel','focus'])window.addEventListener(type,()=>{if(screenLive&&reminder.hidden)resetIdle()},{passive:true,capture:true});
  document.addEventListener('visibilitychange',()=>{
+  if(screenLive){if(!document.hidden&&reminder.hidden)resetIdle();return}
   if(!boardLive)return;
   if(document.hidden){hiddenAt=Date.now();document.title='⚠ Whiteboard still on – '+baseTitle}
   else{document.title=baseTitle;if(hiddenAt&&Date.now()-hiddenAt>=AWAY_MS)showReminder();hiddenAt=0}
@@ -462,7 +477,7 @@ function init(){
   live.textContent='Live: '+(docOpen()?lastDoc:'Shared screen');
   stopBtn.textContent='';stopBtn.append(icon('stop'),el('span',null,'Stop '+(docOpen()?(lastDoc==='PDF'?'PDF':lastDoc.toLowerCase()):'sharing my screen')));
   syncHint();
-  syncReminder(isLive&&docOpen()&&lastDoc==='Whiteboard');
+  syncReminder(isLive&&((docOpen()&&lastDoc==='Whiteboard')||(!docOpen()&&sharingScreen())),!docOpen()&&sharingScreen());
  }
  if(stage)new MutationObserver(syncLive).observe(stage,{attributes:true,attributeFilter:['class']});
  if(stopScreen)new MutationObserver(syncLive).observe(stopScreen,{attributes:true,attributeFilter:['disabled']});

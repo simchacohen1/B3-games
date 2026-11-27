@@ -272,6 +272,7 @@
     await writeSession(ref,async()=>{
       await ref.update({
         studentScreenSharing:true,
+        shareMayBeLeftOn:false,
         shareRequest:{at:firebase.database.ServerValue.TIMESTAMP}
       });
       sharingOn=true;
@@ -295,11 +296,18 @@
         // already approved Entire Screen capture. Only an explicit Disable
         // student sharing or the class ending may revoke that permission.
         ...(mode==='screens'?{studentScreenSharing:true}:{}),
+        shareMayBeLeftOn:false,
         permissionRevision:firebase.database.ServerValue.TIMESTAMP,
         destinationRequest:{mode,at:firebase.database.ServerValue.TIMESTAMP}
       });
       if(mode==='screens')sharingOn=true;
     });
+  },async setShareMayBeLeftOn(flag){
+    // The teacher's own check says the share may have been left on by accident: students are offered a way to shrink or close it.
+    const ref=activeRef;if(!ref)return;
+    const context=await ready;
+    if(!firebase.auth().currentUser||firebase.auth().currentUser.uid!==context.user.uid)return;
+    await writeSession(ref,()=>ref.update({shareMayBeLeftOn:flag===true}));
   },async setStudentScreenSharing(enabled){
     const ref=activeRef;if(!ref)return;
     const context=await ready;
