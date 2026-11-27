@@ -60,6 +60,7 @@
 <script src="teacher-preview.js?v=20261008-1"></script>
 <script src="backend/functions/student-tool-policy.js"></script>
 <script src="student-tool-controls.js"></script>
+<script src="class-confirm-gate.js?v=20261126-site-class"></script>
 </head><body>
 <button id="signOut" class="signout-pill hidden">Sign out</button>
 <h1 id="homeTitle">Fun Torah Tools</h1>
@@ -93,13 +94,24 @@ function showTeacherSignIn(message){
 }
 function setupTopBar(ids,snaps,access){
  const bar=q('homeTopBar'),pick=q('homeClassPick'),rows=ids.map((id,i)=>({id,row:snaps[i].val()||{},ok:snaps[i].exists()&&(snaps[i].val()||{}).active!==false})).filter(x=>x.ok);
+ const G=window.B3ClassGate,lab=x=>G?G.label(x.id,x.row.name):(x.row.name||x.id);
  bar.classList[rows.length?'remove':'add']('hidden');
- const keep=pick.value;
- pick.innerHTML='<option value="">All my classes</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.row.name||x.id)+'</option>').join('');
- if(rows.some(x=>x.id===keep))pick.value=keep;else if(rows.length===1)pick.value=rows[0].id;
+ // One class choice for the whole teacher site (saved for this account). Teacher Home follows it live.
+ window.__b3ClassLive=!previewActive;
+ const pickRows=G?rows.filter(x=>G.pickable(rows.map(r=>r.id)).includes(x.id)):rows;
+ pick.innerHTML='<option value="all">All classes</option>'+pickRows.map(x=>'<option value="'+esc(x.id)+'">'+esc(lab(x))+'</option>').join('');
  const cards=document.querySelectorAll?[...document.querySelectorAll('#classes .class-card')]:[];
- const apply=()=>cards.forEach((c,i)=>{const id=rows[i]?.id;if(c.style)c.style.display=!pick.value||id===pick.value?'':'none';});
- pick.onchange=apply;apply();
+ const apply=()=>cards.forEach((c,i)=>{const id=rows[i]?.id;if(c.style)c.style.display=pick.value==='all'||id===pick.value?'':'none';});
+ const show=id=>{pick.value=pickRows.some(x=>x.id===id)?id:'all';apply();};
+ pick.onchange=()=>{if(G&&!previewActive)G.setSite(pick.value);apply();};
+ if(!previewActive&&G){
+  // Follow a change made with the class button at the top, without reloading.
+  if(!window.__b3HomeClassWatch){window.__b3HomeClassWatch=true;window.addEventListener('b3-class-changed',e=>{const id=e.detail&&e.detail.id;if(id&&pick.value!==id)show(id);});}
+  const names={};rows.forEach(x=>{names[x.id]=x.row.name});
+  show(G.getSite());
+  // First time (no saved class): ask once. A single class is simply used.
+  G.choose({ids:rows.map(x=>x.id),names,requested:'-',allowAll:true}).then(id=>show(id)).catch(()=>{});
+ }else show(rows.length===1?rows[0].id:'all');
  const current=()=>rows.find(x=>x.id===pick.value)||rows[0];
  q('homeTeacherToolsBtn').onclick=()=>{const idx=rows.indexOf(current());const sec=cards[idx]?.querySelector('.teacher-tools-section');if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});};
  q('homeApprovalsBtn').onclick=()=>{
@@ -153,7 +165,7 @@ async function render(user,access){
  const places=R.renderMap({audience:"teacher",isOn,hrefFor:t=>previewActive?previewHref(t.id,id):R.withClass(t.teacherHref||t.href,id)});
  const teacherCards=R.renderTeacherTools({audience:"teacher",classId:id,isOn,preview:previewActive,previewHref:tool=>previewHref(tool,id)});
  const teacherBox='<div class="teacher-tools-section"><h3>👨‍🏫 Teacher Tools</h3><p class="teacher-tools-subtitle">For you and this class</p><div class="teacher-tools-container">'+teacherCards+'</div></div>';
- return '<section class="class-card"><h2>'+esc(row.name||id)+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
+ return '<section class="class-card"><h2>'+esc(window.B3ClassGate?window.B3ClassGate.label(id,row.name):(row.name||id))+'</h2>'+(principal?'<p class="sub">Teacher: '+(supervised.filter(t=>t.classIds?.[id]===true).map(t=>esc(t.name)).join(", ")||"Assigned teacher")+'</p>':"")+' <div class="island-intro"><div><h3>Welcome to Learning Island!</h3><p>Choose a place to explore.</p></div></div><div class="game-container island-map" aria-label="Learning Island destinations">'+(places||'<div class="empty">No tools have been enabled for this class yet.</div>')+'</div>'+teacherBox+(!previewActive&&window.B3StudentToolControls?window.B3StudentToolControls.render(id,row,TOOLS,access.role==='admin'&&['et','wt'].includes(id)):'')+'</section>';
  }).join("")||'<div class="gate">No classes are assigned to this teacher yet.</div>';
  if(!previewActive&&window.B3StudentToolControls)window.B3StudentToolControls.bind(q("classes"));
  setupTopBar(ids,snaps,access);

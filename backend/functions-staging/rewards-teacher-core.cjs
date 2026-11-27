@@ -1,4 +1,5 @@
 'use strict';
+const balanceCore=require('./rewards-balance-core.cjs');
 // Student Rewards for every teacher: a signed-in teacher can award points,
 // save daily points, comment, and approve activity points for students in
 // their own classes (classes with the Student Rewards tool turned on).
@@ -98,9 +99,9 @@ async function loadRoot(store,scope){
 }
 
 async function addToBalance(store,studentId,amount){
- let applied=0;
- const r=await store.tx(SR+'/students/'+studentId+'/rewardBalance',cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
- return {applied,balance:Number(r?.snapshot?.val?.()??0)};
+ const path=SR+'/students/'+studentId+'/rewardBalance';
+ const r=await balanceCore.changeWith({get:()=>store.get(path),tx:fn=>store.tx(path,fn)},amount,{clamp:true});
+ return {applied:r.committed?r.applied:0,balance:Number(r?.snapshot?.val?.()??0)};
 }
 
 async function decideRequest(store,scope,email,requestId,approve,now){

@@ -197,6 +197,10 @@
     if (pendingBounce && kind === 'limited') { pendingBounce = false; root.location.replace('/'); return; }
     var wantFull = kind === 'full';
     if (wantFull === full) return;
+    // A student sign-in is still being finished (the page sets this flag, see studentSignIn in index.html). Firebase reports the
+    // new user a moment BEFORE the page has saved who signed in, so reloading now would wipe the form and make the student type
+    // everything again. Wait: the check runs again every 1.5 seconds and reloads once the sign-in has finished.
+    if (root.__b3SignInBusy) return;
     // The view changes: remember it and load the page again in the new view.
     writeFull(wantFull);
     full = wantFull;

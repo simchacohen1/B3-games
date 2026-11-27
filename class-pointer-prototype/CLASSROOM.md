@@ -133,7 +133,7 @@ How it travels: positions are 0..1 across and down the captured screen. `screen-
 - **Privacy:** a student's files are readable only with that student's own sign-in for that class. Other students and teachers cannot list or open them. Deleting a class folder never deletes files; they show under "Other".
 - **Sign-in:** students need the Firebase sign-in made on the home page (`signInWithCustomToken`, kept per tab). If it is missing, or belongs to a different student than the tab, Save says to sign in on the home page first. Activity pages get it from `game-gate.js`; `saved-work.js` loads the Firebase Auth and Storage parts itself the first time they are needed.
 - **Safety on open:** a saved whiteboard must parse as JSON, be `version: 1`, be the right `kind` and fit the size limit before it is handed to the whiteboard code, which checks every mark again. PDFs are only ever given to pdf.js. Names are always written as text.
-- **Limits:** student whiteboard 3 MB, teacher whiteboard 10 MB, picture 2 MB, PDF 25 MB (rules and page agree); 50 files per student and 200 whiteboards per teacher (page only, rules cannot count); 60 folders per class, names up to 40 letters.
+- **Limits:** student whiteboard 3 MB, teacher whiteboard 10 MB, picture 2 MB, PDF 25 MB (rules and page agree); 200 files per student and 200 whiteboards per teacher (page only, rules cannot count); 60 folders per class, names up to 40 letters.
 - **Tests:** `tests/class-pointer-saved-work.test.cjs`, `-ui.test.cjs`, `tests/class-pointer-home-saved-files.test.cjs`; rules in `tests/storage-rules-emulator.test.cjs` (needs the Firebase emulator).
 
 ## Send a whiteboard to every student (issue #835)
@@ -166,3 +166,15 @@ No new Firebase rules, Storage rules or functions.
 - **Templates:** tick *Keep as a template* when saving, or press **Make template** on a saved whiteboard. **Use template**
   puts a fresh copy on the whiteboard that is not tied to the file: Save can only make a new file, never save over the
   template. **Show templates only** filters the list. Templates and folders are the teacher's own; students never see them.
+
+## Student zones on the shared whiteboard
+
+On the teacher's **Whiteboard** (the one every student sees), the toolbar's **▦ Zones** button gives each student their own part of the board.
+
+- **Making zones.** *Draw a zone* (drag a box on the board), or open *Zones…* to split the whole board into rows × columns, or press **One box for each student here** (one box each, given out automatically). The window lists every zone; each one is given to one student, several students or a whole group (a group from 🧑‍🤝‍🧑 Groups) with *＋ Give to…*, and can be taken away again. **Lock all zones** stops every student at once (they still see the board); **Unlock all zones** gives it back. **Remove all zones** frees the board.
+- **What a student can do.** Only inside a box that is theirs they can draw, move, resize or take away their marks. A press outside it does nothing and says the part is locked; a line dragged out of the box stops at its edge. Everything else is dimmed for them, with *Your box* and the other boxes' owners named, so they can still see the whole board. A student with no zone can write nowhere while zones are on. The teacher can write, move and erase everywhere.
+- **Enforced on the teacher's page.** `classroom.js` checks every new, changed and removed mark of a student against that student's zones (who the student is comes from the connection, never from the message). A student page that has been changed cannot get around it. Without zones on the slide being shown the board is free, exactly as before.
+- **Slides, saving and templates.** Each slide has its own zones (a copied slide copies them; a new slide has none). They are saved inside the whiteboard file (`zones` on each page, `zonesLocked` on the file) with who has each zone, so *Save*, *My files*, the automatic save, *Make template* and *Use template* all keep them, and an old file opens with none. A student that joins or refreshes is told their zones again.
+- **Not changed.** Private student copies (*Send to class*, Student boards) and Group boards work exactly as before; zones never apply to them. No Firebase rules, Storage rules or functions change.
+- **Limits.** Up to 30 zones on a slide and 12 owners on a zone. Students that are on another Fun Torah Tools page (not in the classroom page) are held to their zones by the teacher's page too, but only see the dimming on the classroom page.
+- **Code.** `board-zones-core.js` (the rules, no page needed), `board-zones.js` (the teacher's Zones button, window and drawing), `pdf-mode.js` (boxes per slide, saving, the student's guards and dimming), `classroom.js` (checks and messages `lesson-zones`). Tests: `tests/class-pointer-board-zones.test.cjs`.

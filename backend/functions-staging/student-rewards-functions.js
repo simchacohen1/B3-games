@@ -46,7 +46,11 @@ function cooldownText(until) {
 }
 
 function cors(req, res) {
-  res.set("Access-Control-Allow-Origin", "https://fun-torah-tools-staging.web.app");
+  // The main staging address, or this session's own staging preview channel (same pattern as STAGING_ORIGINS).
+  const origin = String(req.headers.origin || "");
+  const previewOk = /^https:\/\/fun-torah-tools-staging--[a-z0-9-]+\.web\.app$/.test(origin);
+  res.set("Access-Control-Allow-Origin", previewOk ? origin : "https://fun-torah-tools-staging.web.app");
+  res.set("Vary", "Origin");
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   if (req.method === "OPTIONS") { res.status(204).send(""); return true; }

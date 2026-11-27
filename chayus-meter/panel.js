@@ -1,10 +1,12 @@
 /*
- * Chayus Meter panel for the ET/WT Davening pages (pages-only version).
+ * Chayus Meter panel for the ET/WT Davening pages and the Chayus Meter page.
  * Independent of "I Want to Be Chazzan": it shares no state, audio or
- * microphone with it and never touches the page's player.
- * Sound is analysed on this device only. NOTHING is sent anywhere: this file
- * makes no network requests, and the microphone stream goes only into a local
- * analyser (no recorder, no connection, not played back).
+ * microphone with it and never touches the page's player (it only LISTENS to the
+ * class audio level, to tell it apart from the student's voice).
+ * Sound is analysed on this device only. This file makes no network requests and
+ * has no recorder or connection: the microphone stream goes only into a local
+ * analyser. The one number a signed-in student's day adds up to is handed to
+ * points.js, which is the only file that talks to the server.
  */
 (function () {
   'use strict';
@@ -47,11 +49,24 @@
 .chayus-controls button.primary{background:#315efb;color:#fff}
 .chayus-controls button:focus-visible{outline:3px solid #eeac17;outline-offset:3px}
 .chayus-privacy{font-size:13px;color:#667085;margin:14px 0 0}
+.chayus-level{margin:16px 0 0;padding:14px 16px;border-radius:16px;background:#fff;border:1px solid #d6e3f1}
+.chayus-level-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.chayus-level-name{font-size:19px;font-weight:900;color:#15315b}
+.chayus-points{font-size:14px;font-weight:850;color:#8a5a00}
+.chayus-level-bar{height:12px;border-radius:8px;background:#e3ecf8;overflow:hidden;margin:10px 0 6px}
+.chayus-level-bar i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#00aa91,#ffb938);transition:width .8s ease}
+.chayus-level-next{margin:0;font-size:14px;font-weight:750;color:#516686}
+.chayus-celebrate{position:relative;margin:12px 0 0;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,#fff3c4,#ffe0a3);color:#5c3b00;font-size:21px;font-weight:950;text-align:center;overflow:hidden;animation:chayusCelebrate .6s ease}
+.chayus-celebrate[hidden]{display:none}
+.chayus-celebrate small{display:block;font-size:15px;font-weight:800;margin-top:4px}
+.chayus-spark{position:absolute;top:50%;left:50%;width:10px;height:10px;border-radius:50%;background:#ff8a3d;opacity:0;animation:chayusSpark 1.6s ease-out forwards}
+@keyframes chayusCelebrate{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
+@keyframes chayusSpark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
 @keyframes chayusFlicker{0%,100%{transform:scale(1,1) rotate(-1.5deg)}35%{transform:scale(.96,1.06) rotate(1.5deg)}70%{transform:scale(1.04,.97) rotate(-.5deg)}}
 @keyframes chayusBar{0%,100%{height:6px}50%{height:26px}}
 @keyframes chayusBreathe{0%,100%{opacity:.45}50%{opacity:1}}
 @keyframes chayusPop{0%{transform:scale(.94);opacity:.3}60%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
-@media (prefers-reduced-motion:reduce){.chayus-panel *{animation:none!important;transition:none!important}.chayus-bars[data-voice="on"] i{height:18px}}
+@media (prefers-reduced-motion:reduce){.chayus-panel *{animation:none!important;transition:none!important}.chayus-spark{display:none}.chayus-bars[data-voice="on"] i{height:18px}}
 `;
   const panel = document.createElement('section');
   panel.className = 'chayus-panel';
@@ -59,7 +74,7 @@
   panel.innerHTML = `<h2>🎙️ My Chayus Meter</h2>
 <p id="chayusStatus" class="chayus-status" role="status">The microphone is off. Turn it on only if you want to.</p>
 <div id="chayusBody" class="chayus-body">
-  <div id="chayusCircle" class="chayus-meter" data-state="off" data-voice="off" role="img" aria-label="Chayus meter. It glows while your voice is heard steadily. It does not measure how loud you are.">
+  <div id="chayusCircle" class="chayus-meter" data-state="off" data-voice="off" role="img" aria-label="Chayus meter. It glows while your voice is heard steadily. A normal voice counts fully and a stronger voice counts up to double. Shouting adds nothing more.">
     <div class="chayus-halo"></div>
     <svg viewBox="0 0 120 120" aria-hidden="true">
       <defs>
@@ -80,15 +95,135 @@
     <p id="chayusLive" class="chayus-live"></p>
   </div>
 </div>
+<div id="chayusCelebrate" class="chayus-celebrate" role="status" aria-live="polite" hidden></div>
+<div id="chayusLevel" class="chayus-level" aria-label="My Chayus level">
+  <div class="chayus-level-head"><span id="chayusLevelName" class="chayus-level-name"></span><span id="chayusPoints" class="chayus-points"></span></div>
+  <div class="chayus-level-bar" aria-hidden="true"><i id="chayusLevelFill"></i></div>
+  <p id="chayusLevelNext" class="chayus-level-next"></p>
+</div>
 <div id="chayusControls" class="chayus-controls"></div>
-<p class="chayus-privacy">Microphone access starts only when you choose it, and your browser asks permission each time. Sound is analyzed on this computer only. It is never recorded, saved, or sent anywhere. The meter follows how steadily a voice is heard, never how loud it is. It does not judge kavana, words, pronunciation, or davening quality. Points are never automatic.</p>`;
+<p class="chayus-privacy">Microphone access starts only when you choose it, and your browser asks permission each time. Sound is analyzed on this computer only. It is never recorded, saved, or sent anywhere. Only the number of minutes your voice was heard today is saved, to give you your Chayus points (1 point for each level, up to 10 a day). Your time counts only while a voice is heard: a normal voice counts fully and a stronger voice counts up to double, so shouting adds nothing more. Class audio from your speakers does not count. It does not judge kavana, words, pronunciation, or davening quality.</p>`;
   document.head.append(style);
   const anchor = document.querySelector('main');
   if (anchor) anchor.after(panel); else document.body.append(panel);
   const status = $('chayusStatus'), controls = $('chayusControls'), feedback = $('chayusFeedback');
   const circle = $('chayusCircle'), ring = $('chayusRing'), bars = $('chayusBars'), liveLine = $('chayusLive');
+  const levelName = $('chayusLevelName'), levelPoints = $('chayusPoints'), levelFill = $('chayusLevelFill'), levelNext = $('chayusLevelNext');
+  const celebrateBox = $('chayusCelebrate');
   let meter = null, stream = null, context = null, analyser = null, sampleTimer = null, starting = false;
   const samples = new Float32Array(2048);
+  const points = window.ChayusPoints || null;
+  const REPORT_EVERY_MS = 30000;
+  let server = null, signedOut = false, reportTimer = null, reporting = false, lastReported = -1, celebrateTimer = null;
+  let currentDay = schoolDay();
+  // The class audio playing on the page. It is only listened to (never changed) so it can be told apart from the voice.
+  let classAudio = null, classAnalyser = null, classTracksSeen = 0, playingSince = 0, playbackSeen = 0;
+  const classSamples = new Float32Array(1024);
+
+  // The school day is the New York day, the same one the server uses to reset Chayus points.
+  function schoolDay(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+    const get = type => (parts.find(part => part.type === type) || {}).value || '';
+    return get('year') + '-' + get('month') + '-' + get('day');
+  }
+  function totalSeconds() {
+    const mine = meter ? meter.live().countedSeconds : 0;
+    return Math.max(mine, server ? server.countedSeconds : 0);
+  }
+  function paintLevel() {
+    const info = window.ChayusMeter.levelInfo(totalSeconds());
+    const earned = server && Number.isFinite(server.points) ? server.points : null;
+    levelName.textContent = info.level ? 'Level ' + info.level + ' · ' + info.name : 'Level 0 · ' + info.name;
+    levelPoints.textContent = server && server.paused ? 'Points are paused right now'
+      : signedOut ? 'Sign in from the home page to save your points'
+      : earned === null ? info.level + ' / ' + info.maxLevel + ' levels today'
+      : earned + ' / ' + info.maxLevel + ' points today';
+    levelFill.style.width = Math.round(info.progressToNext * 100) + '%';
+    if (info.nextLevel) {
+      const s = info.secondsToNext, m = Math.floor(s / 60), r = String(s % 60).padStart(2, '0');
+      levelNext.textContent = m + ':' + r + ' of davening to go until Level ' + info.nextLevel + ' · ' + info.nextName;
+    } else {
+      levelNext.textContent = 'You reached the top level today. Wonderful!';
+    }
+  }
+  function celebrate(level) {
+    const row = window.ChayusMeter.LEVELS[level - 1];
+    if (!row) return;
+    celebrateBox.replaceChildren();
+    const title = document.createElement('div'); title.textContent = '🎉 Level ' + level + ': ' + row.name + '!';
+    const small = document.createElement('small'); small.textContent = row.cheer + (level === window.ChayusMeter.LEVELS.length ? '' : ' Keep going!');
+    celebrateBox.append(title, small);
+    for (let i = 0; i < 14; i++) {
+      const spark = document.createElement('span'); spark.className = 'chayus-spark';
+      const angle = (Math.PI * 2 * i) / 14;
+      spark.style.setProperty('--dx', Math.round(Math.cos(angle) * 140) + 'px');
+      spark.style.setProperty('--dy', Math.round(Math.sin(angle) * 60) + 'px');
+      spark.style.background = i % 2 ? '#ff8a3d' : '#00aa91';
+      celebrateBox.append(spark);
+    }
+    celebrateBox.hidden = false;
+    clearTimeout(celebrateTimer);
+    celebrateTimer = setTimeout(() => { celebrateBox.hidden = true; }, 6000);
+  }
+  // Hands today's running total to the server (one number). Safe to call often: it skips when nothing changed.
+  async function reportNow(force) {
+    if (!points || signedOut || reporting || !meter) return;
+    const seconds = meter.live().countedSeconds;
+    if (!force && seconds === lastReported) return;
+    reporting = true;
+    try {
+      const result = await points.report(seconds);
+      if (result && result.ok) {
+        lastReported = seconds; server = result;
+        if (meter && !result.paused) meter.adoptCountedSeconds(result.countedSeconds);
+      } else if (result && result.signedOut) {
+        signedOut = true;
+      }
+    } finally { reporting = false; paintLevel(); }
+  }
+  async function loadSavedDay() {
+    if (!points || signedOut) return;
+    const result = await points.status();
+    if (result && result.ok) {
+      server = result;
+      if (meter && !result.paused) meter.adoptCountedSeconds(result.countedSeconds);
+    } else if (result && result.signedOut) signedOut = true;
+    paintLevel();
+  }
+  // A new school day starts from zero.
+  function checkNewDay() {
+    const today = schoolDay();
+    if (today === currentDay) return;
+    currentDay = today; server = null; lastReported = -1;
+    if (meter) meter.resetDay();
+    paintLevel();
+    loadSavedDay();
+  }
+  function classAux() {
+    if (!classAudio) return undefined;
+    const a = classAudio;
+    const playing = !a.paused && !a.ended && a.currentTime > 0 && !a.muted && a.volume > 0;
+    if (!playing) { playingSince = 0; return { playing: false }; }
+    if (!playingSince) playingSince = performance.now();
+    if (!classAnalyser && context) {
+      try {
+        const captured = a.captureStream ? a.captureStream() : a.mozCaptureStream ? a.mozCaptureStream() : null;
+        if (captured && captured.getAudioTracks().length) {
+          classAnalyser = context.createAnalyser(); classAnalyser.fftSize = 1024;
+          context.createMediaStreamSource(captured).connect(classAnalyser);
+        }
+      } catch (_) { classAnalyser = null; }
+    }
+    let level;
+    if (classAnalyser) {
+      classAnalyser.getFloatTimeDomainData(classSamples);
+      level = window.ChayusMeter.rmsFromFloatSamples(classSamples) * a.volume;
+      playbackSeen = Math.max(playbackSeen, level);
+      // A capture that stays silent while the class audio plays cannot be trusted: say the level is unknown.
+      if (performance.now() - playingSince > 3000 && playbackSeen < 0.0015) level = undefined;
+    }
+    return { playing: true, playbackLevel: level };
+  }
 
   function button(label, fn, primary = false) {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
@@ -123,7 +258,9 @@
     if (sampleTimer !== null) clearInterval(sampleTimer);
     sampleTimer = null;
     if (stream) stream.getTracks().forEach(track => { track.onended = null; track.stop(); });
-    stream = null; analyser = null;
+    stream = null; analyser = null; classAnalyser = null; playbackSeen = 0; playingSince = 0;
+    if (reportTimer !== null) clearInterval(reportTimer);
+    reportTimer = null;
     if (context) { const old = context; context = null; old.close().catch(() => {}); }
   }
   function renderControls() {
@@ -145,12 +282,15 @@
     paintMeter('paused');
     status.textContent = typeof message === 'string' ? message : 'Paused · your microphone is off and nothing is being measured.';
     renderControls();
+    paintLevel();
+    reportNow(true);
   }
   function turnOff() {
     if (meter && stream) meter.pause(performance.now());
     const hadSession = Boolean(meter);
     stopMedia();
-    meter = null; // the next time starts completely fresh
+    reportNow(true);
+    meter = null; // the next time starts completely fresh, and picks the day's saved total back up from the server
     paintMeter('off');
     feedback.textContent = DEFAULT_FEEDBACK;
     status.textContent = hadSession
@@ -181,13 +321,22 @@
       });
       const continued = Boolean(meter && meter.snapshot().measuredSeconds > 0);
       if (!meter) meter = window.ChayusMeter.createMeter();
+      classAudio = document.querySelector('audio');
+      checkNewDay();
       meter.start(performance.now());
+      loadSavedDay();
+      reportTimer = setInterval(() => reportNow(false), REPORT_EVERY_MS);
       sampleTimer = setInterval(() => {
         if (!analyser) return;
         analyser.getFloatTimeDomainData(samples);
-        const message = meter.sample(window.ChayusMeter.rmsFromFloatSamples(samples), performance.now());
+        const message = meter.sample(window.ChayusMeter.rmsFromFloatSamples(samples), performance.now(), classAux());
+        checkNewDay();
         paintMeter('on');
-        if (message) showFeedback(message);
+        paintLevel();
+        const reached = meter.consumeLevelUp();
+        if (reached && server && server.paused) { reportNow(true); }
+        else if (reached) { celebrate(reached); reportNow(true); }
+        else if (message) showFeedback(message);
       }, 200);
       status.textContent = continued
         ? 'Microphone on · your meter picked up where it left off.'
@@ -212,5 +361,6 @@
     stopMedia();
   });
   paintMeter('off');
+  paintLevel();
   renderControls();
 })();

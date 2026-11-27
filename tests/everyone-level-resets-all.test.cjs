@@ -47,5 +47,5 @@ test('the Everyone control no longer listens for a drop-down change; the roster 
   // setAll itself sets every student already in the class and forgets the ones set one by one.
   const cls=read('class-pointer-prototype/classroom.js');
   assert.match(cls,/setAll\(level\)\{\s*if\(!LEVELS\.includes\(level\)\)return;defaultLevel=level;nameLevels\.clear\(\);\s*for\(const m of \[\.\.\.members\.values\(\),\.\.\.presence\.values\(\)\]\)if\(m\.admitted\)applyLevel\(m,level\);/);
-  assert.match(read('class-pointer-prototype/classroom.html'),/teacher-dashboard\.js\?v=20261122-resume1/);
+  assert.match(read('class-pointer-prototype/classroom.html'),/teacher-dashboard\.js\?v=20261126-idle1/);
 });

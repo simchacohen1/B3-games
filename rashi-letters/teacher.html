@@ -120,6 +120,70 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 
 .wrap{max-width:1250px}header.top{display:block}#tableHolder{overflow-x:auto}table{border:1px solid #dce3f4}thead th{font-size:15px;padding:18px 14px}tbody td{font-size:17px;padding:18px 14px}.unit-pill{font-size:15px;padding:7px 10px}.phase-tag{font-size:14px}.toolbar{background:white;border-color:#dce3f4;padding:20px}.toolbar label{font-size:18px!important}tbody tr:nth-child(even){background:#f6f8ff}
+  .who-recorded{ margin:0 0 14px; padding:10px 12px; border-radius:14px; background:#fffdf6; border:2px solid #e0d3ad; }
+  .who-recorded:empty{ display:none; }
+  .wr-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:8px; color:#5a4310; }
+  .wr-head span{ font-size:.85rem; font-weight:700; color:#7a6a3d; }
+  .wr-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .wr-chip{ font:inherit; font-size:.88rem; font-weight:700; padding:6px 12px; border-radius:999px; cursor:pointer; border:2px solid transparent; }
+  .wr-chip.done{ background:#d3f2d8; color:#14532d; border-color:#4caf6a; }
+  .wr-chip.none{ background:#eceae4; color:#6b6558; border-color:#d4d0c4; }
+  .wr-chip:hover,.wr-chip:focus-visible{ outline:2px solid #1f3d73; outline-offset:1px; }
+  .wr-check{ font-weight:900; }
+  .wr-n{ margin-left:4px; font-size:.78rem; opacity:.8; }
+  .wr-empty{ color:#7a6a3d; font-size:.88rem; }
+  .wr-head{ flex-wrap:wrap; }
+  .wr-switch{ display:inline-flex; gap:4px; }
+  .wr-switch button{ font:inherit; font-size:.82rem; font-weight:800; padding:4px 11px; border-radius:999px; border:2px solid #d4c79a; background:#fff; color:#5a4310; cursor:pointer; }
+  .wr-switch button[aria-pressed=true]{ background:#5a4310; border-color:#5a4310; color:#fff; }
+  .wr-chip.sel{ outline:3px solid #1f3d73; outline-offset:1px; }
+  .wr-pick{ margin-top:8px; font-size:.88rem; font-weight:700; color:#1f3d73; }
+  .wr-pick button{ font:inherit; font-weight:800; margin-left:6px; padding:2px 10px; border-radius:999px; border:2px solid #1f3d73; background:#fff; color:#1f3d73; cursor:pointer; }
+  #earlierPanel{ background:#fff; border:2px solid var(--gold); border-radius:14px; padding:14px 18px; margin-bottom:18px; }
+  #earlierPanel h2{ margin:0 0 4px; font-size:1.25rem; color:var(--rimon-dark); }
+  .er-bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
+  .er-bar button{ font:inherit; font-size:.85rem; font-weight:800; padding:6px 13px; border-radius:999px; border:2px solid #cfd6ee; background:#fff; color:var(--ink); cursor:pointer; }
+  .er-bar button[aria-pressed=true]{ background:var(--rimon-dark); border-color:var(--rimon-dark); color:#fff; }
+  .er-bar input{ font:inherit; padding:6px 11px; border-radius:10px; border:2px solid #cfd6ee; min-width:150px; margin-left:auto; }
+  .er-day{ margin:14px 0 4px; font-weight:900; color:var(--rimon-dark); font-size:1.02rem; border-bottom:2px solid #eef0fa; padding-bottom:3px; }
+  .er-row{ display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; padding:7px 2px; border-bottom:1px solid #f1f2f8; font-size:.95rem; }
+  .er-row .er-name{ font-weight:800; min-width:120px; }
+  .er-row .er-time{ color:var(--ink-soft); font-variant-numeric:tabular-nums; min-width:70px; }
+  .er-row .er-what{ flex:1 1 180px; font-weight:700; }
+  .er-row .er-res{ color:var(--ink-soft); }
+  .er-pill{ font-size:.78rem; font-weight:800; padding:2px 9px; border-radius:999px; background:#e8eaf3; color:#344; white-space:nowrap; }
+  .er-pill.ok{ background:#d3f2d8; color:#14532d; } .er-pill.wait{ background:#fff0c2; color:#6b4a00; } .er-pill.bad{ background:#fde0e0; color:#8a1c1c; }
+  .er-row audio{ height:30px; max-width:240px; }
+  .er-empty{ padding:18px; text-align:center; color:var(--ink-soft); }
+  .hidden{ display:none!important; }
+  /* Recordings redesign: two tabs, one clean card per recording */
+  .how-marks{ margin:0 0 12px; }
+  .how-marks summary{ display:inline-block; cursor:pointer; color:var(--rimon-dark); font-weight:700; font-size:.9rem; text-decoration:underline; }
+  .how-marks > div{ margin-top:8px; padding:10px 14px; background:#f6f8ff; border-radius:12px; color:var(--ink-soft); font-size:.9rem; line-height:1.55; }
+  .rec-tabs{ display:flex; gap:8px; margin:6px 0 14px; border-bottom:2px solid #dce3f4; }
+  .rec-tab{ font:800 1.05rem 'Quicksand',Arial,sans-serif; padding:12px 20px; border:0; border-bottom:4px solid transparent; margin-bottom:-2px; background:none; color:var(--ink-soft); cursor:pointer; border-radius:12px 12px 0 0; }
+  .rec-tab[aria-selected="true"]{ color:var(--rimon-dark); border-bottom-color:var(--rimon); background:#f3f0ff; }
+  .rec-opt{ display:flex; gap:8px; align-items:center; margin:0 0 12px; font-weight:600; font-size:.9rem; color:var(--ink-soft); }
+  .rec-item.rcard{ border:2px solid #dce3f4; border-radius:18px; padding:18px 20px; margin:0 0 16px; background:#fff; gap:10px; }
+  .rec-item.rcard.is-graded{ background:#f7fcf4; border-color:#b9dfbf; }
+  .rc-top{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
+  .rc-name{ font-size:1.7rem; font-weight:800; color:var(--ink); line-height:1.15; }
+  .rec-status{ margin-left:auto; font-weight:800; font-size:.95rem; padding:5px 14px; border-radius:999px; background:#fff0cf; color:#8a5a00; }
+  .rec-status.marked{ background:#d3f2d8; color:#14532d; }
+  .rc-sub{ color:var(--ink-soft); font-size:.95rem; font-weight:600; }
+  .rc-sub b{ color:var(--ink); }
+  .rc-player{ display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .rc-play{ font:800 1.25rem 'Quicksand',Arial,sans-serif; min-width:150px; min-height:56px; padding:0 26px; border:0; border-radius:16px; background:var(--rimon); color:#fff; box-shadow:0 5px 0 #4433a1; cursor:pointer; }
+  .rc-play:active{ transform:translateY(2px); box-shadow:0 3px 0 #4433a1; }
+  .rc-clock{ font-variant-numeric:tabular-nums; font-weight:700; color:var(--ink-soft); }
+  .rc-speed{ margin-left:auto; display:inline-flex; gap:6px; }
+  .rc-speed button{ font:800 .85rem 'Quicksand',Arial,sans-serif; min-width:46px; padding:7px 10px; border:2px solid #cfd6ee; border-radius:10px; background:#fff; color:var(--ink); cursor:pointer; }
+  .rc-speed button.on{ background:var(--rimon-dark); border-color:var(--rimon-dark); color:#fff; }
+  .rc-scrub{ display:block; width:100%; height:36px; margin:0; cursor:pointer; accent-color:var(--rimon-dark); }
+  .rec-item.rcard .rec-form{ margin-top:6px; }
+  .btn.rc-done{ font-size:1.25rem; min-height:58px; padding:0 34px; border-radius:16px; }
+  .rec-empty-tab{ text-align:center; padding:36px 10px; color:var(--ink-soft); font-size:1.05rem; }
+  @media(max-width:600px){ .rec-tab{ padding:10px 12px; font-size:.95rem; } .rc-name{ font-size:1.4rem; } .rec-status{ margin-left:0; } .rc-play,.btn.rc-done{ width:100%; } .rc-speed{ margin-left:0; } .rec-item.rcard .rec-text .lt,.rec-item.rcard .rec-text .lp{ font-size:2.6rem; } }
 </style>
 </head>
 <body>
@@ -140,11 +204,31 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
     <button class="btn gold" id="refreshBtn">Refresh</button>
   </div>
 
+  <div id="whoRecordedStrip" class="who-recorded" aria-label="Who recorded"></div>
+
   <section id="recPanel" aria-live="polite">
-    <h2>🎤 Rashi Letters Recordings <span id="recCount"></span></h2>
-    <p class="rec-sub">Listen and follow along. All letters count as correct: tap a letter that was <b>not recognized</b> (tap again to undo). The text is split into 5 equal parts and each part with no missed letter earns <b>1 point</b> (perfect = 5). The student paid 2 points to send it; if it earned less than 5 he can record it again (and pay 2 again), and you will see the new one here. <b>Delete</b> removes a bad recording and refunds the 2 points. There is no Save button: it saves a few seconds after your last tap, and you can change it again at any time (points are adjusted for you, never paid twice). If every letter was right, press <b>Done</b>.</p>
+    <h2>🎤 Rashi Letters Recordings</h2>
+    <details class="how-marks"><summary>How marking works</summary><div>Listen and follow along. All letters count as correct: tap a letter that was <b>not recognized</b> (tap again to undo). The text is split into 5 equal parts and each part with no missed letter earns <b>1 point</b> (perfect = 5). The student paid 2 points to send it; if it earned less than 5 he can record it again (and pay 2 again), and you will see the new one here. <b>Delete</b> removes a bad recording and refunds the 2 points. There is no Save button: it saves a few seconds after your last tap, and you can change it again at any time (points are adjusted for you, never paid twice). If every letter was right, press <b>Done</b>.</div></details>
     <div class="rec-bulk"><button class="btn green hidden" id="approveLegacyAllBtn" type="button">✅ Approve All Legacy Readings</button><span id="approveLegacyAllMsg" aria-live="polite"></span></div>
+    <div class="rec-tabs" role="tablist" aria-label="Recordings">
+      <button type="button" class="rec-tab" role="tab" id="tabWaiting" data-tab="waiting" aria-selected="true">Waiting to mark (<span id="cntWaiting">0</span>)</button>
+      <button type="button" class="rec-tab" role="tab" id="tabMarked" data-tab="marked" aria-selected="false">Marked today (<span id="cntMarked">0</span>)</button>
+    </div>
     <div id="recList"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section id="earlierPanel">
+    <h2>🗂 Earlier</h2>
+    <p class="rec-sub">Every Rashi reading and practice, newest first. Practice shows each boy's latest practice only.</p>
+    <div class="er-bar" role="group" aria-label="Show">
+      <button type="button" data-range="today" aria-pressed="false">Today</button>
+      <button type="button" data-range="yesterday" aria-pressed="false">Yesterday</button>
+      <button type="button" data-range="week" aria-pressed="false">This week</button>
+      <button type="button" data-range="month" aria-pressed="false">This month</button>
+      <button type="button" data-range="all" aria-pressed="true">All</button>
+      <input type="search" id="erSearch" placeholder="Search posuk…" aria-label="Search posuk">
+    </div>
+    <div id="earlierList"><div class="empty">Loading…</div></div>
   </section>
 
   <section id="letterPanel">
@@ -166,6 +250,7 @@ body{background:radial-gradient(ellipse at 5% 5%,#e0dcff,transparent 45%),radial
 <script src="../teacher-class-scope.js"></script>
 <script src="../shared/one-audio-at-a-time.js?v=20261124"></script>
 <script src="./rashi-letter-marks-core.js?v=20261122"></script>
+<script src="./history-core.js?v=20261126-onepage"></script>
 <script>
 if(!firebase.apps.length) firebase.initializeApp(window.B3_FIREBASE_CONFIG);
 const db = firebase.database();
@@ -204,6 +289,7 @@ async function loadDashboard(){
   const entries = await Promise.all(ids.map(async id => [id, (await db.ref('rashiLetters/progress/' + id).once('value')).val()]));
   const data = {};
   entries.forEach(([id, rec]) => { if(rec) data[id] = { ...rec, name: teacherScope.students[id].name || rec.name }; });
+  window.rashiProgress = data; if(window.drawRashiHistory) window.drawRashiHistory();
   const rows = Object.keys(data).map(slug => {
     const rec = data[slug];
     const units = rec.units || {};
@@ -249,7 +335,7 @@ async function loadDashboard(){
     const phaseTag = r.phase === 'word'
       ? '<span class="phase-tag word">Word</span>'
       : '<span class="phase-tag">Letter</span>';
-    html += '<tr>' +
+    html += '<tr data-sid="' + escapeHtml(r.slug) + '">' +
       '<td>' + escapeHtml(r.name) + '</td>' +
       '<td>' + (r.alphabetStarted ? r.masterCount + ' / 27' : 'Not started') +
         (r.troubleLetters.length ? '<br><small>Needs practice: ' + escapeHtml(r.troubleLetters.join(' · ')) + '</small>' : '') + '</td>' +
@@ -263,6 +349,7 @@ async function loadDashboard(){
   });
   html += '</tbody></table>';
   holder.innerHTML = html;
+  if(window.applyStudentFilter) window.applyStudentFilter();
 }
 
 // ---- Rashi reading recordings: approval list (server checks class scope) ----
@@ -292,18 +379,64 @@ function rashiTextHtml(r){
     : '<span class="lp">'+escapeHtml(p.text)+'</span>').join('')+'</span>').join('')+'</div>'+
     '<div class="rec-words-help">Tap a letter that was not recognized. Tap again to undo. Every other letter counts as correct.</div>';
 }
+// Time shown on a card: just the time for today, date + time for older recordings.
+function rashiWhen(ts){
+  if(!ts) return '—';
+  const d=new Date(Number(ts)),t=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+t;
+}
 function rashiCardHtml(r,graded){
-  return '<div class="rec-item'+(graded?' is-graded':'')+'" data-id="'+escapeHtml(r.id)+'">'+
-    '<div class="rec-head"><span>'+escapeHtml(r.studentName)+'</span>'+
+  return '<div class="rec-item rcard'+(graded?' is-graded':'')+'" data-id="'+escapeHtml(r.id)+'">'+
+    '<div class="rc-top"><span class="rc-name">'+escapeHtml(r.studentName)+'</span>'+
       (r.className?'<span class="rec-class">'+escapeHtml(r.className)+'</span>':'')+
-      '<span>'+escapeHtml(r.sectionLabel)+(r.attempt>1?' · try #'+Number(r.attempt):'')+'</span></div>'+
+      '<span class="rec-status" data-field="status"></span></div>'+
+    '<div class="rc-sub"><b>'+escapeHtml(r.sectionLabel)+'</b> · Try #'+(Number(r.attempt)>1?Number(r.attempt):1)+' · '+escapeHtml(rashiWhen(r.createdAt))+(r.durationMs?' · '+Math.round(r.durationMs/1000)+' sec':'')+'</div>'+
+    rashiPlayerHtml(r)+
     rashiTextHtml(r)+
-    '<div class="rec-meta">'+escapeHtml(fmtTime(r.createdAt))+(r.durationMs?' · '+Math.round(r.durationMs/1000)+' sec':'')+(graded&&r.gradedAt?' · Graded '+escapeHtml(new Date(Number(r.gradedAt)).toLocaleDateString()):'')+'</div>'+
-    (r.audioUrl?'<audio controls preload="none" src="'+escapeHtml(r.audioUrl)+'"></audio>':'<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>')+
     '<div class="rec-form"><span class="rec-score" data-field="score"></span>'+
-      '<button type="button" class="btn green" data-done="1"'+(graded?' hidden':'')+'>✅ Done — save</button>'+
+      '<button type="button" class="btn green rc-done" data-done="1"'+(graded?' hidden':'')+'>✅ Done — save</button>'+
       '<button type="button" class="btn-delete-rec" data-delete="1" title="Remove this bad recording and refund the 2 points">Delete</button></div>'+
     '<div class="rec-msg" data-field="msg"></div></div>';
+}
+/* Player: a big Play button, a scrubber to jump anywhere, and 1x / 1.5x / 2x. The sound still comes from a plain <audio>
+   element, so the "one recording at a time" rule (shared/one-audio-at-a-time.js) keeps working. */
+let rashiSpeed=1;
+function rashiPlayerHtml(r){
+  if(!r.audioUrl) return '<div class="rec-meta">Audio could not be loaded. Press Refresh.</div>';
+  return '<div data-player="1"><audio preload="metadata" src="'+escapeHtml(r.audioUrl)+'"></audio>'+
+    '<div class="rc-player"><button type="button" class="rc-play" data-play="1" aria-label="Play">▶ Play</button><span class="rc-clock" data-clock="1">0:00 / 0:00</span>'+
+      '<span class="rc-speed" role="group" aria-label="Speed">'+[1,1.5,2].map(v=>'<button type="button" data-speed="'+v+'" aria-pressed="false">'+v+'x</button>').join('')+'</span></div>'+
+    '<input type="range" class="rc-scrub" data-scrub="1" min="0" max="1000" step="1" value="0" aria-label="Recording position — click anywhere to jump"></div>';
+}
+function wireRashiPlayer(card,r){
+  const box=card.querySelector('[data-player]');
+  if(!box) return;
+  const audio=box.querySelector('audio'),scrub=box.querySelector('[data-scrub]'),play=box.querySelector('[data-play]'),clock=box.querySelector('[data-clock]');
+  const total=()=>Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:(Number(r.durationMs)||0)/1000;
+  const fmt=sec=>{ sec=Math.max(0,Math.round(sec||0)); return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'); };
+  let dragging=false;
+  const paint=()=>{
+    const t=total();
+    if(!dragging) scrub.value=t?String(Math.min(1000,Math.round(audio.currentTime/t*1000))):'0';
+    clock.textContent=fmt(audio.currentTime)+' / '+fmt(t);
+    play.textContent=audio.paused?'▶ Play':'⏸ Pause';
+    play.setAttribute('aria-label',audio.paused?'Play':'Pause');
+  };
+  const setSpeed=v=>{
+    rashiSpeed=v; audio.playbackRate=v;
+    box.querySelectorAll('[data-speed]').forEach(b=>{ const on=Number(b.dataset.speed)===v; b.classList.toggle('on',on); b.setAttribute('aria-pressed',String(on)); });
+  };
+  ['timeupdate','play','pause','ended','loadedmetadata','durationchange'].forEach(ev=>audio.addEventListener(ev,paint));
+  audio.addEventListener('loadedmetadata',()=>{ audio.playbackRate=rashiSpeed; });
+  audio.addEventListener('play',()=>{ audio.playbackRate=rashiSpeed; });
+  play.onclick=()=>{ if(audio.paused){ const p=audio.play(); if(p&&p.catch) p.catch(()=>{}); } else audio.pause(); };
+  scrub.addEventListener('pointerdown',()=>{ dragging=true; });
+  scrub.addEventListener('input',()=>{ const t=total(); if(t) audio.currentTime=Number(scrub.value)/1000*t; clock.textContent=fmt(audio.currentTime)+' / '+fmt(t); });
+  const stop=()=>{ dragging=false; paint(); };
+  scrub.addEventListener('change',stop); scrub.addEventListener('pointerup',stop); scrub.addEventListener('pointercancel',stop);
+  box.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>setSpeed(Number(b.dataset.speed)));
+  setSpeed(rashiSpeed);
+  paint();
 }
 /* "Only items I've opened": a reading a boy already sent stays on the list by default (he sent it while it was open).
    Tick the box to see only readings for items that are open for sending right now (for the class or for that boy). */
@@ -311,26 +444,54 @@ const OPEN_ONLY_KEY='b3RashiGradeOpenOnly';
 function openOnlyPref(){ try{ return localStorage.getItem(OPEN_ONLY_KEY)==='1'; }catch(_e){ return false; } }
 function setOpenOnlyPref(on){ try{ localStorage.setItem(OPEN_ONLY_KEY,on?'1':'0'); }catch(_e){} }
 function renderRecordings(allRows,recent){
-  const list=document.getElementById('recList');
   recent=recent||[];
   const onlyOpen=openOnlyPref();
   const rows=onlyOpen?allRows.filter(r=>r.sendOpen!==false):allRows;
   recRows={};rows.concat(recent).forEach(r=>{recRows[r.id]=r;});
-  document.getElementById('recCount').textContent=rows.length?'('+rows.length+')':'';
+  const midnight=new Date();midnight.setHours(0,0,0,0);
+  recState={allCount:allRows.length,onlyOpen,waiting:rows,marked:recent.filter(r=>Number(r.gradedAt)>=midnight.getTime())};
   // Older recordings (sent before letter marking) can be approved all at once: +2 points, no letter data.
   pendingLegacyIds=rows.filter(r=>!r.v2&&!String(r.sectionId||'').startsWith('vayeira-')).map(r=>r.id);
   const bulk=document.getElementById('approveLegacyAllBtn');
   bulk.classList.toggle('hidden',!pendingLegacyIds.length);
   bulk.textContent='✅ Approve All Legacy Readings ('+pendingLegacyIds.length+')';
-  let html='<label style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:700;"><input type="checkbox" id="recOpenOnly"'+(onlyOpen?' checked':'')+'> Only show items I have opened for sending</label>'+
-    '<div class="rec-sub">Readings a boy already sent stay on this list unless you tick the box.'+(onlyOpen?' Showing '+rows.length+' of '+allRows.length+' waiting readings.':'')+'</div>';
-  html+=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="empty">'+(allRows.length?'No waiting readings are for items you have opened.':'✅ No Rashi recordings are waiting.')+'</div>';
-  if(recent.length) html+='<h3 class="rec-section-title">✔️ Recently graded</h3><p class="rec-sub">Tap letters to change the marks. The points are adjusted for you (a student is never paid twice).</p>'+recent.map(r=>rashiCardHtml(r,true)).join('');
+  drawRecTab();
+}
+/* Two tabs. "Waiting to mark" = readings with no marks yet. "Marked today" = readings marked today (including ones
+   marked in this visit, which move over as soon as they are saved). */
+let recState={allCount:0,onlyOpen:false,waiting:[],marked:[]},recTab='waiting';
+const recIsDone=r=>!!r._done;
+let selSid='';                        // a boy picked in the "Who recorded" strip: filters the whole page
+const selOk=r=>!selSid||r.studentId===selSid;
+function recWaitingNow(){ return recState.waiting.filter(r=>!recIsDone(r)&&selOk(r)); }
+function recMarkedNow(){ return recState.marked.concat(recState.waiting.filter(recIsDone)).filter(selOk).sort((a,b)=>(Number(b.gradedAt)||0)-(Number(a.gradedAt)||0)); }
+function updateRecCounts(){
+  document.getElementById('cntWaiting').textContent=recWaitingNow().length;
+  document.getElementById('cntMarked').textContent=recMarkedNow().length;
+  [['waiting','tabWaiting'],['marked','tabMarked']].forEach(([k,id])=>document.getElementById(id).setAttribute('aria-selected',String(recTab===k)));
+}
+function drawRecTab(){
+  const list=document.getElementById('recList');
+  updateRecCounts();
+  let html='';
+  if(recTab==='waiting'){
+    const rows=recWaitingNow();
+    html+='<label class="rec-opt"><input type="checkbox" id="recOpenOnly"'+(recState.onlyOpen?' checked':'')+'> Only show items I have opened for sending'+(recState.onlyOpen?' (showing '+rows.length+' of '+recState.allCount+')':'')+'</label>';
+    html+=rows.length?rows.map(r=>rashiCardHtml(r,false)).join(''):'<div class="rec-empty-tab">'+(recState.onlyOpen&&recState.allCount>recState.waiting.length?'No waiting readings are for items you have opened.':'✅ Nothing is waiting to be marked.')+'</div>';
+  }else{
+    const rows=recMarkedNow();
+    html+=rows.length?'<div class="rec-opt">Tap letters to change a mark. Points are adjusted for you (a student is never paid twice).</div>'+rows.map(r=>rashiCardHtml(r,true)).join(''):'<div class="rec-empty-tab">Nothing has been marked yet today.</div>';
+  }
   list.innerHTML=html;
   const openOnlyBox=document.getElementById('recOpenOnly');
   if(openOnlyBox)openOnlyBox.onchange=()=>{setOpenOnlyPref(openOnlyBox.checked);loadRecordings();};
-  list.querySelectorAll('.rec-item').forEach(card=>wireRashiCard(card,recRows[card.dataset.id]));
+  list.querySelectorAll('.rec-item').forEach(card=>{ const r=recRows[card.dataset.id]; wireRashiPlayer(card,r); wireRashiCard(card,r); });
 }
+document.querySelector('.rec-tabs').addEventListener('click',async e=>{
+  const t=e.target.closest('[data-tab]'); if(!t||t.dataset.tab===recTab) return;
+  await flushGradeSaves();   // never lose a tap when switching tabs
+  recTab=t.dataset.tab; drawRecTab();
+});
 async function flushGradeSaves(){ await Promise.all([...gradeSavers].map(fn=>fn())); }
 window.addEventListener('beforeunload',e=>{ if(gradeSavers.size){ e.preventDefault(); e.returnValue=''; } });
 async function loadRecordings(){
@@ -355,6 +516,8 @@ function wireRashiCard(card,r){
     const s=LM.score(rashiTextOf(r),[...missed]);
     scoreEl.innerHTML='<b>'+s.points+'/5 points</b> &nbsp; <span class="rec-parts" aria-label="Parts with no missed letter">'+s.partsClean.map(ok=>'<i class="'+(ok?'ok':'no')+'"></i>').join('')+'</span> &nbsp; '+
       (total-missed.size)+'/'+total+' letters correct ('+s.pct+'%)'+(graded?'':' · not graded yet');
+    const st=card.querySelector('[data-field="status"]');
+    if(st){ st.textContent=graded?'✔ Marked · '+s.points+'/5':'Waiting'; st.classList.toggle('marked',graded); }
   };
   paint();
   if(graded) msg.textContent='Saved. You can still change it.';
@@ -374,6 +537,10 @@ function wireRashiCard(card,r){
         msg.textContent='✔️ Saved. '+out.parts+' of 5 parts perfect'+(out.priorPoints?' (he already earned '+out.priorPoints+' before, so this send adds '+out.paidTotal+')':'')+(moved>0?' · +'+moved+' points now':moved<0?' · '+Math.abs(moved)+' points taken back':'')+'.'+(out.canRerecord?' He can record it again.':'');
         card.classList.add('is-graded');paint();
         if(doneBtn) doneBtn.hidden=true;
+        // Remember the marks on the row so the card still looks marked if the tab is redrawn, and move it to "Marked today".
+        r.letterReview={total,missed:[...missed].sort((a,b)=>a-b)};
+        if(!r.gradedAt) r.gradedAt=Date.now();
+        r._done=true; updateRecCounts();
         scheduleLetterScores();
       }catch(err){
         console.error(err);dirty=true;
@@ -423,13 +590,14 @@ async function loadLetterScores(){
     let html='<table><thead><tr><th>Boy</th>'+LM.LETTER_KEYS.map(k=>'<th class="lh">'+k+'</th>').join('')+'<th>Readings</th></tr></thead><tbody>';
     boys.forEach(id=>{
       const st=out.students[id];
-      html+='<tr><td>'+escapeHtml(names(id))+'</td>'+LM.LETTER_KEYS.map(k=>{
+      html+='<tr data-sid="'+escapeHtml(id)+'"><td>'+escapeHtml(names(id))+'</td>'+LM.LETTER_KEYS.map(k=>{
         const row=st.letters[k],pct=LM.letterPct(row);
         if(pct===null) return '<td class="ls-none">–</td>';
         return '<td class="'+(pct>=90?'ls-good':pct>=70?'ls-mid':'ls-low')+'" title="'+k+': '+(row.seen-row.missed)+' of '+row.seen+' read correctly">'+pct+'%</td>';
       }).join('')+'<td>'+st.readings+'</td></tr>';
     });
     holder.innerHTML=html+'</tbody></table>';
+    if(window.applyStudentFilter) window.applyStudentFilter();
   }catch(error){ holder.innerHTML='<div class="empty">'+escapeHtml(error.message||'Could not load letter scores.')+'</div>'; }
 }
 
@@ -491,6 +659,133 @@ async function loadTeacher(user, access){
 }
 window.B3SiteSettings.onAuthStateChanged((user, authorized, access) => loadTeacher(user, access || { authorized }));
 </script>
-<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script></body>
+<script>
+/* One page: the "Who recorded" strip (Today / Yesterday / This week), the waiting cards above, and "Earlier" below.
+   Everything here only READS. It never changes marking, points or refunds. Every count is Rashi only. */
+(function(){
+  const H=window.RashiHistoryCore;
+  const strip=document.getElementById('whoRecordedStrip'),earlier=document.getElementById('earlierList');
+  if(!H||!strip||!earlier||typeof renderRecordings!=='function') return;
+  const esc=escapeHtml;
+  let stripPeriod='today',erRange='all',erText='';
+  let serverRows=[],historyRows=[],historyState='loading';   // readings: the server list (marks, recording) + the older rewards history
+  const names=()=>{ const o={}; Object.entries((teacherScope&&teacherScope.students)||{}).forEach(([id,s])=>{ o[id]=(s&&s.name)||id; }); return o; };
+  const nameOf=id=>names()[id]||id;
+
+  function readingFromServer(r,marked){
+    const rev=r.letterReview, pct=rev&&Number(rev.total)>0?Math.round((Number(rev.total)-Number(rev.missedCount||0))/Number(rev.total)*100):null;
+    return {id:r.id,sid:r.studentId,name:r.studentName||nameOf(r.studentId),kind:'reading',when:Number(r.createdAt)||0,label:r.sectionLabel||r.sectionId||'Reading',
+      result:pct!==null?'Reading '+pct+'%':(r.durationMs?Math.round(r.durationMs/1000)+' sec':''),status:marked||pct!==null||r.gradedAt?'Marked':'Waiting to mark',audioUrl:r.audioUrl||''};
+  }
+  function setServer(allRows,recent){
+    serverRows=(allRows||[]).map(r=>readingFromServer(r,false)).concat((recent||[]).map(r=>readingFromServer(r,true)));
+    drawStrip(); drawEarlier();
+  }
+  function practiceRows(){
+    const out=[],p=window.rashiProgress||{};
+    Object.keys(p).forEach(id=>{
+      const rec=p[id]||{},u=rec.units||{};let a=0,c=0;
+      Object.keys(u).forEach(k=>{ if(/_(letter|word)$/.test(k)){ a+=Number(u[k]&&u[k].attempts)||0; c+=Number(u[k]&&u[k].correct)||0; } });
+      const when=Number(rec.lastActive)||0; if(!when&&!a) return;
+      const unit=typeof rec.currentUnitIndex==='number'?Math.min(rec.currentUnitIndex+1,UNITS.length):1;
+      out.push({id:'practice:'+id,sid:id,name:nameOf(id),kind:'practice',when,label:'Practice · unit '+unit+' of '+UNITS.length,result:a?Math.round(c/a*100)+'% over '+a+' answers (all time)':'',status:'Latest practice'});
+    });
+    return out;
+  }
+  const inScope=sid=>!!(teacherScope&&teacherScope.students&&teacherScope.students[sid]);
+  const readings=()=>H.mergeReadings(serverRows,historyRows).filter(r=>inScope(r.sid)).map(r=>Object.assign({},r,{name:nameOf(r.sid)}));
+  const allRows=()=>readings().concat(practiceRows());
+
+  /* ---------- strip ---------- */
+  function drawStrip(){
+    const now=Date.now(),cnt=H.counts(readings(),H.range(stripPeriod,now));
+    const list=H.chips(names(),cnt),done=list.filter(c=>c.recorded).length;
+    const word={today:'today',yesterday:'yesterday',week:'this week'}[stripPeriod];
+    const sw=[['today','Today'],['yesterday','Yesterday'],['week','This week']].map(([k,l])=>'<button type="button" data-period="'+k+'" aria-pressed="'+(stripPeriod===k)+'">'+l+'</button>').join('');
+    strip.innerHTML='<div class="wr-head"><b>Who recorded</b><span class="wr-switch" role="group" aria-label="Period">'+sw+'</span><span>'+done+' of '+list.length+'</span></div>'+
+      '<div class="wr-chips">'+(list.length?list.map(c=>'<button type="button" class="wr-chip '+(c.recorded?'done':'none')+(selSid===c.sid?' sel':'')+'" data-wr-sid="'+esc(c.sid)+'" aria-pressed="'+(selSid===c.sid)+'" aria-label="'+esc(c.name+(c.recorded?': recorded '+c.count+(c.count===1?' time ':' times ')+word:': no recording '+word))+'">'+
+        (c.recorded?'<span class="wr-check" aria-hidden="true">✓</span> ':'')+esc(c.name)+(c.recorded?'<span class="wr-n">×'+c.count+'</span>':'')+'</button>').join(''):'<span class="wr-empty">No students in this class.</span>')+'</div>'+
+      (selSid?'<div class="wr-pick">Showing only '+esc(nameOf(selSid))+'<button type="button" data-clear="1">Show everyone</button></div>':'');
+  }
+  strip.addEventListener('click',e=>{
+    const per=e.target.closest&&e.target.closest('[data-period]'),chip=e.target.closest&&e.target.closest('[data-wr-sid]'),clr=e.target.closest&&e.target.closest('[data-clear]');
+    if(per){ stripPeriod=per.dataset.period; drawStrip(); return; }
+    if(clr){ pick(''); return; }
+    if(chip) pick(selSid===chip.dataset.wrSid?'':chip.dataset.wrSid);
+  });
+  async function pick(sid){
+    try{ await flushGradeSaves(); }catch(_e){}
+    selSid=sid; drawStrip(); drawRecTab(); drawEarlier(); applyStudentFilter();
+  }
+  window.applyStudentFilter=function(){
+    document.querySelectorAll('#letterHolder tr[data-sid],#tableHolder tr[data-sid]').forEach(tr=>{ tr.hidden=!!selSid&&tr.dataset.sid!==selSid; });
+  };
+
+  /* ---------- Earlier ---------- */
+  const PILL={'Marked':'ok','Waiting to mark':'wait','Rejected':'bad'};
+  function drawEarlier(){
+    document.querySelectorAll('.er-bar [data-range]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.range===erRange)));
+    if(!teacherScope){ earlier.innerHTML=''; return; }
+    const rows=H.filter(allRows(),{sid:selSid,range:H.range(erRange,Date.now()),text:erText});
+    const groups=H.groupByDay(rows,Date.now());
+    let html='';
+    if(historyState==='failed') html+='<div class="rec-sub">Older readings could not be loaded right now, so only recent readings are listed.</div>';
+    else if(historyState==='loading') html+='<div class="rec-sub">Loading older readings…</div>';
+    if(!groups.length) html+='<div class="er-empty">Nothing matches.</div>';
+    groups.forEach(g=>{
+      html+='<div class="er-day">'+esc(g.heading)+'</div>';
+      g.rows.forEach(r=>{
+        const t=r.when?new Date(r.when).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'';
+        html+='<div class="er-row"><span class="er-name">'+esc(r.name)+'</span><span class="er-time">'+esc(t)+'</span><span class="er-what">'+(r.kind==='practice'?'🔤 ':'🎤 ')+esc(r.label)+'</span><span class="er-res">'+esc(r.result||'')+'</span>'+
+          '<span class="er-pill '+(PILL[r.status]||'')+'">'+esc(r.status)+'</span>'+(r.audioUrl?'<audio controls preload="none" src="'+esc(r.audioUrl)+'"></audio>':'')+'</div>';
+      });
+    });
+    earlier.innerHTML=html;
+  }
+  window.drawRashiHistory=drawEarlier;
+  document.querySelector('.er-bar').addEventListener('click',e=>{ const b=e.target.closest('[data-range]'); if(b){ erRange=b.dataset.range; drawEarlier(); } });
+  document.getElementById('erSearch').addEventListener('input',e=>{ erText=e.target.value; drawEarlier(); });
+
+  /* Older readings: the Student Rewards request list (read only). The owner reads it directly, a teacher through the
+     same server call the Rewards page uses. If it cannot be loaded, the page still shows the readings from the server list. */
+  async function loadHistory(){
+    historyState='loading'; drawEarlier();
+    try{
+      let reqs=null;
+      if(isOwner){ try{ reqs=(await db.ref('studentRewards/pointRequests').once('value')).val()||{}; }catch(_e){ reqs=null; } }
+      if(!reqs){
+        const user=firebase.auth().currentUser; if(!user) throw new Error('signed out');
+        const res=await fetch('https://us-central1-b3-games.cloudfunctions.net/studentRewardsTeacher',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+await user.getIdToken()},body:JSON.stringify({action:'load'})});
+        const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.error||('HTTP '+res.status));
+        reqs=(data.root&&data.root.pointRequests)||{};
+      }
+      historyRows=Object.keys(reqs).filter(id=>reqs[id]&&reqs[id].source==='rashi-recording'&&inScope(reqs[id].practiceStudentId)).map(id=>{
+        const it=reqs[id],st=String(it.status||'pending');
+        return {id,sid:it.practiceStudentId,name:nameOf(it.practiceStudentId),kind:'reading',when:Number(it.createdAt)||0,label:H.labelFromReason(it.reason),result:'',
+          status:st==='approved'?'Marked':st==='rejected'?'Rejected':'Waiting to mark'};
+      });
+      historyState='ok';
+    }catch(e){ console.warn('Rashi history',e); historyState='failed'; }
+    drawStrip(); drawEarlier();
+  }
+
+  const baseRender=renderRecordings;
+  renderRecordings=function(allRows,recent){
+    baseRender.apply(this,arguments);
+    try{ setServer(allRows,recent); }catch(e){ console.warn('Rashi strip',e); }
+  };
+  let historyStarted=false;
+  const baseLoad=loadRecordings;
+  loadRecordings=async function(){
+    await baseLoad.apply(this,arguments);
+    if(!historyStarted&&teacherScope){ historyStarted=true; loadHistory(); }
+  };
+  document.getElementById('refreshBtn').addEventListener('click',()=>{ historyStarted=false; });
+  drawEarlier();
+})();
+</script>
+
+<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script>
+</body>
 </html>
 

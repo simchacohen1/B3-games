@@ -1,0 +1,690 @@
+level,hebrew,english
+1,אָב,Father
+1,אָדוֹן,Master
+1,אָדָם,Man
+1,אַדָמָה,Ground
+1,אֹהֶל,Tent
+1,אוּלַי,Maybe
+1,אָח,Brother
+1,אֶחָד,One
+1,אָחוֹת,Sister
+1,אֵין,Not
+1,אִישׁ,Man
+1,אוֹכֶל,Food
+1,אֶל,To
+1,אֵם,Mother
+1,אָמַר,Said
+1,אַנַחְנוּ,We
+1,אַרְבָּעָה,Four
+1,אַרְבָּעִים,Forty
+1,אֶרֶץ,Land
+1,אִשָׁה,Woman
+1,אַתָּה,You
+1,אַתֶּם,You (many)
+1,בְּאֵר,Well
+1,בְּהֵמָה,Farm animal
+1,בֶּגֶד,Clothing
+1,בֹא,Come
+1,בֵּין,Between
+1,בֵּן,Son
+1,בֹּקֶר,Morning
+1,בָּרָא,Created
+1,בְּרִית,Agreement
+1,בְּרָכָה,Blessing
+1,בָּשָׂר,Meat
+1,בַּת,Daughter
+1,גָדוֹל,Big
+1,גָדַל,Grew
+1,גוֹי,Nation
+1,גָמָל,Camel
+1,גַן,Garden
+1,דָם,Blood
+1,הוּא,He
+1,הִיא,She
+1,הָיָה,Was
+1,הָלַך,Went
+1,הֵם,They
+1,הָר,Mountain
+1,זֹאת,This (girl)
+1,זֶה,This (boy)
+1,זָכָר,Male
+1,חַי,Alive
+1,חַמִשָׁה,Five
+1,טוֹב,Good
+1,יָד,Hand
+1,יוֹם,Day
+1,יַיִן,Wine
+1,יֶלֶד,Boy
+1,יֵשׁ,There is
+1,כַּאַשֶׁר,As/Like
+1,כִּי,Because
+1,כָּל,All
+1,כֶּסֶף,Money/Silver
+1,לֹא,Not
+1,לֵב,Heart
+1,לֶחֶם,Bread
+1,לַיְלָה,Night
+1,לָמָה,Why
+1,לִפְנֵי,Before
+1,לָקַח,Took
+1,מַבּוּל,Flood
+1,מַה,What
+1,מִי,Who
+1,מַיִם,Water
+1,מַלְאַךְ,Angel
+1,מֶלֶךְ,King
+1,מְעַט,A little
+1,מָצָא,Found
+1,מָקוֹם,Place
+1,מִשְׁפָּחָה,Family
+1,נָתַן,Gave
+1,עֶבֶד,Slave/Servant
+1,עַד,Until
+1,עוֹלָם,World
+1,עוֹף,Bird
+1,עַיִן,Eye
+1,עַל,On
+1,עֵץ,Tree
+1,עֶרֶב,Evening
+1,עַשָׂרָה,Ten
+1,פֹּה,Here
+1,פָּנִים,Face
+1,פָּרָה,Cow
+1,צַדִיק,Righteous
+1,קוּם,Get up
+1,קָטָן,Small
+1,קָרָא,Called
+1,רָאָה,Saw
+1,רֹאשׁ,Head
+1,רִאשׁוֹן,First
+1,רוּחַ,Wind/Spirit
+1,רֶגֶל,Foot
+1,רָעָב,Hunger
+1,רַק,Only
+1,הִשְׁתַחַוֶה,Bowed down
+1,שָׁלוֹם,Peace
+1,שְׁלֹשָׁה,Three
+1,שֵׁם,Name
+1,שָׁם,There
+1,שָׁמַים,Sky
+1,שְׁמוֹנָה,Eight
+1,שָׁמַר,Watched/Guarded
+1,שָׁנָה,Year
+1,שְׁנֵי,Two
+1,תֵּבָה,Ark
+1,תֵּשַע,Nine
+1,תַּחַת,Under
+1,אֶבֶן,Stone
+1,אָהַב,Loved
+1,אַחַר,After
+1,אַחֵר,Another
+1,אָכַל,Ate
+1,אַךְ,Only/But
+1,אַל,Not
+1,אִם,If
+1,אָנֹכִי,I
+1,הֵאָסֵף,Gather
+1,אַף,Nose/Also/Angry
+1,אַשֶׁר,That
+1,בָּנָה,Built
+1,בַּעַבוּר,Because of
+1,בָּקָר,Cattle
+1,גַם,Also
+1,גָנַב,Stole
+1,דַבֵּר,Speak
+1,דָבָר,Thing/Word
+1,דֶרֶךְ,Way
+1,הֵנָה,Here
+1,הָרַג,Killed
+1,הָרָה,Pregnant
+1,זֶרַע,Children/Seed
+1,חָדָשׁ,New
+1,חוּץ,Outside
+1,חַיָה,Wild animal
+1,חַיִים,Life
+1,חַלוֹם,Dream
+1,חַמוֹר,Donkey
+1,חֵן,Favor
+1,חֶסֶד,Kindness
+1,חָרָה,Anger
+1,טֶרֶם,Before
+1,יָדַע,Knew
+1,יָכוֹל,Can
+1,יָלֹד,Was born
+1,יָם,Sea
+1,יוֹסֵף,Add
+1,יָרֵא,Was afraid
+1,יָצָא,Went out
+1,יָרַד,Went down
+1,יָשׁוּב,Will return
+1,כֹּה,Like this
+1,כַּלֵה,End
+1,כֵּן,Like this/So
+1,לִקְרַאת,Toward
+1,מֵאָה,Hundred
+1,מְאֹד,Very
+1,מַהֵר,Hurry
+1,הִמוֹל,Make a bris
+1,מָוֶת,Death
+1,מִזְבֵּחַ,Altar
+1,מִין,Kind/Species
+1,מָכַר,Sold
+1,מִן,From
+1,מִנְחָה,Present
+1,מְעָרָה,Cave
+1,מִפְּנֵי,Because of
+1,מִקְנֶה,Animal group
+1,מַרְאֶה,Appearance
+1,מַשְׁקֶה,Drink
+1,נָא,Now/please
+1,נֶגֶד,Against
+1,נַגֵד,Tell
+1,נִגַשׁ,Approached
+1,נָסַע,Traveled
+1,נַעַר,Young man
+1,נָפַל,Fell
+1,נֶפֶשׁ,Soul
+1,נָשֹׂא,Lift/carry
+1,עָבַד,Worked
+1,עָבַר,Went through
+1,עֵדֶר,Flock
+1,עוֹד,Again
+1,עֵז,Goat
+1,עָזַב,Left
+1,עִיר,City
+1,עָלָה,Went up
+1,עִם,With
+1,עַם,Nation
+1,עָמַד,Stood
+1,עָנָה,Answered
+1,עָשָׂה,Made
+1,עֶשְׂרִים,Twenty
+1,עֵת,Time
+1,עַתָּה,Now
+1,פֶּן,Maybe
+1,פַּעַם,Time
+1,צֹאן,Sheep
+1,צַוֵה,Command
+1,צַיִד,Capture
+1,קֶבֶר,Grave
+1,קֶדֶם,Before/eastern
+1,קוֹל,Voice
+1,קָנָה,Bought
+1,רַב,A lot
+1,רוֹעֶה,Shepherd
+1,רְכוּשׁ,Belongings
+1,רָעָה,Bad
+1,דֶשֶׁא,Grass/vegetation
+1,שִׂים,Put
+1,שַׂר,Officer
+1,שָׁאַל,Asked
+1,שִׁבּוֹלֶת,Stalk
+1,שִׁבְעָה,Seven
+1,שְׁבוּעָה,Oath
+1,שָׁבַר,Broke
+1,שׁוּב,Return
+1,שָכַב,Lay down
+1,שָׁלַח,Sent
+1,שְׁלֹשִׁים,Thirty
+1,שְׁמַע,Listen
+1,שִׁפְחָה,Maidservant
+1,תּוֹך,Inside
+1,תּוֹלְדָה,Children
+2,אַבֵדָה,Lost object
+2,אֲנָשִׁים,People
+2,דוֹר,Generation
+2,הַיוֹם,Today
+2,יַלְדָה,Girl
+2,מִדְבָּר,Desert
+2,מִדָה,Measurement
+2,מְזוּזָה,Doorpost
+2,מְלָאכָה,Work
+2,מִלְחָמָה,War
+2,מִשְׁתֶּה,Feast
+2,מַתָּנָה,Gift
+2,נַחַל,Stream/river
+2,נְקֵבָה,Female
+2,נֵר,Candle
+2,נָשִׁים,Women
+2,סוּלָם,Ladder
+2,סַל,Basket
+2,סֶלַע,Rock
+2,סֵפֶר,Book
+2,עָפָר,Dust
+2,עֶצֶם,Bone
+2,עָשִׁיר,Rich man
+2,פָּרוֹכֶת,Curtain
+2,צָבָא,Army
+2,צְבִי,Deer
+2,צָפוֹן,North
+2,צְפַרְדֵעַ,Frog
+2,קֶמַח,Flour
+2,קָצִיר,Harvest
+2,קָרְבָּן,Sacrifice
+2,קֶשֶׁת,Rainbow
+2,רֵיחַ,Smell
+2,שָׁבוּעַ,Week
+2,שֵׁבֶט,Tribe/stick
+2,שִׁירָה,Song
+2,שֻׁלְחָן,Table
+2,שַׁעַר,Gate
+2,שַׂק,Sack
+2,שֶׁקֶר,Lie
+2,תְּבוּאָה,Grain/produce
+2,תּוֹרָה,Torah
+2,אֲבָל,But
+2,אָדֹם,Red
+2,אוֹ,Or
+2,אוֹיֵב,Enemy
+2,אוֹר,Light
+2,אוֹת,Sign
+2,אָז,Then
+2,אֹזֶן,Ear
+2,אַחֲרוֹן,Last
+2,אַיִל,Ram
+2,אֵלֶה,These
+2,אֶלֶף,Thousand
+2,אַמָה,Cubit
+2,אֶמֶת,Truth
+2,אֲנִי,I
+2,אָפָה,Baked
+2,אַף,Nose/also/angry
+2,אֶצְבַּע,Finger
+2,אַרְבֶּה,Locust
+2,אַרְיֵה,Lion
+2,אֹרֶךְ,Length
+2,אֵשׁ,Fire
+2,בּוֹ,In it
+2,בּוֹר,Pit
+2,בֶּטֶן,Stomach
+2,בֵּיצָה,Egg
+2,בַּיִת,House
+2,בְּכוֹר,First born
+2,בָּרָד,Hail
+2,גִבּוֹר,Strong
+2,גְבוּל,Border
+2,גַג,Roof
+2,גְדִי,Baby goat
+2,גָדֵר,Fence
+2,גִיד,Vein
+2,גֶפֶן,Grapevine
+2,גֶשֶׁם,Rain
+2,גֵר,Convert/stranger
+2,דֶבֶר,Animal disease
+2,דְבַשׁ,Honey
+2,דָג,Fish
+2,דֶלֶת,Door
+2,הַבְדָלָה,Separation
+2,הַצָלָה,Rescue
+2,זְאֵב,Wolf
+2,זָהָב,Gold
+2,זֵיתִים,Olives
+2,זָקֵן,Old
+2,זְרוֹע,Arm
+2,זָרַח,Shone
+2,חַג,Holiday
+2,חוֹדֶשׁ,Month
+2,חוּט,String
+2,חוֹלֶה,Sick
+2,חוֹרֶף,Winter
+2,חָזָק,Strong
+2,חִטָה,Wheat
+2,חָכָם,Smart
+2,חָלָב,Milk
+2,חִנָם,Free
+2,חָצֵר,Yard
+2,חֶרֶב,Sword
+2,חֹשֶׁך,Darkness
+2,יוֹנָה,Dove
+2,יָמָה,Westward
+2,יָמִין,Right
+2,יָפֶה,Pretty
+2,יָרֵחַ,Moon
+2,כּוֹכָבִים,Stars
+2,כּוֹס,Cup
+2,כֹּחַ,Strength
+2,כֶּלֶב,Dog
+2,כְּלִי,Vessel
+2,כִּסֵא,Chair
+2,כֶּרֶם,Vineyard
+2,כָּתוּב,Written
+2,כֻּתּוֹנֶת,Shirt
+2,כֶּתֶר,Crown
+2,לָבָן,White
+2,לָמַד,Learned
+2,לָשׁוֹן,Tongue/language
+2,מַדוּעַ,Why
+2,מָחָר,Tomorrow
+2,מִטָה,Bed
+2,מָלֵא,Full
+2,מֶלַח,Salt
+2,מְצוֹרָע,Leper
+2,נֶגֶב,South
+2,נָהָר,River
+2,נָחָשׁ,Snake
+2,נְחֹשֶׁת,Copper
+2,נְשָׁמָה,Soul
+2,נֶשֶׁר,Eagle
+2,סוּכָּה,Sukkah
+2,סוּס,Horse
+2,עֵגֶל,Calf
+2,עֲגָלָה,Wagon
+2,עוֹר,Skin/leather
+2,עֲנָבִים,Grapes
+2,עָנִי,Poor
+2,עָנָן,Cloud
+2,עֵשֶׂב,Grass
+2,פֶּה,Mouth
+2,פָּר,Bull
+2,פְּרִי,Fruit
+2,פֶּתַח,Opening
+2,צָעִיר,Young
+2,צִפּוֹר,Bird
+2,קוֹדֶשׁ,Holy
+2,שׁוֹר,Ox
+2,שְׂמֹאל,Left
+2,שֶׁמֶן,Oil
+2,שֶׁמֶשׁ,Sun
+2,שֵׁשׁ,Six/linen
+2,אָבִיב,Spring
+2,אָבַד,Lost
+2,אֶבְיוֹן,Poor
+2,אֵבֶל,Mourning
+2,אַבְנֵט,Belt
+2,אָבָק,Dust
+2,אֵבָר,Limb
+2,אַבְרֵךְ,Young man
+2,אֲדִיר,Strong
+2,אוּלָם,But
+2,אוּמָן,Craftsman
+2,אוֹרֵג,Weaver
+2,אֵזוֹב,Kind of grass
+2,אִילָן,Tree
+2,אָלָה,Oath/curse
+2,אַלְמָנָה,Widow
+2,אַלְפַּיִם,Two thousand
+2,אָמָה,Maid
+2,אֻמָה,Nation
+2,אֳנִיָה,Boat
+2,אָסוֹן,Tragedy
+2,אֶפְרוֹחִים,Baby chicks
+2,אָרוּר,Cursed
+2,אִתּוֹ,With him
+2,אֶתְמוֹל,Yesterday
+2,בָּדָד,Alone
+2,בָּחַר,Chose
+2,בֶּטַח,Sure
+2,בִּינָה,Understanding
+2,בִּישׁוּל,Cooking
+2,בָכָה,Cried
+2,בִּקֵשׁ,Asked
+2,בַּרְזֶל,Iron
+2,בָּרַח,Ran away
+2,בְּתוּלָה,Unmarried girl
+2,גָאַל,Redeemed
+2,גָבִיעַ,Silver cup
+2,גוֹרָל,Lottery
+2,גוֹרֶן,Silo
+2,גֶחָלִים,Coals
+2,גָרוֹן,Throat
+2,גַרְזֶן,Ax
+2,גָרֵשׁ,Chase away
+2,דָגָן,Crop
+2,דַל,Poor
+2,דַעַת,Knowledge
+2,הֶחְרִישׁ,Kept quiet
+2,הִכָּה,Hit
+2,הַכָנָה,Preparation
+2,הַלֵל,Praise
+2,הִנְנִי,Here I am
+2,הָפַךְ,Switched/turned over
+2,הַשְׁכָּמָה,Early rising
+2,זֶבַח,Sacrifice
+2,זַךְ,Pure
+2,זָכַר,Remembered
+2,זְמַן,Time
+2,זָר,Stranger
+2,חֵלֶק,Part
+2,חַבּוּרָה,Bruise
+2,חֶבֶל,Rope
+2,חָבֵר,Friend
+2,חֶדֶר,Room
+2,חוֹל,Sand
+2,חוֹמָה,Wall
+2,חָטָא,Sinned
+2,חַיִל,Military
+2,חִלֵל,Desecrate
+2,חֶמְאָה,Butter
+2,חָנָה,Camped
+2,חָפְשִׁי,Free
+2,חַצִי,Half
+2,חֹק,Law
+2,חָשַׁב,Thought
+2,טָהוֹר,Pure
+2,טִיט,Mortar/cement
+2,טֶנֶא,Basket
+2,טַף,Young child
+2,טָרַף,Torn
+2,יְאוֹר,River
+2,יַבָּשָׁה,Dry land
+2,יָגוֹן,Sorrow
+2,יַחְדָיו,Together
+2,יָחִיד,Singular
+2,יָקָר,Precious
+2,יָרֵךְ,Thigh
+2,יָשַׁב,Sat
+2,יְשׁוּעָה,Salvation/help
+2,יָשָׁן,Old
+2,יָשֵׁן,Sleep
+2,יָשָׁר,Straight
+2,יָתוֹם,Orphan
+2,כָּבֵד,Heavy/Liver
+2,כָּבוֹד,Honor
+2,כֶּבֶשׂ,Sheep
+2,כַּד,Pitcher
+2,כָּכָה,Like this
+2,כִּלְאַיִם,Mixtures
+2,כִּנוֹר,Harp
+2,כִּסָה,Covered
+2,כַּף,Palm/spoon
+2,כֶּפֶל,Double
+2,לְבַדוֹ,By himself
+2,לְבֵנִים,Bricks
+2,לָבַשׁ,Wore
+2,לוֹ,To him
+2,לְמַעַן,So that
+2,מֵאֵת,From
+2,מָאתַיִם,Two hundred
+2,מוּם,Blemish
+2,מַחֲנֶה,Camp
+2,מַטֶה,Stick/tribe
+2,מָטָר,Rain
+2,מִלְּבַד,Besides
+2,מִסְפָּר,Number
+2,מְעִיל,Coat
+2,מִשְׁפָּט,Law/sentence
+2,מָתוֹק,Sweet
+2,מָתַי,When
+2,נְאֻם,The word of
+2,נָבִיא,Prophet
+2,נֶגַע,Plague
+2,נְדָבָה,Donation
+2,נֶדֶר,Promise
+2,נַחֲלָה,Inheritance
+2,נָטַע,Planted
+2,נֶכֶד,Grandson
+2,נֹכַח,Opposite
+2,נִצָב,Stands
+2,סָבִיב,Around
+2,סוֹף,End
+2,סַפֵּר,Tell
+2,עֵד,Witness
+2,עֵדָה,Congregation
+2,עִוֵּר,Blind
+2,עָיֵף,Tired
+2,עַל כֵּן,Therefore
+2,עַמוּד,Pillar
+2,עָמוֹק,Deep
+2,עֵמֶק,Valley
+2,עָצוּם,Strong
+2,פְּקוּדֵי,Countings
+2,צָעַק,Yelled
+2,קָהָל,Congregation
+2,קַיִץ,Summer
+2,קְלָלָה,Curse
+2,קָרוֹב,Near
+2,רֹחַב,Width
+2,רָחוֹק,Far
+2,רֵיקָם,Empty
+2,רֵעֵהוּ,His friend
+2,שֶׂה,Lamb
+2,שָׁלֵם,Whole
+2,שַׁלֵם,Pay
+2,שִׂמְחָה,Happiness
+2,שָרַף,Burned
+2,תְּחִלָה,At first
+2,תֵּימָנָה,Southern
+2,תָּמִיד,Always
+3,אָבָה,Wanted
+3,אָחַז,Held
+3,אֶנוֹשׁ,Man
+3,אָסַר,Tied up
+3,אֹרַח,Way
+3,אוֹרֵחַ,Guest
+3,בּוֹשׁ,Embarrassed
+3,בָּחַן,Tested
+3,בָּלַל,Mixed
+3,בָּלַע,Swallowed
+3,בָּעַר,Burned
+3,בָּצַר,Harvested grapes
+3,בָּקַע,Split
+3,גָבוֹהַ,High
+3,גָלָה,Exiled
+3,גִלָה,Revealed
+3,גָמַל,Rewarded/did to
+3,דָבַק,Stuck to
+3,דוֹמֵם,Silent
+3,הִנֵה,Behold
+3,זָרַק,Threw
+3,חָגַר,Put on a belt
+3,הֶחְלִיף,Changed
+3,חָמַל,Had mercy
+3,חָס,Trust/took shelter
+3,חָפֵץ,Wanted
+3,חֵץ,Arrow
+3,חָרַב,Destroyed
+3,חָרַד,Trembled
+3,חָרַשׁ,Plowed
+3,חָשַׂךְ,Held back
+3,חָתַם,Sealed
+3,יָעַץ,Advised
+3,יָצַק,Poured in
+3,יָצַר,Created
+3,יָרָה,Threw/shot
+3,יָגַע,Exhausted
+3,יָסַד,Established
+3,יִסֵר,Punished
+3,יֶתֶר,Left over
+3,יַעַר,Forest
+3,כָּרַת,Cut
+3,כִּבֵּס,Washed clothing
+3,כָּשַׁל,Stumbled
+3,כָּרַע,Kneeled
+3,כָּנָף,Wing/corner
+3,כְּסִיל,Fool
+3,כָּתֵף,Shoulder
+3,לָלוּן,To sleep over
+3,לָכַד,Captured
+3,לָקַט,Gathered
+3,מָאַס,Became disgusted
+3,מָדַד,Measured
+3,מָשַׁח,Anointed
+3,מָשַׁל,Ruled
+3,מָחָה,Erased
+3,מָנָה,Counted/portion
+3,מָנַע,Held back
+3,מָעַל,Embezzled/unfaithful
+3,מָשַׁךְ,Pulled
+3,מָגֵן,Shield
+3,מִשְׁקָל,Weight (like in a scale)
+3,נָטָה,Stretched out/turned away
+3,נָגַע,Touched
+3,נָס,Ran away
+3,נָהַג,Led
+3,נָע,Shook/moved
+3,נָטַשׁ,Abandoned
+3,נָסַךְ,Poured
+3,נָקִי,Clean/innocent
+3,נָתַץ,Demolished
+3,סָתַר,Took apart
+3,סָלַח,Forgave
+3,סָמַךְ,Leaned
+3,סָפַד,Eulogized
+3,עוּר,Wake up
+3,עָזַר,Helped
+3,עָרַךְ,Set up
+3,עָצַר,Held back
+3,עָרַב,Guaranteed
+3,עֵרֶב,Mixture
+3,עֹז,Strength
+3,עֶלְיוֹן,Highest
+3,פֶּלֶא,Wonder
+3,פָּעַל,Did
+3,פָּרַד,Separated
+3,פֵּרֵשׁ/פָּרַשׁ/פָּרָשׁ,Explained/separated/horse rider
+3,פָּגַע,Met/Davened
+3,פָּחַד,Feared
+3,פְּלֵיטָה,Escape
+3,פָּרַח,Blossomed
+3,פָּרַץ,Broke through
+3,פָּשַׁט,Stretched out/took off clothes
+3,הִצְלִיחַ,Was successful
+3,צָפָה,Looked (from high up)
+3,צָמַח,Sprouted
+3,צָפַן,Hid
+3,צָרַף,Soldered
+3,קַל,Easy/Light
+3,קָרַע,Tore
+3,קִוָה,Hoped
+3,קָצַף,Got angry
+3,קָצַר,Harvested (grain)
+3,קָרָה,Happened/encountered
+3,קָשַׁר,Tied (made a knot)
+3,הִקְשִׁיב,Listened
+3,קִיר,Wall
+3,קָנֶה,Pipe
+3,קֵץ,End
+3,קָצֶה,Edge
+3,רָם,High
+3,רָדַף,Chased
+3,רוּץ,Run
+3,רָחַץ,Washed
+3,רִיב,Fight/argument
+3,רָכַב,Rode (like on a horse)
+3,רִנֵן,Shouted with joy
+3,רָפָא,Healed
+3,רָצָה,Wanted
+3,רָשׁ,Poor
+3,רָצַח,Murdered
+3,רָצוֹן,Will
+3,שָׁכַח,Forgot
+3,שָׁכַן/שָׁכֵן,Rested/Neighbor
+3,הִשְׁלִיךְ,Threw
+3,שָׁפַךְ,Poured out
+3,שָׂבָע,Full (from eating)
+3,שִׁיר,Song
+3,שִׁית,Put
+3,שָׁמַם,Became empty
+3,שָׂחַק,Laughed
+3,שָׁבָה,Captured
+3,שָׁטַף,Washed (not people)
+3,שָׁפָל,Low
+3,שָׁקַט,Rested/became quiet
+3,שֵׂעָר,Hair
+3,שָׂפָה,Lip/language/edge
+3,שֵׁן,Tooth
+3,תָּמִים,Whole
+3,תָּפַשׂ,Grabbed
+3,תָּלָה,Hung
+3,תָּעָה,Got lost
+3,תְּהִלָה,Praise

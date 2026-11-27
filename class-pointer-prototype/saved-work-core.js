@@ -9,7 +9,7 @@
     teacherBoardBytes:10*MB, // a teacher's lesson whiteboard (up to 12 pasted pictures of 0.7 MB each, plus the drawing)
     pngBytes:2*MB,          // the small picture of a saved whiteboard
     pdfBytes:25*MB,         // a PDF a student uploads
-    studentFiles:50,teacherBoards:200,folders:60, // how many files one person may keep (checked on the page; rules cannot count)
+    studentFiles:200,teacherBoards:200,folders:60, // how many files one person may keep (checked on the page; rules cannot count)
     folderName:40,fileName:60,positions:60
   };
   const WORKSPACE='b3-2026';
