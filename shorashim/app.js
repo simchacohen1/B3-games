@@ -165,7 +165,7 @@ let selectedItemKey = null;
 let selectedArtEl = null;
 let canvas, ctx, drawing = false, erasing = false, drawHistory = [];
 let reviewDeck = [], reviewIndex = 0, reviewFlipped = false, reviewShownAt = 0, reviewSessionSeen = new Set();
-let reviewNoHints = false, reviewPointsMode='regular', shorashimRecorder = null, shorashimRecordingChunks = [], shorashimRecordingStartedAt = 0, shorashimPausedAt=0, shorashimPausedMs=0;
+let reviewNoHints = false, reviewRecordOn=false, shorashimRecorder = null, shorashimRecordingChunks = [], shorashimRecordingStartedAt = 0, shorashimPausedAt=0, shorashimPausedMs=0;
 let activeScreenId = 'studentHome';
 let lastInteraction = Date.now();
 let ticker = null;
@@ -471,13 +471,9 @@ function bindNavigation(){
   if(weekSelect)weekSelect.onchange=()=>{bookletWeek=weekSelect.value==='all'?'all':Number(weekSelect.value);selectedItemKey=null;renderLearningScreen();};
 }
 function backTargetFor(btn){const t=btn.dataset.back;if(!t)return 'studentHome';if(t==='auto-learn')return currentTrack==='shorashim'?'shorashimPerekScreen':'affixHomeScreen';return t;}
-function openReviewMode(mode){
+function openReviewMode(){
   if(!followAllowsScreen('reviewScreen'))return;
-  const ids={regular:'regularChazaraChoice','no-hints':'noHintsChazaraChoice',practice:'practiceOnlyChoice'};
-  const labels={regular:'🎙️ Record Chazara — pictures allowed — 2 points','no-hints':'🏆 No Hints Challenge — no pictures or drawings — 3 points',practice:'🔁 Practice Only — no recording, no points'};
   currentTrack='shorashim';
-  document.getElementById(ids[mode]||ids.regular)?.click();
-  const banner=document.getElementById('reviewModeBanner');if(banner)banner.textContent=labels[mode]||labels.regular;
   goScreen('reviewScreen');
   document.body.classList.add('sh-hub-review');
 }
@@ -650,13 +646,13 @@ function bindReview(){
   });
   document.getElementById('startReviewBtn').onclick=startReview;
   const noHints=document.getElementById('reviewNoHints'); if(noHints) noHints.onchange=()=>{reviewNoHints=!!noHints.checked;};
-  const setMode=(mode)=>{reviewPointsMode=mode;reviewNoHints=mode==='no-hints';if(noHints)noHints.checked=reviewNoHints;document.querySelectorAll('.review-choice').forEach(x=>x.classList.toggle('active',x.id===(mode==='regular'?'regularChazaraChoice':mode==='no-hints'?'noHintsChazaraChoice':'practiceOnlyChoice')));const rec=document.getElementById('shorashimRecordBtn'),rem=document.getElementById('pointsReminder');if(rec){rec.classList.toggle('hidden',mode==='practice');rec.textContent=mode==='no-hints'?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}if(rem)rem.textContent=mode==='practice'?'Press Show My Cards and say each shorash and its meaning. No recording needed.':mode==='no-hints'?'Press Show My Cards. Then press Start Recording and say each shorash and its meaning without pictures or drawings.':'Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.';};
-  document.getElementById('regularChazaraChoice')?.addEventListener('click',()=>setMode('regular'));
-  document.getElementById('noHintsChazaraChoice')?.addEventListener('click',()=>setMode('no-hints'));
-  document.getElementById('practiceOnlyChoice')?.addEventListener('click',()=>setMode('practice'));
+  const setHide=on=>{reviewNoHints=!!on;if(noHints)noHints.checked=reviewNoHints;const b=document.getElementById('hidePicturesToggle');if(b){b.classList.toggle('on',reviewNoHints);b.setAttribute('aria-pressed',reviewNoHints?'true':'false');}if(reviewDeck.length&&!document.getElementById('reviewArea')?.classList.contains('hidden'))renderReviewCard(false);};
+  const setRecord=on=>{reviewRecordOn=!!on;const b=document.getElementById('recordMyselfToggle');if(b){b.classList.toggle('on',reviewRecordOn);b.setAttribute('aria-pressed',reviewRecordOn?'true':'false');}document.getElementById('activeReviewRecording')?.classList.toggle('hidden',!reviewRecordOn);};
+  document.getElementById('hidePicturesToggle')?.addEventListener('click',()=>setHide(!reviewNoHints));
+  document.getElementById('recordMyselfToggle')?.addEventListener('click',()=>{if(shorashimRecorder&&['recording','paused'].includes(shorashimRecorder.state)){const st=document.getElementById('shorashimRecordStatus');if(st)st.textContent='Press Finish & Submit to send your recording first.';return;}setRecord(!reviewRecordOn);});
   const rec=document.getElementById('shorashimRecordBtn'); if(rec) rec.onclick=toggleShorashimRecording;
   const pause=document.getElementById('shorashimPauseBtn'); if(pause) pause.onclick=toggleShorashimPause;
-  setMode('regular');
+  setHide(false);setRecord(false);
   document.getElementById('chooseReviewCardsBtn').onclick=chooseDifferentReviewCards;document.getElementById('flipReviewBtn').onclick=flipReview;document.getElementById('reviewFlipCard').onclick=flipReview;document.getElementById('prevReviewBtn').onclick=()=>moveReview(-1);document.getElementById('nextReviewBtn').onclick=()=>moveReview(1);document.getElementById('editReviewBtn').onclick=()=>{const c=reviewDeck[reviewIndex];if(c)openRedesignCard(c.itemKey);};
   document.getElementById('reviewSort').onchange=renderReviewPicker;document.getElementById('selectAllReview').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=true);updateReviewSelectionCount();};document.getElementById('clearReviewSelection').onclick=()=>{document.querySelectorAll('.review-pick-check').forEach(x=>x.checked=false);updateReviewSelectionCount();};
   document.addEventListener('keydown',e=>{if(activeScreenId!=='reviewScreen'||document.getElementById('reviewArea').classList.contains('hidden')||!reviewDeck.length)return;if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;if(e.key==='ArrowRight'){e.preventDefault();moveReview(1);}else if(e.key==='ArrowLeft'){e.preventDefault();moveReview(-1);}else if(e.key==='ArrowUp'){e.preventDefault();flipReview();}});
@@ -668,7 +664,7 @@ function saveManualReviewOrderFromGrid(box){[...box.querySelectorAll('.review-pi
 function moveManualReviewCard(key,dir){const arr=reviewSortedCards(),i=arr.findIndex(c=>c.itemKey===key),j=i+dir;if(i<0||j<0||j>=arr.length)return;arr.forEach((c,n)=>c.reviewOrder=n);[arr[i].reviewOrder,arr[j].reviewOrder]=[arr[j].reviewOrder,arr[i].reviewOrder];saveDB();renderReviewPicker();}
 function updateReviewSelectionCount(){const n=document.querySelectorAll('.review-pick-check:checked').length;document.getElementById('reviewSelectionCount').textContent=`${n} selected`;const btn=document.getElementById('startReviewBtn');btn.disabled=!n;btn.textContent=n?`Start Review (${n} cards)`:'Start Review';}
 function renderReviewAvailability(){renderReviewUnitFilters();const has=eligibleLearnedCards().length>0;document.getElementById('reviewEmpty').classList.toggle('hidden',has);document.getElementById('reviewSetup').classList.toggle('hidden',!has);if(!has)document.getElementById('reviewArea').classList.add('hidden');else renderReviewPicker();}
-function startReview(){reviewNoHints=!!document.getElementById('reviewNoHints')?.checked;const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;reviewSessionSeen=new Set();document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');const activeRec=document.getElementById('activeReviewRecording');if(activeRec)activeRec.classList.toggle('hidden',reviewPointsMode==='practice');renderReviewCard();}
+function startReview(){reviewNoHints=!!document.getElementById('reviewNoHints')?.checked;const keys=[...document.querySelectorAll('.review-pick-check:checked')].map(x=>x.dataset.key),map=new Map(eligibleLearnedCards().map(c=>[c.itemKey,c]));let arr=keys.map(k=>map.get(k)).filter(Boolean);if(!arr.length){alert('Select at least one card to review.');return;}if(document.querySelector('input[name="reviewOrderMode"]:checked')?.value==='shuffle')arr=shuffle(arr.slice());reviewDeck=arr;reviewIndex=0;reviewFlipped=false;reviewSessionSeen=new Set();document.getElementById('reviewEmpty').classList.add('hidden');document.getElementById('reviewSetup').classList.add('hidden');document.body.classList.add('shorashim-review-active');document.getElementById('reviewArea').classList.remove('hidden');const activeRec=document.getElementById('activeReviewRecording');if(activeRec)activeRec.classList.toggle('hidden',!reviewRecordOn);renderReviewCard();}
 
 
 function chooseDifferentReviewCards(){
@@ -689,7 +685,7 @@ function toggleShorashimPause(){
   const pause=document.getElementById('shorashimPauseBtn'),status=document.getElementById('shorashimRecordStatus');
   if(!shorashimRecorder)return;
   if(shorashimRecorder.state==='recording'){shorashimRecorder.pause();shorashimPausedAt=Date.now();if(pause)pause.textContent='▶ Resume';if(status)status.textContent='Recording paused — press Resume when you are ready.';}
-  else if(shorashimRecorder.state==='paused'){shorashimPausedMs+=Date.now()-shorashimPausedAt;shorashimRecorder.resume();if(pause)pause.textContent='⏸ Pause';if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — 3 points after approval.':'Recording with pictures — 2 points after approval.';}
+  else if(shorashimRecorder.state==='paused'){shorashimPausedMs+=Date.now()-shorashimPausedAt;shorashimRecorder.resume();if(pause)pause.textContent='⏸ Pause';if(status)status.textContent='Recording…';}
 }
 
 async function toggleShorashimRecording(){
@@ -722,7 +718,7 @@ async function toggleShorashimRecording(){
         if(durationMs<5000)throw new Error('Please record at least 5 seconds.');
         const blob=new Blob(shorashimRecordingChunks,{type:shorashimRecorder.mimeType||'audio/webm'});
         if(blob.size<1000)throw new Error('The recording was too short. Please try again.');
-        const date=todayKey(), mode=reviewNoHints?'no-hints':'pictures', points=reviewNoHints?3:2;
+        const date=todayKey(), mode=reviewNoHints?'no-hints':'pictures', points=0;
         const existingRef=cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`);
         const existing=await existingRef.once('value');
         if(existing.exists()){
@@ -733,7 +729,7 @@ async function toggleShorashimRecording(){
           // Never destroy an already uploaded recording because its separate
           // points request failed. The teacher can safely repair that request.
           if(oldData.audioURL&&oldData.storagePath)
-            throw new Error(oldData.pointRequestId?'You already sent today’s Shorashim recording.':'Your recording is saved. Ask your teacher to press Connect Points Request.');
+            throw new Error('You already sent today’s Shorashim recording.');
           // Only a dangling date marker without a usable recording can be replaced.
           await existingRef.remove();
         }
@@ -746,20 +742,12 @@ async function toggleShorashimRecording(){
         // must not allow duplicates or make the pupil's recording disappear.
         await existingRef.set({eventId,mode,points,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
 
-        const source=reviewNoHints?'shorashim-no-hints':'shorashim-recording';
-        const user=window.firebase&&firebase.auth&&firebase.auth().currentUser;
-        if(!user)throw new Error('Please sign in again from the Fun Torah Tools home page.');
-        const idToken=await user.getIdToken();
-        const awardResp=await fetch(STUDENT_REWARDS_AUTO_AWARD_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({studentId:cloudStudentId,source,eventId})});
-        const awardData=await awardResp.json().catch(()=>({}));
-        if(!awardResp.ok)throw new Error('Your recording is saved. Ask your teacher to connect its points request. '+(awardData.error||''));
-        await cloudDb.ref(`${CLOUD_ROOT}/recordingEvents/${cloudStudentId}/${eventId}`).update({pointRequestId:awardData.requestId||null,pointRequestStatus:awardData.status||'pending'});
-        await cloudDb.ref(`${CLOUD_ROOT}/recordings/${cloudStudentId}/${date}`).set({eventId,mode,points,status:awardData.status||'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
-        if(status)status.textContent=`Sent to Rabbi Cohen for approval — ${points} points if approved.`;{const ok=document.getElementById('reviewSentNote');if(ok){ok.textContent=`✅ Sent for approval — ${points} points if approved`;ok.classList.remove('hidden');}}
+        await existingRef.set({eventId,mode,points:0,status:'recorded',createdAt:firebase.database.ServerValue.TIMESTAMP});
+        if(status)status.textContent='Sent to Rabbi Cohen. Great job!';{const ok=document.getElementById('reviewSentNote');if(ok){ok.textContent='✅ Sent to your teacher';ok.classList.remove('hidden');}}
       }catch(err){console.error(err);if(status)status.textContent=err?.message||'Could not save the recording.';}
-      finally{if(btn){btn.disabled=false;btn.textContent=reviewNoHints?'🎙️ Start Recording — 3 Points':'🎙️ Start Recording — 2 Points';}const pause=document.getElementById('shorashimPauseBtn');if(pause){pause.classList.add('hidden');pause.textContent='⏸ Pause';}shorashimRecorder=null;shorashimRecordingChunks=[];shorashimPausedMs=0;}
+      finally{if(btn){btn.disabled=false;btn.textContent='🎙️ Start Recording';}const pause=document.getElementById('shorashimPauseBtn');if(pause){pause.classList.add('hidden');pause.textContent='⏸ Pause';}shorashimRecorder=null;shorashimRecordingChunks=[];shorashimPausedMs=0;}
     };
-    shorashimRecorder.start(500); if(btn){btn.textContent='⏹ Finish & Submit';btn.classList.remove('record-pulse');}const pause=document.getElementById('shorashimPauseBtn');if(pause)pause.classList.remove('hidden'); if(status)status.textContent=reviewNoHints?'Recording No Hints Challenge — worth 3 points after approval.':'Recording with pictures — worth 2 points after approval.';
+    shorashimRecorder.start(500); if(btn){btn.textContent='⏹ Finish & Submit';btn.classList.remove('record-pulse');}const pause=document.getElementById('shorashimPauseBtn');if(pause)pause.classList.remove('hidden'); if(status)status.textContent='Recording… say each shorash and its meaning.';
   }catch(err){console.error(err);if(status)status.textContent='Microphone permission is needed to record.';}
 }
 

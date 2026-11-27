@@ -14,7 +14,7 @@ test('homepage signs student sessions into Firebase with the selected class toke
 test('Posuk Practice, Chazara, and Shorashim point requests send Firebase ID tokens',()=>{
   assert.match(read('record_pesukim/student.html'),/Authorization':'Bearer '\+idToken/);
   assert.match(read('chazara/index.html'),/Authorization':'Bearer '\+idToken/);
-  assert.match(read('shorashim/app.js'),/Authorization':'Bearer '\+idToken/);
+  assert.match(read('shorashim/review-points.js'),/Authorization: 'Bearer ' \+ token/);
 });
 test('student auth returns tokens only after checking the selected class membership',()=>{
   const handler=read('backend/functions/student-auth.js');

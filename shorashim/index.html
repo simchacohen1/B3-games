@@ -1244,12 +1244,22 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <span class="hub-sub">Learn new Hebrew words with pictures and practice.</span>
               <span class="hub-cta">Learn New Words ▶</span>
             </button>
-            <button type="button" class="hub-card hub-review" data-go="reviewHubScreen">
+            <button type="button" class="hub-card hub-review" data-review-mode="regular">
               <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span><span class="hub-emoji">🎮</span></span>
               <strong>Review</strong>
-              <span class="hub-sub">Practice what you learned, record Chazara, or play games.</span>
+              <span class="hub-sub">Practice the words you learned and earn points.</span>
               <span class="hub-cycle hidden" id="homeCycleLeft"></span>
               <span class="hub-cta">Start Reviewing ▶</span>
+            </button>
+            <button type="button" class="hub-card hub-practice-acts" id="practiceHomeCard" data-go="practiceScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">✍️</span></span>
+              <strong>Practice Activities</strong>
+              <span class="hub-sub">Tracing, multiple choice, matching</span>
+            </button>
+            <button type="button" class="hub-card hub-games" id="gamesHomeCard" data-go="gamesScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎮</span></span>
+              <strong>Games</strong>
+              <span class="hub-sub" id="gamesHomeMessage">Choose a practice game.</span>
             </button>
           </div>
           <!-- Kept (hidden) so existing code that fills it keeps working. -->
@@ -1461,64 +1471,19 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           </div>
         </section>
 
-        <section id="reviewHubScreen" class="screen">
-          <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Review</div><h2>How do you want to review?</h2><div class="hub-cycle hidden" id="hubCycleLeft"></div></div>
-          </div>
-          <div class="hub-grid hub-two" aria-label="Review choices">
-            <button type="button" class="hub-card hub-record" data-review-mode="regular">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎙️</span></span>
-              <strong>Record Chazara</strong>
-              <span class="hub-sub">Pictures allowed</span>
-              <span class="hub-pts">2 points</span>
-            </button>
-            <button type="button" class="hub-card hub-nohints" data-review-mode="no-hints">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🏆</span></span>
-              <strong>No Hints Challenge</strong>
-              <span class="hub-sub">No pictures or drawings</span>
-              <span class="hub-pts">3 points</span>
-            </button>
-            <button type="button" class="hub-card hub-practice" data-review-mode="practice">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🔁</span></span>
-              <strong>Practice Only</strong>
-              <span class="hub-sub">No recording</span>
-              <span class="hub-pts none">No points</span>
-            </button>
-            <button type="button" class="hub-card hub-practice-acts" id="practiceHomeCard" data-go="practiceScreen">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">✍️</span></span>
-              <strong>Practice Activities</strong>
-              <span class="hub-sub">Tracing, multiple choice, matching</span>
-            </button>
-            <button type="button" class="hub-card hub-games" id="gamesHomeCard" data-go="gamesScreen">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎮</span></span>
-              <strong>Games</strong>
-              <span class="hub-sub" id="gamesHomeMessage">Choose a practice game.</span>
-            </button>
-          </div>
-        </section>
-
         <section id="reviewScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
-            <div><h2>Review</h2></div>
+            <button class="backBtn ghost">← Home</button>
+            <div><h2>Review</h2><div class="hub-cycle hidden" id="hubCycleLeft"></div></div>
             <div id="dailyReviewBadge" class="session-status"></div>
           </div>
 
-          <div id="reviewModeBanner" class="review-mode-banner" aria-live="polite"></div>
           <div class="review-choice-panel">
-            <div class="review-choice-title">Choose how you want to review:</div>
-            <div class="review-choice-grid">
-              <button type="button" id="regularChazaraChoice" class="review-choice points-choice active">
-                <span class="choice-icon">🎙️</span><strong>Record Chazara</strong><span>Pictures allowed</span><b>2 points</b>
-              </button>
-              <button type="button" id="noHintsChazaraChoice" class="review-choice challenge-choice">
-                <span class="choice-icon">🏆</span><strong>No Hints Challenge</strong><span>No pictures or drawings</span><b>3 points</b>
-              </button>
-              <button type="button" id="practiceOnlyChoice" class="review-choice practice-choice">
-                <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
-              </button>
+            <div class="review-options-row" role="group" aria-label="Review options">
+              <button type="button" id="hidePicturesToggle" class="review-toggle" aria-pressed="false"><span class="toggle-icon">🙈</span><strong>Hide pictures</strong><span class="toggle-state"></span></button>
+              <button type="button" id="recordMyselfToggle" class="review-toggle" aria-pressed="false"><span class="toggle-icon">🎙️</span><strong>Record myself</strong><span class="toggle-state"></span></button>
             </div>
+            <div id="wordPointsLine" class="word-points-line" aria-live="polite"></div>
             <div id="cycleBox" class="cycle-box hidden">
               <div id="cycleLeftLine" class="cycle-left" aria-live="polite"></div>
               <div class="cycle-count-title">How many do you want to review now?</div>
@@ -1533,7 +1498,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             <div class="kid-review-actions">
   <button type="button" id="quickStartReviewBtn" class="kid-start-review">▶ SHOW MY CARDS</button>
 </div>
-<div id="pointsReminder" aria-live="polite" class="points-reminder kid-short-reminder">Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.</div>
+<div id="pointsReminder" aria-live="polite" class="points-reminder kid-short-reminder">Press Show My Cards, then say each shorash and its meaning.</div>
           </div>
 
           <details class="review-options card-panel">
@@ -1573,9 +1538,9 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             </div>
             <div id="tooFastMessage" class="too-fast hidden">Give yourself a moment to say the word and meaning.</div>
             <div id="activeReviewRecording" class="record-action-row">
-              <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording — 2 Points</button>
+              <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording</button>
               <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
-              <span id="shorashimRecordStatus" class="mini-note kid-record-note">🎙️ Record your Shorashim. Rabbi Cohen will check it.</span>
+              <span id="shorashimRecordStatus" class="mini-note kid-record-note">🎙️ Record your Shorashim. Your teacher will listen.</span>
               <div id="reviewSentNote" class="review-sent-note hidden" role="status" aria-live="polite"></div>
             </div>
             <div class="review-card-wrap">
@@ -1603,7 +1568,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
         <section id="practiceScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
+            <button class="backBtn ghost">← Home</button>
             <div><h2>Practice Activities</h2></div>
           </div>
           <div class="hero-grid two game-menu-grid">
@@ -1616,7 +1581,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
         <section id="gamesScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
+            <button class="backBtn ghost">← Home</button>
             <div><h2>Games</h2></div>
           </div>
           <div id="gamesLockedPanel" class="card-panel center-panel hidden">
@@ -1705,10 +1670,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="review-cycle-core.js?v=20261127-cycles2"></script>
   <script src="builtin-pictures.js?v=20261127-builtin1"></script>
   <script src="mastery-core.js?v=20261127-mastery1"></script>
-  <script src="app.js?v=20261127-builtin1-cycles2-mastery1"></script>
+  <script src="app.js?v=20261127-builtin1-cycles2-mastery1-simplify1"></script>
   <script src="practice-activities.js?v=20261127-mastery2"></script>
   <script src="review-categories.js?v=20261127-cycles2"></script>
-  <script src="review-cycles.js?v=20261127-cycles2"></script>
+  <script src="review-cycles.js?v=20261127-cycles3"></script>
+  <script src="review-points.js?v=20261127-points1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
   <script src="../b3-race.js?v=race-sync-20261109"></script>

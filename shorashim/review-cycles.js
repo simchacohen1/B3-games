@@ -175,7 +175,7 @@
       if (recordingBusy()) { const n = $('reviewBatchNote'); if (n) n.textContent = 'Press “Finish & Submit” to send your recording first.'; return; }
       hideBatchDone();
       chooseDifferentReviewCards();
-      goScreen('reviewHubScreen');
+      goScreen('studentHome');
     });
     document.querySelectorAll('#cycleCountBtns [data-count]').forEach(b => b.addEventListener('click', () => {
       chosenCount = b.dataset.count;
