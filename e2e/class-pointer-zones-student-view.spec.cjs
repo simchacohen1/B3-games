@@ -277,3 +277,97 @@ test('personal whiteboard: the student moves what the teacher sent (picture, sha
   expect(await sum()).toBe(inkBefore);
   await a.context.close(); await t.context.close();
 });
+
+test('personal whiteboard: a picture the teacher sent (page background) can be moved and resized with Select; Select and Pointer never draw', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const a = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await a.page.setViewportSize({ width: 1280, height: 1500 });
+  // The teacher's "Paste to all boards" arrives as a page background (a small JPEG), not as a mark.
+  await a.page.evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 80; c.height = 60; const x = c.getContext('2d'); x.fillStyle = '#2e7d32'; x.fillRect(0, 0, 80, 60);
+    const bg = c.toDataURL('image/jpeg', .9);
+    window.ClassPointerBoards.fromTeacher({ type: 'board-mode', on: true, mode: 'boards', activity: null, strokes: [], pages: [{ id: 'pg0', bg, strokes: [] }], at: 'pg0' });
+  });
+  await expect(a.page.getByRole('button', { name: 'Select', exact: true }).first()).toBeVisible({ timeout: 15000 });
+  await a.page.getByRole('button', { name: 'Select', exact: true }).first().click();
+  const cv = await a.page.evaluate(() => { const r = document.querySelector('#fttAnnotate .fa-capture').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const at = (fx, fy) => a.page.evaluate(([fx, fy]) => { const c = document.querySelector('#myBoard canvas'), k = c.width / c.clientWidth, d = c.getContext('2d').getImageData(Math.round(fx * c.clientWidth * k), Math.round(fy * c.clientHeight * k), 1, 1).data; return [d[0], d[1], d[2]]; }, [fx, fy]);
+  const isGreen = ([r, g, b]) => g > 90 && r < 90 && b < 90;
+  const isWhite = ([r, g, b]) => r > 240 && g > 240 && b > 240;
+  const drag = async (fx, fy, tx, ty) => {
+    await a.page.mouse.move(cv.x + cv.w * fx, cv.y + cv.h * fy); await a.page.mouse.down();
+    await a.page.mouse.move(cv.x + cv.w * tx, cv.y + cv.h * ty, { steps: 6 }); await a.page.mouse.up(); await a.page.waitForTimeout(500);
+  };
+  expect(isGreen(await at(.9, .9))).toBe(true);
+  await drag(.5, .5, .5, .5);                                      // click the picture to pick it
+  await drag(.995, .995, .6, .6);                                  // drag its corner in: it gets smaller
+  await expect.poll(async () => isGreen(await at(.3, .3)) && !isGreen(await at(.9, .9)), { timeout: 8000 }).toBe(true);
+  await drag(.3, .3, .5, .5);                                      // and move it down and right
+  await expect.poll(async () => isGreen(await at(.7, .7)) && !isGreen(await at(.1, .1)), { timeout: 8000 }).toBe(true);
+  // The teacher sees where the student put it.
+  const sum = () => a.page.evaluate(() => { const c = document.querySelector('#myBoard canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += 765 - d[i] - d[i + 1] - d[i + 2]; return s; });
+  // Pointer tool: a drag on the board is not a pen either.
+  await a.page.getByRole('button', { name: 'Pointer', exact: true }).first().click();
+  const before = await sum();
+  await drag(.1, .9, .4, .95);
+  expect(await sum()).toBe(before);
+  await a.context.close(); await t.context.close();
+});
+
+test('Send from the teacher whiteboard: each student gets editable pieces (Hebrew words, picture, shape) and can move them; locked picture is an option', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const a = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await t.page.evaluate(() => document.getElementById('openWhiteboard').click());
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerPdf.zones.available()), { timeout: 15000 }).toBe(true);
+  await t.page.evaluate(img => { const B = window.ClassPointerBridge;
+    B.submitStroke({ tool: 'picture', color: '#1f2937', size: .016, points: [{ x: .1, y: .2 }, { x: .25, y: .4 }], image: img });
+    B.submitStroke({ tool: 'text', color: '#c62828', size: .06, points: [{ x: .4, y: .3 }, { x: .8, y: .4 }], text: 'וְהָאָדָם' });
+    B.submitStroke({ tool: 'ellipse', color: '#2e7d32', size: .008, points: [{ x: .6, y: .6 }, { x: .85, y: .85 }] });
+  }, PNG);
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerBridge.highlights().length), { timeout: 10000 }).toBe(3);
+  await a.page.setViewportSize({ width: 1280, height: 1500 });
+  // saved-work.js sendCurrent does exactly this (it only runs on the real teacher dashboard page).
+  await t.page.evaluate(async () => { const P = window.ClassPointerPdf, pieces = await P.exportPieces(); await window.ClassPointerBoards.sendPictureToAll(await P.exportPng(), 'note', { pieces }); });
+  await expect(t.page.getByRole('button', { name: '✓ Send to all boards' })).toBeVisible({ timeout: 15000 });
+  await expect(t.page.getByText('Send as a locked picture')).toBeVisible();
+  await t.page.getByRole('button', { name: '✓ Send to all boards' }).click();
+  await expect(a.page.getByRole('button', { name: 'Select', exact: true }).first()).toBeVisible({ timeout: 20000 });
+  const pieces = () => a.page.evaluate(() => (window.ClassPointerBoards.exportBoard()?.strokes || []).map(s => ({ id: s.id, tool: s.tool || 'pen', by: s.by, text: s.text, hasImage: !!s.image, y: s.points[0].y })));
+  await expect.poll(async () => (await pieces()).length, { timeout: 10000 }).toBe(3);
+  const list = await pieces();
+  expect(list.find(s => s.text).text).toBe('וְהָאָדָם');
+  expect(list.find(s => s.hasImage)).toBeTruthy();
+  expect(list.find(s => s.tool === 'ellipse')).toBeTruthy();
+  expect(list.every(s => s.by === 'teacher')).toBe(true);
+  await a.page.getByRole('button', { name: 'Select', exact: true }).first().click();
+  const cv = await a.page.evaluate(() => { const r = document.querySelector('#fttAnnotate .fa-capture').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const drag = async (fx, fy, tx, ty) => {
+    await a.page.mouse.move(cv.x + cv.w * fx, cv.y + cv.h * fy); await a.page.mouse.down();
+    await a.page.mouse.move(cv.x + cv.w * tx, cv.y + cv.h * ty, { steps: 6 }); await a.page.mouse.up(); await a.page.waitForTimeout(600);
+  };
+  const textY = async () => (await pieces()).find(s => s.text).y;
+  const before = await textY();
+  await drag(.41, before + .03, .41, before + .03 + .25);          // the Hebrew words
+  await expect.poll(async () => (await textY()) > before + .15, { timeout: 8000 }).toBe(true);
+  expect((await pieces()).find(s => s.text).text).toBe('וְהָאָדָם');
+  await a.context.close(); await t.context.close();
+});
+
+test('Send as a locked picture: the student gets one static picture and no pieces', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const a = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await t.page.evaluate(() => document.getElementById('openWhiteboard').click());
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerPdf.zones.available()), { timeout: 15000 }).toBe(true);
+  await t.page.evaluate(() => window.ClassPointerBridge.submitStroke({ tool: 'text', color: '#c62828', size: .06, points: [{ x: .4, y: .3 }, { x: .8, y: .4 }], text: 'וְהָאָדָם' }));
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerBridge.highlights().length), { timeout: 10000 }).toBe(1);
+  await t.page.evaluate(async () => { const P = window.ClassPointerPdf, pieces = await P.exportPieces(); await window.ClassPointerBoards.sendPictureToAll(await P.exportPng(), 'note', { pieces }); });
+  await t.page.getByText('Send as a locked picture').click();
+  await t.page.getByRole('button', { name: '✓ Send to all boards' }).click();
+  await expect(a.page.getByRole('button', { name: 'Select', exact: true }).first()).toBeVisible({ timeout: 20000 });
+  const strokes = await a.page.evaluate(() => (window.ClassPointerBoards.exportBoard()?.strokes || []).length);
+  expect(strokes).toBe(0);
+  await a.context.close(); await t.context.close();
+});

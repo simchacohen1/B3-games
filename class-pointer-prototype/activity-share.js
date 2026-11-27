@@ -141,13 +141,13 @@
     await load(new URL('class-pointer-prototype/poll.js?v=2',root).href);
     await load(new URL('class-pointer-prototype/board-tiles-core.js?v=20261123-tiles2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/board-pages-core.js?v=20261124-pages1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261127-sel1',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261127-pc1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261124-pages1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261125-wb3',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261127-pc1',root).href).catch(()=>{});
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261124-pages1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/saved-work.js?v=20261125-wb3',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/saved-work.js?v=20261127-pc1',root).href).catch(()=>{});
     }
     // ---------- A student in more than one class joins whichever of his classes has a live lesson ----------
     // His class list is NOT changed: this page only listens to the lesson list of every class he is an active member

@@ -1959,6 +1959,32 @@
     }
     return blobs;
   }
+  // The whiteboard as separate pieces, one entry per page (or just page `only`, 1 up), for "Send to students" as editable items:
+  // its marks (words, pictures, shapes, lines), whether the page also has old-style background pictures, and render(left, maxChars),
+  // a JPEG of the page background (those pictures, plus any marks in `left` that cannot travel as pieces).
+  async function exportPieces(only){
+    if(!isBoardOpen())throw Error('The whiteboard is not open.');
+    if(Pages&&wbPages)capturePage();
+    const entries=Pages&&wbPages?wbPages.map((page,n)=>({pictures:n===wbAt?boardPictures:page.pictures,marks:n===wbAt?strokes:page.strokes,n})):[{pictures:boardPictures,marks:strokes,n:0}];
+    const out=[];
+    for(const entry of entries){
+      if(only&&only-1!==entry.n)continue;
+      await whenPictures(entry.marks);
+      const marks=cloneStrokes(entry.marks),pictures=entry.pictures.slice();
+      out.push({strokes:marks,hasBackground:pictures.length>0,
+        async render(left,maxChars){
+          await whenPictures(left);
+          for(const width of [Math.min(boardSize.w,1000),720,520])for(const quality of [.85,.7,.55]){
+            const c=document.createElement('canvas');c.width=width;c.height=Math.max(1,Math.round(width*boardSize.h/boardSize.w));
+            paintPage(c,pictures,left||[]);
+            const url=c.toDataURL('image/jpeg',quality);c.width=0;
+            if(url.length<=maxChars)return url;
+          }
+          return '';
+        }});
+    }
+    return out;
+  }
   function pagesInfo(){return isBoardOpen()&&Pages&&wbPages?{count:wbPages.length,current:wbAt}:null}
   // The strip: previous / next, "Page 2 of 4", New page, and a panel of small pictures to jump to, copy, delete or move a page.
   function pageSignature(){
@@ -2267,7 +2293,7 @@
     studentJoined:member=>{if(isTeacher&&docId&&(bytes||paged))deliver(member)},
     close:closePdf,openSnapshot,reset:()=>{myZones=null;renderZones();studentReset()},isOpen:()=>!!lay,
     pastePicture,openUpload,uploadFiles,arrange,boardPictureCount:()=>boardPictures.length+pictureEdits.length+pictureCount(),
-    pagesInfo,exportPagePngs,showPage,addPage,newSlides,
+    pagesInfo,exportPagePngs,exportPieces,showPage,addPage,newSlides,
     // Which whiteboard is open (a new one is a new id), so the automatic save never writes one board over another.
     boardId:()=>isBoardOpen()?boardUid:null,
     exportWhiteboard,importWhiteboard,exportPng,boardRatio,
