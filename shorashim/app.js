@@ -146,8 +146,9 @@ function normalizeCatalogUnits(catalog){
   // perek, so untagged words there keep their historical unit. A teacher's own
   // class space is never guessed at: a word without a perek is grouped by its
   // list/category instead.
+  // Chumash Vocab words copied into the shared catalog stay in their own Level 1/2/3 lists.
   if(!classSpaceId)catalog.shorashim.forEach(item=>{
-    if(!item.perek&&!item.bookletWeek)item.perek=String(item.id||'').startsWith('19-')?19:18;
+    if(!item.perek&&!item.bookletWeek&&!/^chumash-vocab-l\d/.test(String(item.id||'')))item.perek=String(item.id||'').startsWith('19-')?19:18;
   });
   return catalog;
 }

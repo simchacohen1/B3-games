@@ -50,3 +50,17 @@ test('the new lists do not change the regular catalog (home count, games, other 
 test('scripts are loaded by the student and teacher pages',()=>{
   assert.match(html,/chumash-vocab\.js/);assert.match(teacherHtml,/chumash-vocab\.js/);
 });
+test('B3 ET/WT shared catalog: copied Chumash words are not retagged Perek 18, so students see all 3 lists',()=>{
+  const fnLine=n=>{if(n!=='normalizeCatalogUnits')return fn(n);const a=app.indexOf('function normalizeCatalogUnits(');return app.slice(a,app.indexOf('\n}',a)+2);};
+  const copied=Array.from(words,w=>({id:w.id,front:w.front,english:w.english,hebrew:w.front,listName:w.listName,art:[],hidden:false}));
+  const ctx=vm.createContext({window:g.window,classSpaceId:'',DEFAULT_CATALOG:{shorashim:[]},clone:v=>JSON.parse(JSON.stringify(v)),
+    db:{catalog:null},currentTrack:'shorashim',learningPerek:null,bookletWeek:1,student:()=>({cards:{}}),
+    isStudentAvailable:i=>!!i&&!i.hidden,keyFor:(t,id)=>t+':'+id});
+  ['normalizeCatalogUnits'].concat(['bookletCatalog','chumashCatalog','chumashExtra','visibleCatalog','unitKeyOf','unitLabels','studentUnits']).forEach(n=>vm.runInContext(fnLine(n),ctx));
+  ctx.db.catalog=vm.runInContext('normalizeCatalogUnits',ctx)({shorashim:[{id:'p18',front:'x',english:'x'},{id:'19-1',front:'y',english:'y'},...copied]});
+  const byId=Object.fromEntries(ctx.db.catalog.shorashim.map(i=>[i.id,i]));
+  assert.equal(byId.p18.perek,18);assert.equal(byId['19-1'].perek,19);
+  const units=vm.runInContext('studentUnits()',ctx);
+  for(const [l,n] of [[1,231],[2,315],[3,143]])assert.equal(units.find(u=>u.key==='list:Chumash Vocab Level '+l)?.count,n);
+  assert.equal(units.find(u=>u.key==='perek:18').count,1);
+});
