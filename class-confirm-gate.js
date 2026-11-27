@@ -219,6 +219,8 @@
   // Pages with their own class dropdown: a teacher's pick there is the site-wide
   // class too, and the two classes are always spelled B3 ET / B3 WT.
   var SELECT_IDS = { classSelect: 1, classSel: 1, cls: 1, fClass: 1 };
+  // More teacher-page class pickers the owner sees limited (they do not change the site-wide class).
+  var LIMIT_IDS = { classSelect: 1, classSel: 1, cls: 1, fClass: 1, pointerClassChoice: 1, classChoice: 1, homeClassPick: 1, fttTeacherQuickClass: 1, fttTeacherModalClass: 1, liveClassSelect: 1, launchClass: 1, progressClass: 1, wpnClass: 1 };
   function relabelOptions(scope) {
     try {
       Array.prototype.forEach.call(scope.querySelectorAll('select option[value="et"],select option[value="wt"]'), function (o) {
@@ -232,7 +234,7 @@
   function limitOwnerDropdowns(scope) {
     try {
       if (/(?:^|\/)(?:admin|owner-admin)\.html$/.test(root.location.pathname) || !isOwner()) return;
-      Object.keys(SELECT_IDS).forEach(function (id) {
+      Object.keys(LIMIT_IDS).forEach(function (id) {
         var sel = scope.getElementById(id);
         if (!sel || sel.tagName !== 'SELECT') return;
         var classOpts = Array.prototype.filter.call(sel.options, function (o) { return SAFE.test(o.value) && o.value !== ALL; });
