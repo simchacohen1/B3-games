@@ -183,7 +183,9 @@
     if (q) {
       // A class named in the link is the teacher's class for the whole site (only if it is theirs).
       var mine = access && (access.role === 'admin' || (access.classIds || []).indexOf(q) >= 0);
-      if (mine && (SAFE.test(q) || (allowAll && q === ALL))) { setSite(q); api.effective = q; }
+      // (A one-class page that was sent here because the choice is "All classes" keeps that choice.)
+      var kept = readSite() === ALL && !allowAll && q === readLast();
+      if (mine && !kept && (SAFE.test(q) || (allowAll && q === ALL))) { setSite(q); api.effective = q; }
       return Promise.resolve(q);
     }
     var base = 'b3Games/workspaces/' + (workspace || 'b3-2026') + '/classes';

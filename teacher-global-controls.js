@@ -157,6 +157,13 @@
     if (saved === 'all' || classIsValid(saved)) return saved;
     return '';
   }
+  // A class named in the page link (?class=) is the teacher's class for the whole site.
+  function adoptLinkClass() {
+    var g = gateApi();
+    var linked = new URLSearchParams(location.search).get('class') || '';
+    // (Where the choice is "All classes", a link to the latest single class is just that page's fallback.)
+    if (g && classIsValid(linked) && g.getSite() !== linked && !(g.getSite() === 'all' && linked === g.getLast())) g.setSite(linked);
+  }
   function syncClassButton() {
     if (!classBtn) return;
     var id = pageClass();
@@ -549,6 +556,7 @@
       // The panels act on the class in the link, else the teacher's site-wide class.
       authorized=true;
       selected = ids.includes(requested) ? requested : siteClass();
+      adoptLinkClass();
       teacherAnnotate(true);
       setupUi();
       syncClassPicker();
@@ -591,7 +599,7 @@
     // The shared class gate holds the site-wide class; load it where the page has not.
     if (!window.B3ClassGate && !Array.from(document.scripts).some(function(s){return /(?:^|\/)class-confirm-gate\.js(?:\?|$)/.test(s.src||'');})) {
       var gs=el('script');gs.src=new URL('class-confirm-gate.js?v=20261126-site-class',base).href;
-      gs.onload=function(){if(authorized){if(!selected)selected=siteClass();syncClassButton();}};document.head.appendChild(gs);
+      gs.onload=function(){if(authorized){adoptLinkClass();if(!selected)selected=siteClass();syncClassButton();}};document.head.appendChild(gs);
     }
     var ticker=setInterval(ready,100);
     ready();
