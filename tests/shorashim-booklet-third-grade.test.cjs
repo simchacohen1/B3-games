@@ -92,7 +92,7 @@ test('unit choices are generated, booklet tile, week dropdown, source load order
   assert.match(html,/id="bookletWeekSelect"/);
   for(let n=1;n<=30;n++)assert.match(html,new RegExp('<option value="'+n+'">Week '+n+'</option>'));
   assert.match(html,/data-review-perek="booklet"/);
-  assert.match(html,/Change List/);
+  assert.match(html,/Switch list/);
   assert.ok(html.indexOf('app.js?v=')>0&&html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v='));
   assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the booklet release');
   assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261127-block-all2'));

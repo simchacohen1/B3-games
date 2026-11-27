@@ -7,12 +7,13 @@ const page = fs.readFileSync('shorashim/index.html', 'utf8');
 const app = fs.readFileSync('shorashim/app.js', 'utf8');
 const pointsSrc = fs.readFileSync('shorashim/review-points.js', 'utf8');
 
-test('one Review button, no 4-mode screen; Games stay a separate link on the home page', () => {
+test('one Review button, no 4-mode screen; practice and games live on the Review page', () => {
   assert.ok(!page.includes('id="reviewHubScreen"'));
   assert.ok(!/data-review-mode="(no-hints|practice)"/.test(page));
   for (const gone of ['Record Chazara', 'No Hints Challenge', 'Practice Only', 'regularChazaraChoice', 'noHintsChazaraChoice', 'practiceOnlyChoice']) assert.ok(!page.includes(gone), gone);
   assert.match(page, /class="hub-card hub-review" data-review-mode="regular"/);
-  assert.match(page, /id="gamesHomeCard" data-go="gamesScreen"/);
+  assert.ok(!page.includes('id="gamesHomeCard"') && !page.includes('id="practiceHomeCard"'));
+  assert.equal((page.match(/class="hub-card /g) || []).length - (page.match(/class="hub-card hub-(cards|affix)/g) || []).length, 2);
   assert.match(page, /How many do you want to review now\?/);
   assert.match(page, /id="hidePicturesToggle"[\s\S]*Hide pictures/);
   assert.match(page, /id="recordMyselfToggle"[\s\S]*Record myself/);

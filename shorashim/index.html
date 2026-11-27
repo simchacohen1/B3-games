@@ -1170,7 +1170,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
-<link rel="stylesheet" href="shorashim-hubs.css?v=20261126-inner2">
+<link rel="stylesheet" href="shorashim-hubs.css?v=20261127-simplify2">
 <link rel="stylesheet" href="practice.css?v=20261127-mastery2">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap">
 <style id="shorashim-perek-menu-styles">
@@ -1238,28 +1238,18 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
         <section id="studentHome" class="screen active">
           <div class="hub-grid hub-two" aria-label="Main menu">
-            <button type="button" class="hub-card hub-new" data-go="shorashimPerekScreen" data-track="shorashim">
+            <button type="button" class="hub-card hub-new" data-learn-direct="1" data-track="shorashim">
               <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🌱</span><span class="hub-emoji">📖</span></span>
               <strong>New Shorashim</strong>
               <span class="hub-sub">Learn new Hebrew words with pictures and practice.</span>
               <span class="hub-cta">Learn New Words ▶</span>
             </button>
             <button type="button" class="hub-card hub-review" data-review-mode="regular">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span><span class="hub-emoji">🎮</span></span>
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span></span>
               <strong>Review</strong>
               <span class="hub-sub">Practice the words you learned and earn points.</span>
               <span class="hub-cycle hidden" id="homeCycleLeft"></span>
               <span class="hub-cta">Start Reviewing ▶</span>
-            </button>
-            <button type="button" class="hub-card hub-practice-acts" id="practiceHomeCard" data-go="practiceScreen">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">✍️</span></span>
-              <strong>Practice Activities</strong>
-              <span class="hub-sub">Tracing, multiple choice, matching</span>
-            </button>
-            <button type="button" class="hub-card hub-games" id="gamesHomeCard" data-go="gamesScreen">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎮</span></span>
-              <strong>Games</strong>
-              <span class="hub-sub" id="gamesHomeMessage">Choose a practice game.</span>
             </button>
           </div>
           <!-- Kept (hidden) so existing code that fills it keeps working. -->
@@ -1318,7 +1308,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             <div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
             </div>
-            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change List</button>
+            <button type="button" id="changeLearningPerekBtn" class="ghost small hidden">🔀 Switch list</button>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
@@ -1477,6 +1467,22 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             <div><h2>Review</h2><div class="hub-cycle hidden" id="hubCycleLeft"></div></div>
             <div id="dailyReviewBadge" class="session-status"></div>
           </div>
+          <aside id="reviewMoreWays" class="card-panel review-more-ways" aria-label="Other ways to review">
+            <h3>More ways to review</h3>
+            <p class="mini-note">These count toward review and points too.</p>
+            <div class="rmw-group">
+              <button type="button" class="ghost" data-more-practice="trace">✍️ Tracing</button>
+              <button type="button" class="ghost" data-more-practice="mc">🅰️ Multiple Choice</button>
+              <button type="button" class="ghost" data-more-practice="match">🔗 Matching</button>
+            </div>
+            <div class="rmw-label">Games</div>
+            <div class="rmw-group">
+              <button type="button" class="ghost" data-more-game="match">🧩 Match</button>
+              <button type="button" class="ghost" data-more-game="shoot">🎯 Target Shoot</button>
+              <button type="button" class="ghost" data-more-game="whack">🔨 Whack-a-Word</button>
+              <button type="button" class="ghost" data-more-game="race">🏎️ Word Race</button>
+            </div>
+          </aside>
 
           <div class="review-choice-panel">
             <div class="review-options-row" role="group" aria-label="Review options">
@@ -1670,7 +1676,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="review-cycle-core.js?v=20261127-cycles2"></script>
   <script src="builtin-pictures.js?v=20261127-builtin1"></script>
   <script src="mastery-core.js?v=20261127-mastery1"></script>
-  <script src="app.js?v=20261127-builtin1-cycles2-mastery1-simplify1"></script>
+  <script src="app.js?v=20261127-builtin1-simplify2"></script>
   <script src="practice-activities.js?v=20261127-mastery2"></script>
   <script src="review-categories.js?v=20261127-cycles2"></script>
   <script src="review-cycles.js?v=20261127-cycles3"></script>
@@ -1889,7 +1895,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 })();
 </script>
 
-<script src="shorashim-skin.js?v=20261013-skin"></script>
+<script src="shorashim-skin.js?v=20261127-tracker2"></script>
 <style id="shorashim-single-card-v1">
   /* One big centered card. The front is decorated; the back only shows the meaning when the card turns. */
   #learnWorkspace .flip-stage{
