@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><script src="/domain-redirect.js"></script><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script><script src="../sync-to-nigri/nigri-school-gate.js?v=20261107"></script><script src="../teacher-signin.js?v=20261122-one-signin"></script><script src="../sync-to-nigri/nigri-auth.js"></script><script src="../sync-to-nigri/nigri-connect.js?v=20261108"></script>
+<head><script src="/domain-redirect.js"></script><script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script><script src="../sync-to-nigri/nigri-school-gate.js?v=20261107"></script><script src="../teacher-signin.js?v=20261122-one-signin"></script><script src="../sync-to-nigri/nigri-auth.js"></script><script src="../sync-to-nigri/nigri-connect.js?v=20261127"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nigri Sync · SOLS</title>
@@ -237,6 +237,7 @@
   #status.error { color: var(--bad); }
   #status.pending { color: var(--muted); }
 </style>
+<script src="../class-confirm-gate.js?v=20261126-site-class"></script>
 <script defer src="../teacher-global-bootstrap.js?v=20261020"></script>
 </head>
 <body>
@@ -457,7 +458,12 @@ function init() {
     classSelect.appendChild(opt);
   });
 
-  const lastClass = localStorage.getItem(LAST_CLASS_KEY);
+  // Opens on the teacher's site-wide class (B3 ET / B3 WT); a ?class= link wins.
+  const G = window.B3ClassGate;
+  const sectionOf = id => (id === "et" || id === "wt") ? "B3 " + id.toUpperCase() : "";
+  const linked = (new URLSearchParams(location.search).get("class") || "").trim().toLowerCase();
+  const siteSection = sectionOf(linked) || (G ? sectionOf(G.getSite() === "all" ? G.getLast() : G.getSite()) : "");
+  const lastClass = siteSection || localStorage.getItem(LAST_CLASS_KEY);
   if (lastClass && ROSTERS[lastClass]) {
     classSelect.value = lastClass;
   }
@@ -631,6 +637,8 @@ clearAllSyncBtn.addEventListener("click", () => {
 
 classSelect.addEventListener("change", () => {
   localStorage.setItem(LAST_CLASS_KEY, classSelect.value);
+  const picked = classSelect.value.replace(/^B3 /, "").toLowerCase();
+  if (window.B3ClassGate && (picked === "et" || picked === "wt")) window.B3ClassGate.setSite(picked);
   renderStudents();
 });
 

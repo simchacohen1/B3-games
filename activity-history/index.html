@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en"><head><script src="/domain-redirect.js"></script>
+<script src="../guest-mode.js?v=20261011-guest" data-guest="block"></script>
+<meta charset="utf-8">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Activity History · SOLS</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicons/report.svg">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1f2937}
+header{background:#172033;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+body.embed header{display:none}
+body.embed .wrap{margin-top:10px}
+h1{margin:0;font-size:23px}.sub{color:#b9c6da;font-size:13px;margin-top:4px}
+button,select,input{font:inherit}
+.btn{border:0;border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;background:#334155;color:#fff}
+.btn.light{background:#fff;color:#1f2937;border:1px solid #cbd5e1}
+.wrap{max-width:1400px;margin:20px auto;padding:0 16px}
+.gate{text-align:center;padding:70px 20px;font-size:17px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;align-items:end}
+.filters label{display:block;font-size:12px;font-weight:700;color:#475569}
+.filters select,.filters input{width:100%;margin-top:3px;padding:8px 10px;border-radius:9px;border:1px solid #cbd5e1;background:#fff}
+.status{color:#64748b;font-size:14px;margin:6px 0 10px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 5px 18px rgba(15,23,42,.05)}
+.tablebox{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eef2f7;vertical-align:top}
+th{background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#64748b;white-space:nowrap}
+tbody tr.row{cursor:pointer}tbody tr.row:hover{background:#f8fafc}
+tbody tr.row:focus{outline:2px solid #2563eb;outline-offset:-2px}
+.when{white-space:nowrap;color:#475569}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;background:#e2e8f0;color:#334155;white-space:nowrap}
+.pill.g{background:#dcfce7;color:#166534}.pill.y{background:#fef3c7;color:#92400e}.pill.r{background:#fee2e2;color:#991b1b}
+.tool{white-space:nowrap}
+.detail td{background:#f8fafc}
+.detail .dbox{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.detail audio{max-width:100%}
+.detail a.open{font-weight:700;color:#2563eb;text-decoration:none}
+.empty{padding:30px;text-align:center;color:#64748b}
+.more{margin:12px auto;display:block}
+@media(max-width:700px){
+ table,thead,tbody,tr,td{display:block}
+ thead{display:none}
+ tr.row{padding:10px 12px;border-bottom:1px solid #eef2f7}
+ tr.row td{border:0;padding:2px 0}
+ tr.row td:before{content:attr(data-l)': ';font-size:12px;color:#94a3b8;font-weight:700}
+ tr.detail td{padding:8px 12px}
+}
+</style>
+</head><body>
+<header><div><h1>🕘 Activity History</h1><div class="sub">Everything students did in every tool. Read only.</div></div></header>
+<div class="wrap">
+<div id="gate" class="gate card">Checking your teacher account…</div>
+<div id="app" style="display:none">
+ <div class="filters">
+  <label>Student<select id="fStudent"><option value="">All students</option></select></label>
+  <label>Class<select id="fClass"><option value="">All classes</option></select></label>
+  <label id="fToolWrap">Tool<select id="fTool"><option value="">All tools</option></select></label>
+  <label>From<input type="date" id="fFrom"></label>
+  <label>To<input type="date" id="fTo"></label>
+  <label>Search<input type="search" id="fText" placeholder="posuk, word, prize…"></label>
+  <div><button class="btn light" id="fClear" type="button">Clear filters</button> <button class="btn" id="refresh" type="button">↻ Refresh</button></div>
+ </div>
+ <div class="status" id="status" role="status"></div>
+ <div class="card tablebox"><table>
+  <thead><tr><th>Student</th><th>Class</th><th>Tool</th><th>Date &amp; time</th><th>What</th><th>Result</th><th>Status</th></tr></thead>
+  <tbody id="rows"></tbody>
+ </table><div id="empty" class="empty" style="display:none">No activity matches these filters.</div></div>
+ <button class="btn light more" id="more" style="display:none" type="button">Show more</button>
+</div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script>window.firebase||document.write('<script src="../vendor/firebase/12.15.0/firebase-app-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script>window.firebase&&firebase.auth||document.write('<script src="../vendor/firebase/12.15.0/firebase-auth-compat.js"><\/script>')</script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+<script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
+<script src="../firebase-config.js?v=20261001-teacherauth"></script>
+<script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="../class-confirm-gate.js?v=20261126-site-class"></script>
+<script src="../backend/functions/student-tool-policy.js"></script>
+<script src="../private-media.js?v=20261015-private"></script>
+<script src="../student-report/quiz-history.js?v=20261026-simple-csv"></script>
+<script src="../chayus-meter/history.js?v=20261126-history"></script>
+<script src="core.js?v=20261126-activity3"></script>
+<script>
+(function(){
+'use strict';
+const H=window.ActivityHistoryCore;
+const api=window.B3SiteSettings,WS=(api&&api.workspaceId)||'b3-2026';
+const params=new URLSearchParams(location.search);
+const EMBED=params.get('embed')==='1';
+/* ?tool=chazara locks the page to one tool; ?tool=daily,prize,points limits it to those tools. */
+const TOOL_LIST=(params.get('tool')||'').split(',').filter(t=>H.TOOL_BY_ID[t]);
+const FIXED_TOOL=TOOL_LIST.length===1?TOOL_LIST[0]:'';
+if(EMBED)document.body.classList.add('embed');
+if(!firebase.apps.length)firebase.initializeApp(window.B3_FIREBASE_CONFIG);
+const db=firebase.database(),$=id=>document.getElementById(id);
+const LEGACY=['et','wt'];
+const obj=v=>v&&typeof v==='object'?v:{};
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const get=async p=>{try{return (await db.ref(p).once('value')).val()}catch(e){return undefined}};
+const PAGE=200;
+let rashiAdminAsked=false,user=null,access=null,classes=[],people={},allRows=[],shown=PAGE,filtered=[],notes=[];
+
+/* ---------- Which classes: same rule as the Student Report ---------- */
+async function classesFor(acc,u){
+ let allRaw=await get('b3Games/workspaces/'+WS+'/classes');
+ if(allRaw===undefined){
+  const own=(acc.classIds||[]).filter(id=>id&&id!=='*');
+  allRaw={};await Promise.all(own.map(async id=>{const row=await get('b3Games/workspaces/'+WS+'/classes/'+id);if(row)allRaw[id]=row}));
+ }
+ const all=obj(allRaw);let ids;
+ if(acc.role==='admin')ids=Object.keys(all);
+ else{
+  ids=(acc.classIds||[]).filter(Boolean);
+  if(!ids.length&&u){const row=obj(await get('b3Games/workspaces/'+WS+'/teachers/'+u.uid));ids=Object.keys(obj(row.classIds)).filter(id=>id!=='*'&&row.classIds[id]===true)}
+ }
+ return ids.filter(id=>all[id]&&all[id].active!==false).map(id=>({id,name:String(all[id].name||id.toUpperCase()),members:obj(all[id].members),toolGrants:obj(all[id].toolGrants)}));
+}
+async function chayusOn(c,legacy){
+ try{
+  if(legacy){const st=await api.readOnce();return api.isGameEnabledForClass(st,c.id,'chayus-meter')}
+  return window.B3StudentTools.granted(c,'chayus-meter');
+ }catch(e){return false}
+}
+
+/* ---------- Loading (reads only) ---------- */
+async function loadClass(c){
+ const legacy=LEGACY.includes(c.id),rows=[];
+ const ids=Object.entries(c.members).filter(([id,m])=>/^[A-Za-z0-9_-]{1,100}$/.test(id)&&(!m||m.active!==false)).map(([id])=>id);
+ const shRoot=legacy?'posukPractice/shorashimLearning/students/':'posukPractice/shorashimLearning/classes/'+c.id+'/students/';
+ const needsTools=ids.length>0;
+ const classPeople={};
+ const [quizRoot,chayus]=await Promise.all([
+  needsTools?(async()=>{const q=legacy?'b3Quiz':'b3Quiz/classes/'+c.id;const [launches,responses,completions]=await Promise.all([get(q+'/launches'),get(q+'/responses'),get(q+'/completions')]);return {launches,responses,completions}})():null,
+  (async()=>{try{if(!needsTools||!user||!window.ChayusHistory||!(await chayusOn(c,legacy)))return null;return await ChayusHistory.fetchHistory({idToken:await user.getIdToken(),classId:c.id,days:90,projectId:firebase.app().options.projectId})}catch(e){console.warn('Chayus history',e);return null}})()
+ ]);
+ await Promise.all(ids.map(async id=>{
+  const m=obj(c.members[id]);
+  const [profile,att,chzEv,sh,rashiP]=await Promise.all([
+   m.name?null:get('b3Games/students/'+id+'/profile'),
+   get('posukPractice/attempts/'+id),get('posukPractice/chazara/events/'+id),get(shRoot+id),get('rashiLetters/progress/'+id)
+  ]);
+  const name=String(m.name||(profile&&profile.name)||id);
+  const who={sid:id,name,classId:c.id,className:c.name};
+  classPeople[id]={name,classId:c.id,className:c.name};
+  if(!people[id])people[id]={name,classId:c.id,className:c.name,classNames:{}};
+  people[id].classNames[c.id]=c.name;
+  rows.push(...H.posukRows(who,att),...H.chazaraRows(who,chzEv),...H.shorashimRows(who,sh),...H.chayusRows(who,chayus),...H.rashiProgressRows(who,rashiP));
+  if(quizRoot&&window.B3QuizHistory){
+   try{rows.push(...H.quizRows(who,B3QuizHistory.buildHistory({root:quizRoot,studentId:id,classId:c.id,joinedAt:0,since:0})))}catch(e){console.warn('Quiz history',e)}
+  }
+ }));
+ /* Recorded Rashi readings: the same server list the Rashi teacher page uses (class-scoped by the server). */
+ try{
+  /* The owner's list is not limited to one class, so ask once; a teacher's list is limited by the server to the class asked for. */
+  if(needsTools&&user&&!(access.role==='admin'&&rashiAdminAsked)){
+   if(access.role==='admin')rashiAdminAsked=true;
+   const list=await rashiList(c.id);
+   const known=new Set(classes.map(x=>x.id));
+   rows.push(...H.rashiListRows(list,classPeople).map(r=>known.has(r.classId)?r:{...r,classId:c.id,className:c.name}));
+  }
+ }catch(e){console.warn('Rashi recordings',e);notes.push('Rashi recordings could not be loaded for '+c.name+'.')}
+ return rows;
+}
+async function rashiList(classId){
+ const token=await user.getIdToken();
+ const res=await fetch('https://us-central1-'+firebase.app().options.projectId+'.cloudfunctions.net/studentRewardsAutoAward',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'rashi-list-pending',classId})});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(data.error||('HTTP '+res.status));
+ return data;
+}
+/* Student Rewards ledger: the owner reads it directly, teachers through the same backend call the Rewards page uses. */
+async function loadRewards(){
+ const ownerPaths=['dailyAwards','pointRequests','pointAdjustments','redemptionsByStudent','rewards','classes','students'];
+ if(access.role==='admin'){
+  try{
+   const vals=await Promise.all(ownerPaths.map(async p=>(await db.ref('studentRewards/'+p).once('value')).val()));
+   return Object.fromEntries(ownerPaths.map((p,i)=>[p,vals[i]||{}]));
+  }catch(e){console.warn('Direct rewards read',e)}
+ }
+ const token=await user.getIdToken();
+ const url='https://us-central1-b3-games.cloudfunctions.net/studentRewardsTeacher';
+ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'load'})});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(data.error||('HTTP '+res.status));
+ return data.root||{};
+}
+async function loadAll(){
+ notes=[];people={};allRows=[];rashiAdminAsked=false;
+ $('status').textContent='Loading activity from every tool…';
+ const parts=await Promise.all(classes.map(c=>loadClass(c).catch(e=>{console.error(e);notes.push('Could not load '+c.name+'.');return []})));
+ parts.forEach(p=>allRows.push(...p));
+ try{
+  const root=await loadRewards();
+  const byId=Object.fromEntries(classes.map(c=>[c.id,c]));
+  const classMap={};Object.entries(obj(root.classes)).forEach(([rid,rc])=>{classMap[rid]=(rc&&rc.b3ClassId)||rid});
+  const rr=H.rewardRows(root,Object.fromEntries(Object.entries(people).map(([sid,p])=>[sid,{...p,classNames:{}}])));
+  rr.forEach(r=>{
+   const b=classMap[r.classId]||r.classId;
+   if(byId[b]){r.classId=b;r.className=byId[b].name}
+   else{const p=people[r.sid];r.classId=p.classId;r.className=p.className}
+  });
+  allRows.push(...rr);
+ }catch(e){console.warn('Rewards history',e);notes.push('Daily Points, Prize Store and Rashi recordings could not be loaded right now.')}
+ allRows=H.sortNewest(H.dedupe(allRows));
+}
+
+/* ---------- Drawing ---------- */
+const fmtTime=r=>{if(!r.when)return '—';const d=new Date(r.when);return r.tool==='chayus'?d.toLocaleDateString():d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})};
+function pillClass(s){return /^(scored|counted|learned|completed|approved|posted|level reached|delivered|fulfilled|recorded)$/i.test(s)?'g':/wait|pending|progress|disputed|not scored/i.test(s)?'y':/reject|removed|undone|declin|cancel|refund/i.test(s)?'r':''}
+function filters(){return {student:$('fStudent').value,classId:$('fClass').value,tool:$('fTool').value||TOOL_LIST.join(','),from:$('fFrom').value,to:$('fTo').value,text:$('fText').value}}
+/* A tool page may name its class a little differently (et / ET / b3_et / the class name): match them all. */
+function resolveClass(want){
+ want=String(want||'').trim().toLowerCase();if(!want||want==='all')return '';
+ const norm=x=>String(x||'').toLowerCase().replace(/^b3[_-]/,'');
+ const hit=classes.find(c=>c.id.toLowerCase()===want)||classes.find(c=>norm(c.id)===norm(want))||classes.find(c=>String(c.name).toLowerCase()===want);
+ return hit?hit.id:'';
+}
+function fillSelects(){
+ const keepS=$('fStudent').value,keepC=$('fClass').value;
+ $('fClass').innerHTML='<option value="">All classes</option>'+classes.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');
+ // Opens on the teacher's site-wide class (a ?class= link still wins); "All classes" when that is the choice.
+ const G=window.B3ClassGate;if(G)G.allowAll=true;
+ const siteWant=G&&G.getSite()!=='all'?G.getSite():'';
+ $('fClass').value=keepC||resolveClass(params.get('class')||siteWant);
+ fillStudents(keepS);
+ $('fTool').innerHTML='<option value="">'+(TOOL_LIST.length?'All of these':'All tools')+'</option>'+H.TOOLS.filter(t=>!TOOL_LIST.length||TOOL_LIST.includes(t.id)).map(t=>'<option value="'+t.id+'">'+esc(t.icon+' '+t.label)+'</option>').join('');
+ if(FIXED_TOOL){$('fTool').value=FIXED_TOOL;$('fToolWrap').style.display='none'}
+}
+function fillStudents(keep){
+ const cid=$('fClass').value;
+ const list=Object.entries(people).filter(([,p])=>!cid||p.classNames[cid]).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+ $('fStudent').innerHTML='<option value="">All students</option>'+list.map(([id,p])=>'<option value="'+esc(id)+'">'+esc(p.name)+'</option>').join('');
+ $('fStudent').value=keep&&list.some(([id])=>id===keep)?keep:(params.get('student')&&list.some(([id])=>id===params.get('student'))&&!keep?params.get('student'):'');
+}
+function draw(){
+ filtered=H.applyFilters(allRows,filters());
+ const slice=filtered.slice(0,shown);
+ $('rows').innerHTML=slice.map((r,i)=>{
+  const t=H.TOOL_BY_ID[r.tool]||{icon:'',label:r.tool};
+  return '<tr class="row" tabindex="0" data-i="'+i+'"><td data-l="Student"><b>'+esc(r.student)+'</b></td><td data-l="Class">'+esc(r.className)+'</td><td class="tool" data-l="Tool">'+esc(t.icon+' '+t.label)+'</td><td class="when" data-l="When">'+esc(fmtTime(r))+'</td><td data-l="What">'+esc(r.what)+'</td><td data-l="Result">'+esc(r.result)+'</td><td data-l="Status"><span class="pill '+pillClass(r.status)+'">'+esc(r.status)+'</span></td></tr>';
+ }).join('');
+ $('empty').style.display=slice.length?'none':'';
+ $('more').style.display=filtered.length>shown?'':'none';
+ $('status').textContent=(filtered.length===allRows.length?filtered.length+' activities':filtered.length+' of '+allRows.length+' activities')+', newest first. Tap a row to open it.'+(notes.length?' · '+notes.join(' '):'');
+}
+function toggleDetail(tr){
+ const next=tr.nextElementSibling;
+ if(next&&next.classList.contains('detail')){next.remove();return}
+ document.querySelectorAll('tr.detail').forEach(x=>x.remove());
+ const r=filtered[+tr.dataset.i],t=H.TOOL_BY_ID[r.tool];
+ const href='../'+H.rowHref(r);
+ let h='<div class="dbox">';
+ if(r.audioPath||r.audioUrl){
+  h+=(window.B3PrivateMedia?B3PrivateMedia.audioMarkup(r.audioPath,r.audioUrl):'<span>Recording is not available here.</span>');
+ }
+ if(r.detail)h+='<span>'+esc(r.detail)+'</span>';
+ h+='<a class="open" href="'+esc(href)+'"'+(EMBED?' target="_top"':'')+'>Open in '+esc(t?t.label:'tool')+' →</a></div>';
+ const d=document.createElement('tr');d.className='detail';d.innerHTML='<td colspan="7">'+h+'</td>';
+ tr.after(d);
+ if(window.B3PrivateMedia&&B3PrivateMedia.attach)try{B3PrivateMedia.attach(d)}catch(e){}
+}
+$('rows').addEventListener('click',e=>{if(e.target.closest('tr.detail'))return;const tr=e.target.closest('tr.row');if(tr)toggleDetail(tr)});
+$('rows').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('tr.row')){e.preventDefault();toggleDetail(e.target)}});
+['fStudent','fTool','fFrom','fTo'].forEach(id=>$(id).addEventListener('change',()=>{shown=PAGE;draw()}));
+$('fClass').addEventListener('change',()=>{fillStudents('');shown=PAGE;draw()});
+$('fText').addEventListener('input',()=>{shown=PAGE;draw()});
+$('fClear').onclick=()=>{['fStudent','fClass','fFrom','fTo','fText'].forEach(id=>$(id).value='');if(!FIXED_TOOL)$('fTool').value='';fillStudents('');shown=PAGE;draw()};
+$('more').onclick=()=>{shown+=PAGE;draw()};
+$('refresh').onclick=async()=>{await loadAll();fillSelects();draw()};
+
+async function start(u,authorized,acc){
+ user=u;access=acc||{authorized};
+ if(access.actingAsStudent){$('gate').textContent='You are viewing as a student. Exit student view to see Activity History.';return}
+ if(!u||!access.authorized){
+  $('app').style.display='none';$('gate').style.display='';
+  $('gate').innerHTML='Sign in with your teacher Google account to see Activity History.<br><button class="btn" id="login" style="margin-top:14px">Sign in with Google</button>';
+  $('login').onclick=()=>api.signInWithGoogle();return;
+ }
+ try{
+  classes=await classesFor(access,u);
+  if(!classes.length){$('gate').textContent='No classes are assigned to this teacher account yet.';return}
+  $('gate').style.display='none';$('app').style.display='';
+  await loadAll();fillSelects();draw();
+ }catch(e){console.error(e);$('gate').textContent='Could not load Activity History: '+(e.message||e)}
+}
+if(api&&typeof api.onAuthStateChanged==='function')api.onAuthStateChanged(start);
+else $('gate').textContent='Teacher access could not start. Please refresh the page.';
+})();
+</script>
+<script>if(new URLSearchParams(location.search).get('embed')!=='1')document.write('<script src="../back-nav.js" data-mode="inline" data-href="../teacher-home.html" data-label="← Teacher Home"><\/script>')</script>
+</body></html>

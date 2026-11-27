@@ -8,7 +8,7 @@ function load({user,fetchImpl}){
   const auth={currentUser:user,onAuthStateChanged(cb){setTimeout(()=>cb(user),0);return()=>{}}};
   const win={firebase:{auth:()=>auth,apps:[{auth:()=>auth}],app(){return{auth:()=>auth}}},B3_FIREBASE_CONFIG:{}};
   win.firebase.auth=function(){return auth};
-  const sandbox={window:win,setTimeout,clearTimeout,console,fetch:async(url,opt)=>{calls.push({url,headers:{...opt.headers}});return fetchImpl(url,opt)}};
+  const sandbox={window:win,setTimeout,clearTimeout,console,fetch:async(url,opt)=>{if(url.endsWith("/health"))return{status:200};calls.push({url,headers:{...opt.headers}});return fetchImpl(url,opt)}};
   vm.createContext(sandbox);vm.runInContext(helperSource,sandbox);
   return {NigriAuth:win.NigriAuth,calls,sandbox};
 }

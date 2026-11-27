@@ -164,7 +164,7 @@ test('Save, My files and Send to class are right on the toolbar, with a Send cho
   assert.match(actions,/id:'quick-send'[^\n]*items:sendItems/);
   // The order: Students, Stop, Save, My files, Upload (whiteboard only), Send, Groups (only with student whiteboards), Poll, Lesson, More.
   const order=[...actions.matchAll(/\{id:'([a-z-]+)'/g)].map(m=>m[1]);
-  assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-new','quick-upload','quick-send','groups','poll','lesson','more']);
+  assert.deepEqual(order,['students','stop','quick-save','quick-files','quick-new','quick-upload','quick-send','groups','zones','poll','lesson','more']);
   const more=annotate.slice(annotate.indexOf('function moreItems(){'),annotate.indexOf('function sendItems(){'));
   assert.doesNotMatch(more,/FTTSavedWork|Send|My files|Save/);
 });

@@ -57,7 +57,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    results[role]=await page.evaluate(()=>({
     elapsedMs:performance.now(),
     classes:[...document.querySelectorAll('#classes .class-card h2')].map(x=>x.textContent.trim()),
-    etStudentTools:(()=>{const card=[...document.querySelectorAll('#classes .class-card')].find(x=>x.querySelector('h2')?.textContent.trim()==='ET');return card?[...card.querySelectorAll('.student-tool-controls input[data-tool]')].map(x=>x.dataset.tool).sort():[]})(),
+    etStudentTools:(()=>{const card=[...document.querySelectorAll('#classes .class-card')].find(x=>x.querySelector('h2')?.textContent.trim()==='B3 ET');return card?[...card.querySelectorAll('.student-tool-controls input[data-tool]')].map(x=>x.dataset.tool).sort():[]})(),
     appVisible:!document.getElementById('app').classList.contains('hidden'),
     signInVisible:!document.getElementById('gate').classList.contains('hidden'),
     reads:window.__syntheticReads.slice()
@@ -76,12 +76,12 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    const median=rows=>rows.map(x=>x.elapsedMs).sort((a,b)=>a-b)[Math.floor(rows.length/2)];
    results.teacher_signin={measuredMs:median(currentRuns),classes:currentRuns[0].classes,appVisible:currentRuns[0].appVisible,signInVisible:currentRuns[0].signInVisible,reads:currentRuns[0].reads,baselineMs:median(baseRuns),baselineReads:baseRuns[0].reads};
   }
-  assert.deepEqual(results.teacher_et.classes,['ET']);
-  assert.deepEqual(results.teacher_wt.classes,['WT']);
+  assert.deepEqual(results.teacher_et.classes,['B3 ET']);
+  assert.deepEqual(results.teacher_wt.classes,['B3 WT']);
   assert.deepEqual(results.teacher_new.classes,['New Room']);
   assert.deepEqual(results.teacher_return.classes,['New Room']);
-  assert.deepEqual(results.principal.classes,['ET','New Room']);
-  assert.deepEqual(results.owner.classes,['ET','WT','New Room']);
+  assert.deepEqual(results.principal.classes,['B3 ET','New Room']);
+  assert.deepEqual(results.owner.classes,['B3 ET','B3 WT','New Room']);
   assert.deepEqual(results.owner.etStudentTools,results.teacher_et.etStudentTools,'owner and classroom teacher get the same ET student-tool controls');
   assert.deepEqual(results.teacher_signin.classes,['New Room']);
   assert.equal(results.teacher_signin.reads.filter(p=>p==='b3Games/admins/teacher_new').length,1,'Google popup and auth restoration share the in-flight admin check');

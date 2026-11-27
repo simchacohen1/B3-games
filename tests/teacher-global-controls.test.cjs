@@ -66,9 +66,9 @@ test('a button press is never silent: with no class chosen it asks which class (
   // The Yiddish app defines its own global open(), which replaces window.open there.
   assert.doesNotMatch(s, /window\.open\(/);
   assert.match(s, /link\.target = name;/);
-  // Still never picks between several classes by itself.
+  // Never picks between several classes by itself: the link's class, else the saved site-wide class.
   assert.match(s, /classes\.length === 1/);
-  assert.match(s, /selected = ids\.includes\(requested\) \? requested : '';/);
+  assert.match(s, /selected = ids\.includes\(requested\) \? requested : siteClass\(\);/);
 });
 
 test('pages fetch the fixed toolbar, not a cached older copy', () => {

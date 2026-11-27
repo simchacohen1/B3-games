@@ -22,6 +22,7 @@ function harness(){
     el:element,stage:element(),document:{createElement:element},
     isTeacher:true,boardPictures:[],pictureEdits:[],strokes:[],boardSize:{w:1600,h:900},boardPresentation:null,boardBackground:null,selectedId:null,
     pagesBar:null,pagesPanel:null,pagesPanelOpen:false,pagesSig:'',pagesTimer:0,wbPages:null,wbAt:0,wbSwitching:false,
+    Z:null,zones:[],syncZones(){},
     isBoardOpen:()=>true,finishInline(){},finishPictureEdit(){},updateControls(){},composeBoard:()=>'data:image/jpeg;base64,AAAA',
     publishBoard:async()=>{state.published.push(context.boardPictures.map(p=>p.id));},
     paintInk(){},whenPictures:async()=>[],exportPng:async()=>({size:1,type:'image/png'}),

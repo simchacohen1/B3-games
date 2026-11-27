@@ -192,7 +192,9 @@
       const stroke=cleanStroke(s);
       if(stroke)strokes.push({...stroke,owner:s.owner==='teacher'?'teacher':'saved'});
     }
-    return{pictures,strokes};
+    // Student zones saved with the page (board-zones-core.js checks them again).
+    const Zones=typeof window!=='undefined'?window.ClassPointerZones:null;
+    return{pictures,strokes,zones:Zones?Zones.cleanSaved(raw?.zones):[]};
   }
   // A saved lesson whiteboard: version 1 is one page, version 2 lists up to LESSON.pages pages (board-pages-core.js).
   // The result always has `pages` and `current`; `pictures` and `strokes` are the shown page's, as they always were.
@@ -204,7 +206,7 @@
     else return null;
     const pages=list.map(page=>cleanLessonPage(page,cleanStroke));
     const n=Math.floor(Number(raw.current)),current=raw.version===2&&Number.isFinite(n)&&n>=0&&n<pages.length?n:0;
-    return{pictures:pages[current].pictures,strokes:pages[current].strokes,pages,current};
+    return{pictures:pages[current].pictures,strokes:pages[current].strokes,pages,current,zonesLocked:raw.zonesLocked===true};
   }
   const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,flowText,blockText,fitSize,placeImage,cleanImageData,cleanLessonBoard};
   if(typeof module!=='undefined'&&module.exports){module.exports=api;return}

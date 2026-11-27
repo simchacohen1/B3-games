@@ -245,7 +245,7 @@ test('teacher taps letters that were not recognized: auto-saves, points by 5 par
     { id: 'rashi_kid1_samech_a1', studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'samech',
       sectionLabel: 'Mission 8 (ס) words', words: ['סֵפֶר'], attempt: 1, createdAt: 1789000000000, durationMs: 5000, amount: 2, audioUrl: 'https://signed.example/s.webm', letterReview: null }];
   const recent: any[] = [{ id: 'rashi_kid1_alef_a1', v2: true, studentId: 'kid1', studentName: 'Test Kid One', className: 'B3 ET', classId: 'et', sectionId: 'alef',
-    sectionLabel: 'Mission 4 (א) words', words: text, attempt: 1, createdAt: 1789000000000, gradedAt: 1789000500000, durationMs: 5000, amount: 2, audioUrl: 'https://signed.example/c.webm',
+    sectionLabel: 'Mission 4 (א) words', words: text, attempt: 1, createdAt: 1789000000000, gradedAt: Date.now(), durationMs: 5000, amount: 2, audioUrl: 'https://signed.example/c.webm',
     letterReview: { total: 20, missed: [0, 1], missedCount: 2, partsClean: [false, true, true, true, true], points: 4 } }];
   await page.route(API, async route => {
     const req = route.request();
@@ -276,7 +276,9 @@ test('teacher taps letters that were not recognized: auto-saves, points by 5 par
   });
   await page.goto(SITE + '/rashi-letters/teacher.html?class=et&tab=recordings');
   const items = page.locator('#recList .rec-item');
-  await expect(items).toHaveCount(4);                                   // 3 waiting + 1 recently graded
+  await expect(items).toHaveCount(3);                                   // the Waiting tab shows the 3 waiting readings
+  await expect(page.locator('#cntWaiting')).toHaveText('3');
+  await expect(page.locator('#cntMarked')).toHaveText('1');            // the recently graded one is marked today
   const first = items.first();
   await expect(first).toContainText('Test Kid One');
   await expect(first).toContainText('B3 ET');
@@ -285,7 +287,7 @@ test('teacher taps letters that were not recognized: auto-saves, points by 5 par
   // No grade boxes, no number row, no word taps, no Approve / Try Again buttons.
   await expect(page.locator('.rashi-grade, .rashi-feedback, [data-pts], .gw-word')).toHaveCount(0);
   await expect(card.getByRole('button', { name: /Try Again/ })).toHaveCount(0);
-  await expect(page.locator('#recCount')).toHaveText('(3)');
+  await expect(card.locator('[data-field="status"]')).toHaveText('Waiting');
   // The text is large with every LETTER tappable (20 letters), all correct by default.
   await expect(card.locator('.lt')).toHaveCount(20);
   await expect(card.locator('.lt.bad')).toHaveCount(0);
@@ -311,19 +313,20 @@ test('teacher taps letters that were not recognized: auto-saves, points by 5 par
   await perfect.locator('[data-done]').click();
   await expect.poll(() => calls.filter(c => c.action === 'rashi-letter-marks').length, { timeout: 5000 }).toBe(2);
   expect(calls.filter(c => c.action === 'rashi-letter-marks')[1]).toMatchObject({ requestId: 'rashi_kid1_bet_a2', missed: [] });
+  expect(dialogs).toBe(0);   // no popup appeared while marking
+  // Delete removes a bad recording (after one confirmation) and calls the server once.
+  page.once('dialog', d => d.accept());
+  await perfect.locator('[data-delete]').click();
+  await expect.poll(() => calls.filter(c => c.action === 'rashi-delete').length, { timeout: 5000 }).toBe(1);
+  expect(calls.find(c => c.action === 'rashi-delete')).toMatchObject({ requestId: 'rashi_kid1_bet_a2' });
   // A recently graded reading shows its saved marks and can be changed freely.
+  await page.locator('#tabMarked').click();
   const old = page.locator('.rec-item[data-id="rashi_kid1_alef_a1"]');
   await expect(old.locator('.lt.bad')).toHaveCount(2);
   await expect(old.locator('[data-field="score"]')).toContainText('4/5 points');
   await old.locator('.lt').nth(0).click();
   await expect.poll(() => calls.filter(c => c.action === 'rashi-letter-marks').length, { timeout: 9000 }).toBe(3);
   expect(calls.filter(c => c.action === 'rashi-letter-marks')[2]).toMatchObject({ requestId: 'rashi_kid1_alef_a1', missed: [1] });
-  expect(dialogs).toBe(0);
-  // Delete removes a bad recording (after one confirmation) and calls the server once.
-  page.once('dialog', d => d.accept());
-  await perfect.locator('[data-delete]').click();
-  await expect.poll(() => calls.filter(c => c.action === 'rashi-delete').length, { timeout: 5000 }).toBe(1);
-  expect(calls.find(c => c.action === 'rashi-delete')).toMatchObject({ requestId: 'rashi_kid1_bet_a2' });
   // Each boy's letter scores are shown (27 letter columns).
   await expect(page.locator('#letterHolder th.lh')).toHaveCount(27);
   await expect(page.locator('#letterHolder tbody tr')).toHaveCount(1);
