@@ -13,13 +13,13 @@ test('automatic missing-picture repair never calls the paid service',()=>{
  assert.ok(js.includes('await fillArtForShorashim([i]);'));
 });
 test('teacher-approved words with missing art are not skipped',()=>{
- assert.ok(js.includes('const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length&&!sanitizeClassArt(i.pendingArt).length);'));
- assert.ok(js.includes('const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length&&!sanitizeClassArt(i.pendingArt).length);'));
+ assert.ok(js.includes('const targets=(items||[]).filter(i=>i&&!sanitizeClassArt(i.art).length);'));
+ assert.ok(js.includes('const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);'));
  assert.ok(js.includes('if(existing&&!sanitizeClassArt(existing.art).length&&art.length)'));
 });
 test('the paid Regenerate Pictures button is gone (PR 745)',()=>{
  assert.ok(!js.includes('regeneratePictures'));
  assert.ok(!js.includes('data-a="regen"'));
  assert.ok(!js.includes('Regenerate Pictures'));
- assert.match(html,/teacher\.js\?v=20261126-chumash2/);
+ assert.match(html,/teacher\.js\?v=20261126-block1/);
 });
