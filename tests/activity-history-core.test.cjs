@@ -101,3 +101,63 @@ test('rashi: recorded readings from the server list, and a practice row from pro
   assert.equal(pr[0].what, 'Practice · unit 3 of 9');
   assert.equal(C.rashiProgressRows(who, null).length, 0);
 });
+
+test('shorashim cards show the real word and meaning, not the code', () => {
+  const lookup = C.shorashimLookup(
+    { shorashim: [{ id: 'custom1', front: 'שמר', english: 'guard' }] },
+    [[{ id: 'chumash-vocab-l2-002', front: 'אָב', english: 'Father' }], [{ id: 'booklet-3rd-w03-2', front: 'א.מ.ר', english: 'say', bookletWeek: 3, bookletNumber: 2 }]]
+  );
+  const rows = C.shorashimRows(who, { cards: {
+    a: { itemType: 'shorashim', itemId: 'chumash-vocab-l2-002', learnedAt: 3 },
+    b: { itemType: 'shorashim', itemId: 'booklet-3rd-w03-2', learnedAt: 2 },
+    c: { itemType: 'shorashim', itemId: 'custom1', learnedAt: 1 },
+    d: { itemType: 'shorashim', itemId: 'booklet-3rd-w07-5', learnedAt: 0.5 }
+  } }, lookup);
+  const w = n => rows.find(r => r.when === n).what;
+  assert.equal(w(3), 'אָב — Father (Chumash Vocab L2)');
+  assert.equal(w(2), 'א.מ.ר — say (Booklet week 3 · #2)');
+  assert.equal(w(1), 'שמר — guard');
+  assert.equal(w(0.5), 'Booklet week 7 · #5'); /* word not found: still readable */
+});
+
+test('periods: today, yesterday, week (Sun-Sat), month', () => {
+  const now = new Date('2026-11-25T10:00:00').getTime(); /* Wednesday */
+  assert.deepEqual(C.periodRange('today', now), { from: '2026-11-25', to: '2026-11-25' });
+  assert.deepEqual(C.periodRange('yesterday', now), { from: '2026-11-24', to: '2026-11-24' });
+  assert.deepEqual(C.periodRange('week', now), { from: '2026-11-22', to: '2026-11-28' });
+  assert.deepEqual(C.periodRange('month', now), { from: '2026-11-01', to: '2026-11-30' });
+  assert.deepEqual(C.periodRange('all', now), { from: '', to: '' });
+});
+
+test('tool totals, points, and the student by tool grid with weak/strong cells', () => {
+  const rows = [
+    { sid: 'a', tool: 'daily', points: 3 }, { sid: 'a', tool: 'daily', points: 2 }, { sid: 'a', tool: 'posuk' },
+    { sid: 'b', tool: 'daily', points: 1 }, { sid: 'b', tool: 'prize', spent: 20 }
+  ];
+  const t = C.toolTotals(rows, ['daily', 'posuk', 'prize', 'quiz']);
+  assert.deepEqual([t.daily.count, t.daily.points, t.daily.hasPoints], [3, 6, true]);
+  assert.equal(t.posuk.hasPoints, false);
+  assert.deepEqual([t.prize.spent, t.prize.hasSpent], [20, true]);
+  assert.equal(t.quiz.count, 0);
+  const g = C.toolGrid(rows, [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }], ['daily', 'posuk']);
+  assert.deepEqual(g.rows.map(r => r.counts.daily), [2, 1, 0]);
+  assert.deepEqual(g.rows.map(r => r.total), [3, 1, 0]);
+  assert.equal(g.avg.daily, 1);
+  assert.deepEqual([2, 1, 0].map(n => C.cellLevel(n, 1)), ['strong', 'strong', 'weak']);
+  assert.equal(C.cellLevel(1, 3), 'weak');
+  assert.equal(C.cellLevel(2, 3), 'mid');
+  assert.equal(C.cellLevel(0, 0), 'weak');
+});
+
+test('points are carried on daily, chayus, adjustment and approved rashi rows', () => {
+  const r = C.rewardRows({
+    dailyAwards: { s1: { c1: { '2026-11-02': { points: 3, savedAt: 100 } } } },
+    pointAdjustments: { a1: { studentId: 's1', classId: 'c1', amount: -2, createdAt: 80 } },
+    redemptionsByStudent: { s1: { p1: { cost: 20, requestedAt: 90, status: 'rejected' } } }
+  }, people);
+  assert.equal(r.find(x => x.tool === 'daily').points, 3);
+  assert.equal(r.find(x => x.tool === 'points').points, -2);
+  assert.equal(r.find(x => x.tool === 'prize').spent, 0);
+  const ch = C.chayusRows(who, { students: { s1: { days: { '2026-11-01': { level: 1, points: 4, minutes: 5 } } } } });
+  assert.equal(ch[0].points, 4);
+});

@@ -116,14 +116,45 @@
     return out;
   }
 
-  /* ---- Shorashim: one row per card learned ---- */
-  function shorashimRows(who, sh) {
+  /* ---- Shorashim: one row per card learned ----
+     Cards only keep codes like "chumash-vocab-l2-002" or "booklet-3rd-w03-2". lookup(itemType, itemId) returns the
+     catalog item ({front, english, bookletWeek...}) so the table can show the real word and its meaning. */
+  function shorashimItemLabel(item, itemType, itemId) {
+    var id = String(itemId || '');
+    var m = id.match(/^booklet-3rd-w(\d+)-(\d+)$/);
+    var chu = id.match(/^chumash-vocab-l(\d+)-\d+$/);
+    var week = item && item.bookletWeek ? item.bookletWeek : m ? Number(m[1]) : 0;
+    var nr = item && item.bookletNumber ? item.bookletNumber : m ? Number(m[2]) : 0;
+    var group = week ? 'Booklet week ' + week + (nr ? ' · #' + nr : '')
+      : chu ? 'Chumash Vocab L' + Number(chu[1])
+      : itemType === 'prefix' ? 'Prefix' : itemType === 'suffix' ? 'Suffix' : '';
+    var front = item ? String(item.front || item.word || item.hebrew || '').trim() : '';
+    var eng = item ? String(item.english || item.meaning || '').trim() : '';
+    var word = front ? front + (eng ? ' — ' + eng : '') : '';
+    if (word && group) return word + ' (' + group + ')';
+    return word || group || id;
+  }
+  function shorashimLookup(catalog, extraLists) {
+    var byKey = {};
+    var cat = obj(catalog);
+    ['shorashim', 'prefix', 'suffix'].forEach(function (t) {
+      (Array.isArray(cat[t]) ? cat[t] : Object.keys(obj(cat[t])).map(function (k) { return cat[t][k]; })).forEach(function (i) { if (i && i.id != null) byKey[t + ':' + i.id] = i; });
+    });
+    (extraLists || []).forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (i) { if (i && i.id != null && !byKey['shorashim:' + i.id]) byKey['shorashim:' + i.id] = i; });
+    });
+    return function (type, id) { return byKey[String(type || 'shorashim') + ':' + id] || null; };
+  }
+  function shorashimRows(who, sh, lookup) {
     var out = [];
     entries(obj(sh).cards).forEach(function (p) {
       var c = p[1];
       if (!c.learnedAt) return;
-      var word = String(c.word || c.hebrew || c.root || c.itemId || c.wordId || p[0]);
-      out.push(mk(who, 'shorashim', num(c.learnedAt) || 0, word, 'Card learned' + (c.itemType ? ' · ' + c.itemType : ''), 'Learned', { key: p[0] }));
+      var type = c.itemType || 'shorashim';
+      var itemId = c.itemId || c.wordId || (c.itemKey ? String(c.itemKey).replace(/^[a-z]+:/, '') : '') || p[0];
+      var item = lookup ? lookup(type, itemId) : null;
+      var word = item || !(c.word || c.hebrew || c.root) ? shorashimItemLabel(item, type, itemId) : String(c.word || c.hebrew || c.root);
+      out.push(mk(who, 'shorashim', num(c.learnedAt) || 0, word, 'Card learned', 'Learned', { key: p[0] }));
     });
     return out;
   }
@@ -140,7 +171,7 @@
       var mins = Number(x.minutes) || 0;
       out.push(mk(who, 'chayus', isFinite(when) ? when : 0, (mins % 1 === 0 ? mins : mins.toFixed(1)) + ' counted voice minutes',
         (x.level ? 'Level ' + x.level + (x.levelName ? ' · ' + x.levelName : '') : 'No level reached') + ' · ' + points + (points === 1 ? ' point' : ' points'),
-        x.level ? 'Level reached' : 'Recorded', { key: day }));
+        x.level ? 'Level reached' : 'Recorded', { key: day, points: points }));
     });
     return out;
   }
@@ -244,7 +275,7 @@
           var who = who2(sid, cid, null); if (!who) return;
           var when = timeOf(obj(award).savedAt) || Date.parse(date + 'T12:00:00') || 0;
           dailyParts(award).forEach(function (p) {
-            out.push(mk(who, 'daily', when, p.category ? p.category + (p.rating ? ' — ' + p.rating : '') : 'Daily Points', starText(p.points), 'Posted', { key: date + ':' + p.category }));
+            out.push(mk(who, 'daily', when, p.category ? p.category + (p.rating ? ' — ' + p.rating : '') : 'Daily Points', starText(p.points), 'Posted', { key: date + ':' + p.category, points: p.points }));
           });
         });
       });
@@ -258,13 +289,13 @@
       var amount = Number(st === 'approved' ? (item.actualAmount != null ? item.actualAmount : item.amount) : item.amount) || 0;
       out.push(mk(who, 'rashi', timeOf(st === 'approved' ? (item.reviewedAt || item.createdAt) : item.createdAt),
         String(item.reason || 'Recorded reading'), 'Recorded reading · ' + starText(amount),
-        st === 'approved' ? 'Approved' : st === 'rejected' ? 'Rejected' : 'Waiting for approval', { key: id, fullId: 'rashi:' + id }));
+        st === 'approved' ? 'Approved' : st === 'rejected' ? 'Rejected' : 'Waiting for approval', { key: id, fullId: 'rashi:' + id, points: st === 'approved' ? amount : 0 }));
     });
     Object.keys(obj(r.pointAdjustments)).forEach(function (id) {
       var item = obj(r.pointAdjustments[id]);
       var who = who2(item.studentId, item.classId, item); if (!who) return;
       var amount = Number(item.amount || 0); if (!amount) return;
-      out.push(mk(who, 'points', timeOf(item.createdAt), String(item.reason || 'Teacher adjustment'), starText(amount), item.undoneBy ? 'Undone' : 'Posted', { key: id }));
+      out.push(mk(who, 'points', timeOf(item.createdAt), String(item.reason || 'Teacher adjustment'), starText(amount), item.undoneBy ? 'Undone' : 'Posted', { key: id, points: item.undoneBy ? 0 : amount }));
     });
     Object.keys(obj(r.redemptionsByStudent)).forEach(function (sid) {
       Object.keys(obj(r.redemptionsByStudent[sid])).forEach(function (key) {
@@ -274,7 +305,7 @@
         var name = (obj(obj(r.rewards)[item.rewardId]).name) || item.rewardName || 'Reward';
         var st = String(item.status || 'pending');
         out.push(mk(who, 'prize', timeOf(item.requestedAt), name, cost ? '−' + cost + ' ★' : '—',
-          st.charAt(0).toUpperCase() + st.slice(1), { key: sid + '/' + key }));
+          st.charAt(0).toUpperCase() + st.slice(1), { key: sid + '/' + key, spent: /reject|declin|cancel|refund/i.test(st) ? 0 : cost }));
       });
     });
     return out;
@@ -307,6 +338,48 @@
     return out;
   }
 
+
+  /* ---- Overview: periods, totals per tool, boy x tool grid ---- */
+  function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  /* Weeks run Sunday to Saturday. Returns {from, to} as YYYY-MM-DD ('' = no limit). */
+  function periodRange(period, now) {
+    var d = new Date(now || Date.now()); d.setHours(12, 0, 0, 0);
+    var add = function (n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; };
+    if (period === 'today') return { from: ymd(d), to: ymd(d) };
+    if (period === 'yesterday') return { from: ymd(add(-1)), to: ymd(add(-1)) };
+    if (period === 'week') return { from: ymd(add(-d.getDay())), to: ymd(add(6 - d.getDay())) };
+    if (period === 'month') return { from: ymd(new Date(d.getFullYear(), d.getMonth(), 1, 12)), to: ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0, 12)) };
+    return { from: '', to: '' };
+  }
+  /* One entry per tool id: how many activities, points earned (only tools that carry points), stars spent (Prize Store). */
+  function toolTotals(rows, toolIds) {
+    var out = {};
+    toolIds.forEach(function (id) { out[id] = { count: 0, points: 0, hasPoints: false, spent: 0, hasSpent: false }; });
+    rows.forEach(function (r) {
+      var t = out[r.tool]; if (!t) return;
+      t.count++;
+      if (typeof r.points === 'number') { t.points += r.points; t.hasPoints = true; }
+      if (typeof r.spent === 'number') { t.spent += r.spent; t.hasSpent = true; }
+    });
+    return out;
+  }
+  /* students = [{id, name, className}]. Returns {rows: [{student, counts: {tool: n}, total}], avg: {tool: mean}}. */
+  function toolGrid(rows, students, toolIds) {
+    var by = {};
+    students.forEach(function (s) { by[s.id] = { student: s, counts: {}, total: 0 }; toolIds.forEach(function (t) { by[s.id].counts[t] = 0; }); });
+    rows.forEach(function (r) { var b = by[r.sid]; if (!b || b.counts[r.tool] === undefined) return; b.counts[r.tool]++; b.total++; });
+    var list = students.map(function (s) { return by[s.id]; });
+    var avg = {};
+    toolIds.forEach(function (t) { avg[t] = list.length ? list.reduce(function (a, b) { return a + b.counts[t]; }, 0) / list.length : 0; });
+    return { rows: list, avg: avg };
+  }
+  /* 'weak' = under half of the class average for that tool (always when 0), 'strong' = at or above the average. */
+  function cellLevel(count, avg) {
+    if (!(avg > 0)) return count > 0 ? 'strong' : 'weak';
+    if (count < avg * 0.5) return 'weak';
+    return count >= avg ? 'strong' : 'mid';
+  }
+
   /* Where tapping a row goes: the tool's own teacher page, on the same class and student when the page understands them. */
   function rowHref(row) {
     var t = TOOL_BY_ID[row.tool];
@@ -317,5 +390,6 @@
 
   return { TOOLS: TOOLS, TOOL_BY_ID: TOOL_BY_ID, posukRows: posukRows, chazaraRows: chazaraRows, shorashimRows: shorashimRows,
     chayusRows: chayusRows, rashiListRows: rashiListRows, rashiProgressRows: rashiProgressRows, quizRows: quizRows, rewardRows: rewardRows, applyFilters: applyFilters, sortNewest: sortNewest,
-    dedupe: dedupe, rowHref: rowHref, posukLabel: posukLabel };
+    dedupe: dedupe, rowHref: rowHref, posukLabel: posukLabel, shorashimLookup: shorashimLookup, shorashimItemLabel: shorashimItemLabel,
+    periodRange: periodRange, toolTotals: toolTotals, toolGrid: toolGrid, cellLevel: cellLevel };
 });
