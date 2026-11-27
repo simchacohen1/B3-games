@@ -172,6 +172,8 @@ function main() {
   if (storeIsOpen(data.settings)) { console.error('Refusing: the Prize Store is still open. Close it first.'); process.exit(2); }
   const nowMs = Date.now(), batchId = opt.batch || ('prize-store-refund-' + new Date(nowMs).toISOString().slice(0, 10));
   const updates = buildUpdates(data, boys, 'Owner (Prize Store refund)', batchId, nowMs);
+  const planned = boys.reduce((t, b) => t + b.refund, 0);
+  if (opt.expect !== undefined && Number(opt.expect) !== planned) { console.error(`Refusing: the plan now totals ${planned} ★, not the ${opt.expect} ★ that was approved.`); process.exit(2); }
   let done = 0, total = 0, items = 0;
   for (const b of boys) {
     const u = updates[b.id]; if (!u) continue;
@@ -179,7 +181,8 @@ function main() {
     done++; total += b.refund; items += b.refundCount;
     console.log(`refunded ${b.name}: ${b.refund} ★ (${b.refundCount} items)`);
   }
-  dbUpdate(opt.project, '/' + SR, { ...roundResets(data, nowMs), [`refundBatches/${batchId}`]: { at: nowMs, boys: done, items, points: total, by: 'Owner' } });
+  // A re-run with nothing left to refund must not overwrite the first run's summary.
+  dbUpdate(opt.project, '/' + SR, { ...roundResets(data, nowMs), ...(done ? { [`refundBatches/${batchId}`]: { at: nowMs, boys: done, items, points: total, by: 'Owner' } } : {}) });
   console.log(`\nDONE: ${done} boys, ${items} items, ${total} ★ returned. Class prize bars reset to 0.`);
 }
 
