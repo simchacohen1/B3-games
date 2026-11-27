@@ -99,7 +99,7 @@ details.review-options[open]{text-align:left}
 #gamesScreen .game-menu-grid,#gamesScreen .hero-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;max-width:1100px;margin-left:auto;margin-right:auto}
 body.shorashim-review-active .review-mode-banner{display:none!important}
 /* Learn header: Back, Home, title (the strip was built for two items) */
-html body.shorashim-learning-active #learnScreen .section-head{grid-template-columns:auto auto minmax(0,1fr)!important;justify-content:start!important}
+html body.shorashim-learning-active #learnScreen .section-head{grid-template-columns:auto auto minmax(0,1fr) auto!important;justify-content:start!important}
 html body.shorashim-learning-active #learnScreen .section-head .backBtn{min-height:40px!important;font-size:17px!important;font-weight:900;min-width:0!important}
 
 /* Confirmation shown after a recording is sent (the small status line is hidden while reviewing) */
@@ -120,3 +120,4 @@ html body.shorashim-learning-active #learnScreen .section-head .backBtn{min-heig
 body.shorashim-review-active #reviewScreen.active{display:block}
 body.shorashim-review-active .review-more-ways{display:none}
 @media(max-width:900px){#reviewScreen.active{display:block}.review-more-ways .rmw-group{flex-direction:row;flex-wrap:wrap}}
+#changeLearningPerekBtn{white-space:nowrap;font-weight:800;border:2px solid #d9def5}
