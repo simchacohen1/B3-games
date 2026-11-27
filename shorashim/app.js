@@ -1043,6 +1043,7 @@ bindCloudLogin();
 /* Third-grade quick review controls */
 (function(){
   function quickStart(){
+    if(typeof startCycleReview==='function'){startCycleReview();return;}
     const checks=[...document.querySelectorAll('.review-pick-check')];
     if(!checks.some(x=>x.checked)){
       checks.forEach(x=>x.checked=true);

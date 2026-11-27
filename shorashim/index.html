@@ -1246,6 +1246,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span><span class="hub-emoji">🎮</span></span>
               <strong>Review</strong>
               <span class="hub-sub">Practice what you learned, record Chazara, or play games.</span>
+              <span class="hub-cycle hidden" id="homeCycleLeft"></span>
               <span class="hub-cta">Start Reviewing ▶</span>
             </button>
           </div>
@@ -1461,7 +1462,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
         <section id="reviewHubScreen" class="screen">
           <div class="section-head">
             <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Review</div><h2>How do you want to review?</h2></div>
+            <div><div class="eyebrow">Review</div><h2>How do you want to review?</h2><div class="hub-cycle hidden" id="hubCycleLeft"></div></div>
           </div>
           <div class="hub-grid hub-two" aria-label="Review choices">
             <button type="button" class="hub-card hub-record" data-review-mode="regular">
@@ -1511,6 +1512,17 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
               </button>
             </div>
+            <div id="cycleBox" class="cycle-box hidden">
+              <div id="cycleLeftLine" class="cycle-left" aria-live="polite"></div>
+              <div class="cycle-count-title">How many do you want to review now?</div>
+              <div id="cycleCountBtns" role="group" aria-label="How many words to review now">
+                <button type="button" data-count="10" aria-pressed="false">10</button>
+                <button type="button" data-count="20" aria-pressed="false">20</button>
+                <button type="button" data-count="50" aria-pressed="false">50</button>
+                <button type="button" data-count="100" aria-pressed="false">100</button>
+                <button type="button" data-count="all" aria-pressed="false">All</button>
+              </div>
+            </div>
             <div class="kid-review-actions">
   <button type="button" id="quickStartReviewBtn" class="kid-start-review">▶ SHOW MY CARDS</button>
 </div>
@@ -1539,8 +1551,18 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           <div id="reviewArea" class="hidden">
             <div class="review-meta">
               <span id="reviewCounter" class="pill"></span>
+              <span id="reviewCycleLeft" class="pill cycle-pill hidden"></span>
               <span id="reviewProgressToday" class="pill subtle"></span>
               <span id="reviewPasuk" class="muted"></span>
+            </div>
+            <div id="reviewBatchDone" class="hidden" role="status" aria-live="polite">
+              <div id="reviewBatchHead"></div>
+              <div id="reviewBatchSub"></div>
+              <div id="reviewBatchNote"></div>
+              <div class="batch-actions">
+                <button type="button" id="reviewBatchMoreBtn" class="primary">Keep going</button>
+                <button type="button" id="reviewBatchStopBtn" class="ghost">Stop for now</button>
+              </div>
             </div>
             <div id="tooFastMessage" class="too-fast hidden">Give yourself a moment to say the word and meaning.</div>
             <div id="activeReviewRecording" class="record-action-row">
@@ -1660,9 +1682,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
   <script src="chumash-vocab.js?v=20261126-chumash-1"></script>
   <script src="units.js?v=20261108-units-2"></script>
+  <script src="review-cycle-core.js?v=20261127-cycles2"></script>
   <script src="builtin-pictures.js?v=20261127-builtin1"></script>
-  <script src="app.js?v=20261127-builtin1"></script>
-  <script src="review-categories.js?v=20261106-units-1"></script>
+  <script src="app.js?v=20261127-builtin1-cycles2"></script>
+  <script src="review-categories.js?v=20261127-cycles2"></script>
+  <script src="review-cycles.js?v=20261127-cycles2"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
   <script src="../b3-race.js?v=race-sync-20261109"></script>
