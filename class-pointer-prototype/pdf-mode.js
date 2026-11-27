@@ -681,7 +681,7 @@
   const selecting=()=>$(isTeacher?'teacherTool':'studentTool')?.value==='select'&&B.writingAllowed('select');
   function selectedStroke(){
     const stroke=selectedId?strokes.find(item=>item.id===selectedId):null;
-    if(!stroke||(!isTeacher&&(stroke.owner!==B.owner()||!C.isHighlightShape(stroke.tool)))){selectedId=null;return null}return stroke;
+    if(!stroke||(!isTeacher&&!(stroke.owner===B.owner()&&C.isHighlightShape(stroke.tool))&&!zoneSelectable(stroke))){selectedId=null;return null}return stroke;
   }
   // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
   function drawSelection(list){
@@ -765,7 +765,7 @@
     if(!selecting()||notReady())return false;
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
     if(picked&&at){
-      if(picked.tool==='text'){if(textHandles(blockFrame(textBlock(picked))).some(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12))return true}
+      if(picked.tool==='text'){if(isTeacher&&textHandles(blockFrame(textBlock(picked))).some(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12))return true}
       else if(G?.handleAt(picked,at.px,at.py,at.w,at.h,12))return true;
     }
     const point=normalized(event);
@@ -789,13 +789,15 @@
   // Starts picking, dragging or resizing. False when nothing was under the pointer (then the click is the mouse's).
   function startSelect(event,p){
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
-    if(picked?.tool==='text'&&at){
+    if(picked?.tool==='text'&&at&&isTeacher){
       const group=textBlock(picked),frame=blockFrame(group),grip=textHandles(frame).find(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12);
       if(grip){edit={kind:'text',handle:grip.id,stroke:picked,group,frame,preview:new Map(),swap:null,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
     }
-    const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
+    const handle=G&&picked&&at&&(isTeacher||picked.tool!=='text')?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
     if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,zone:studentZoneOf(picked),pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
-    const hit=isTeacher?teacherMarkAt(event,p,true,true):[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&zoneAllowsStudent(mark)&&markHits(mark,p,true));
+    // A student with a box of their own can pick anything inside it (the teacher's words and pictures too); every other mark stays locked.
+    const zoneHit=!isTeacher&&Z&&Z.studentActive(myZones)?teacherMarkAt(event,p,true,true):null;
+    const hit=isTeacher?teacherMarkAt(event,p,true,true):zoneHit&&zoneSelectable(zoneHit)?zoneHit:[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&zoneAllowsStudent(mark)&&markHits(mark,p,true));
     // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
     const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
     selectedId=hit?hit.id:null;
@@ -2119,6 +2121,8 @@
     return zone;
   }
   const zoneAllowsStudent=stroke=>isTeacher||!Z||Z.studentAllows(myZones,stroke);
+  // Student: may this mark (anyone's) be picked, moved and resized? Only while zones are on and unlocked, and only wholly inside their own box.
+  function zoneSelectable(stroke){return !isTeacher&&!!Z&&Z.studentActive(myZones)&&!myZones.locked&&Z.studentAllows(myZones,stroke)}
   // The student's own box that holds this mark (or null: no zones, or the teacher).
   const studentZoneOf=mark=>isTeacher||!Z||!Z.studentActive(myZones)?null:Z.studentZoneAt(myZones,mark.points[0]);
 

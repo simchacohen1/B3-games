@@ -212,7 +212,7 @@ test('moving a picture sends only its new place, and nobody can move the other s
   api.fromTeacher({type:'board-move',id:'t2-theirs',newId:'s1-mine',points:[{x:0,y:0},{x:.2,y:.2}]});
   // Still two pictures, in the same order: mine where it was, the teacher's at the one place he was allowed to move it.
   assert.deepEqual((await seen()).pictures,[[.1,.1,.5,.6],[.2,.2,.4,.5]]);
-  assert.match(boardsSource,/act\(\{type:'board-move',id:from\.id,newId:item\.id,points:item\.points\}\)/);
+  assert.match(boardsSource,/act\(\{type:'board-move',id:from\.id,newId:item\.id,points:item\.points,\.\.\.\(from\.by!==by\?\{any:true\}:\{\}\)\}\)/);
 });
 test('student boards offer Paste and Copy board, and keep paste inside text fields alone',()=>{
   assert.match(boardsSource,/button\('📋 Paste'/);assert.match(boardsSource,/button\('📄 Copy board'/);

@@ -131,7 +131,7 @@ async function joinStudent(browser, room, student, handoffClass) {
   const context = await browser.newContext();
   await wire(context, { student });
   const page = await context.newPage();
-  page.on('pageerror', e => console.log('student pageerror:', e.message));
+  page.on('pageerror', e => console.log('student pageerror:', e.message)); 
   await page.addInitScript(({ room, student, handoffClass }) => sessionStorage.setItem('classPointerDashboardJoin', JSON.stringify({ room, name: student.name, studentId: student.id, classId: handoffClass || student.classId, at: Date.now() })), { room, student, handoffClass });
   await page.goto(BASE + '/class-pointer-prototype/classroom.html?dashboard=student&room=' + encodeURIComponent(room));
   return { context, page };
@@ -175,4 +175,35 @@ test('a student sees his own space clearly, other names, and a note when he has 
   await expect(b.page.locator('.board-zone-notice')).toHaveCount(0);
   for (const s of [a, b]) await s.context.close();
   await t.context.close();
+});
+
+test('inside his own space a student moves the teacher\'s marks; outside it they stay put', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const a = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await t.page.evaluate(() => { for (const id of ['allowPointer', 'allowHighlight', 'allowPen']) { const box = document.getElementById(id); if (box) { box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); } } for (const box of document.querySelectorAll('#roster input[type=checkbox]')) if (!box.checked) box.click(); });
+  await expect(t.page.locator('#openWhiteboard')).toBeEnabled({ timeout: 10000 });
+  await t.page.evaluate(() => document.getElementById('openWhiteboard').click());
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerPdf.zones.available()), { timeout: 15000 }).toBe(true);
+  await t.page.evaluate(() => window.ClassPointerPdf.zones.set([{ id: 'z1', x: .05, y: .1, w: .4, h: .5, owners: [{ k: 'avi', n: 'Avi Synthetic' }] }], false));
+  const rect = (x1, y1, x2, y2) => ({ tool: 'rectangle', color: '#1d4ed8', size: .016, points: [{ x: x1, y: y1 }, { x: x2, y: y2 }] });
+  await t.page.evaluate(([inside, outside]) => { window.ClassPointerBridge.submitStroke(inside); window.ClassPointerBridge.submitStroke(outside); }, [rect(.1, .2, .2, .3), rect(.6, .2, .7, .3)]);
+  const marks = () => t.page.evaluate(() => window.ClassPointerBridge.highlights().map(s => [s.owner, s.points[0].x, s.points[0].y]));
+  await expect.poll(async () => (await marks()).length, { timeout: 10000 }).toBe(2);
+  await expect.poll(() => a.page.evaluate(() => !!document.querySelector('.board-zone-box.mine')), { timeout: 20000 }).toBe(true);
+  await a.page.getByRole('button', { name: 'Select', exact: true }).first().click();   // the student's own toolbar
+  const drag = async (fx, fy, tx, ty) => {
+    const box = await a.page.locator('#pdfContent').boundingBox();
+    await a.page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
+    await a.page.mouse.down(); await a.page.mouse.move(box.x + box.width * (fx + tx) / 2, box.y + box.height * (fy + ty) / 2, { steps: 4 });
+    await a.page.mouse.move(box.x + box.width * tx, box.y + box.height * ty, { steps: 4 }); await a.page.mouse.up();
+  };
+  await a.page.setViewportSize({ width: 1280, height: 1500 }); await a.page.evaluate(() => document.getElementById('pdfContent').scrollIntoView({ block: 'start' })); await a.page.waitForTimeout(300);
+  await drag(.15, .25, .3, .4);                                   // inside his space: the teacher's mark moves
+  await expect.poll(async () => (await marks())[0][1], { timeout: 10000 }).toBeCloseTo(.25, 1);
+  expect((await marks())[0][0]).toBe('teacher');
+  await drag(.65, .25, .4, .4);                                   // outside his space: nothing moves
+  await a.page.waitForTimeout(1500);
+  expect((await marks())[1][1]).toBeCloseTo(.6, 2);
+  await a.context.close(); await t.context.close();
 });

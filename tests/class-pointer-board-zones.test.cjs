@@ -160,7 +160,7 @@ test('the teacher’s page checks every mark a student sends against that studen
   assert.match(src, /const zoneAllows=\(member,stroke\)=>!zonesOn\(\)\|\|Z\.allows\(zoneState\.zones,zoneState\.locked,Z\.keyOf\(member\),stroke\)/);
   // new marks, changed marks, taken-away marks, undo and clear
   assert.match(src, /if\(!zoneAllows\(member,message\.stroke\)\)\{send\(member\.connection,\{type:'lesson-zone-denied'\}\);return\}/);
-  assert.match(src, /zoneAllows\(member,highlightStore\.strokes\.find\(mark=>mark\.id===change\.id\)\)&&zoneAllows\(member,converted\)/);
+  assert.match(src, /zoneAllows\(member,mark\)&&zoneAllows\(member,converted\)/);
   assert.match(src, /canEditStudentMark\(member,mark\)&&zoneAllows\(member,mark\)/);
   assert.match(src, /zonesOn\(\)&&zoneState\.locked\)\{send\(member\.connection,\{type:'lesson-zone-denied'\}\)/);
   // who the student is comes from the connection, never from the message

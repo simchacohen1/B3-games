@@ -55,7 +55,7 @@ test('session: a student sees a clear "Waiting for your teacher" screen, and is 
 
 test('versions: the changed scripts have new cache versions', () => {
   const html = read('classroom.html');
-  const want = { 'student-boards': '20261126-zn1', 'saved-work': '20261125-wb3', 'classroom-annotate': '20261126-zn1', classroom: '20261126-zn3', 'teacher-dashboard': '20261126-idle1', 'activity-share': '20261126-idle1' };
+  const want = { 'student-boards': '20261127-zv1', 'saved-work': '20261125-wb3', 'classroom-annotate': '20261126-zn1', classroom: '20261127-zv1', 'teacher-dashboard': '20261126-idle1', 'activity-share': '20261126-idle1' };
   for (const [f, v] of Object.entries(want)) assert.match(html, new RegExp(f + '\\.js\\?v=' + v), f);
   assert.match(html, /teacher-dashboard\.css\?v=20261124-pages1/);
   for (const page of ['chazara/index.html', 'chavrusa/index.html', 'gematria/index.html', 'halacha/index.html', 'shorashim/index.html'])
