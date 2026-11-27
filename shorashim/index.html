@@ -1019,6 +1019,17 @@ body.shorashim-review-active #chooseReviewCardsBtn {
 .perek-badge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:11px;font-style:normal;font-weight:900;white-space:nowrap}
 .review-perek-filter.hidden{display:none!important}
 </style>
+<style id="speaker-button-v1">
+/* Speaker button (English meaning read aloud) */
+.speak-btn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-left:8px;border-radius:999px;border:2px solid #9fb4f2;background:#eef2ff;font-size:24px;line-height:1;cursor:pointer;vertical-align:middle;user-select:none}
+.speak-btn:hover,.speak-btn:focus-visible{background:#dbe4ff;outline:3px solid #6b87e8}
+.speak-btn-big{min-width:64px;min-height:64px;font-size:34px;margin:0}
+#backCard{position:relative}
+#backCard .speak-btn-big{position:absolute;right:12px;bottom:12px;z-index:5}
+.review-card-wrap{position:relative}
+.review-card-wrap .speak-btn-big{position:absolute;left:50%;bottom:14px;margin-left:calc(min(760px,92vw)/2 - 78px);z-index:5}
+.speak-btn.hidden{display:none}
+</style>
 <style id="shorashim-recording-points-v1">.shorashim-challenge-box{margin:12px 0 16px;padding:14px 16px;border:2px solid #f59e0b;border-radius:16px;background:#fffbeb}.shorashim-challenge-box label{display:block;font-size:16px}.shorashim-challenge-box input{transform:scale(1.35);margin-right:8px}.shorashim-record-box{max-width:760px;margin:14px auto 0;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #c7d2fe;border-radius:16px;background:#eef2ff}.shorashim-record-box .mini-note{max-width:520px}</style>
 <style id="review-record-flow-fix">
 #activeReviewRecording{align-items:center;justify-content:center;margin:4px 0 10px;gap:10px}
@@ -1372,6 +1383,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                     <div class="flashcard editable" id="backCard">
                       <div class="card-label">BACK</div>
                       <div id="englishText" class="movable english-text" tabindex="0"></div>
+                      <button id="learnSpeakBtn" type="button" class="speak-btn speak-btn-big" data-speak="" aria-label="Hear the English meaning">🔊</button>
                       <div id="backExamples" class="card-examples back-examples"></div>
                     </div>
                   </div>
@@ -1547,6 +1559,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <div id="reviewEnglish" class="review-english hidden"></div>
                 <div id="reviewBackExamples" class="review-examples back hidden"></div>
               </button>
+              <button id="reviewSpeakBtn" type="button" class="speak-btn speak-btn-big hidden" data-speak="" aria-label="Hear the English meaning">🔊</button>
             </div>
             <div class="review-nav">
               <button id="chooseReviewCardsBtn" class="ghost">☰ Choose Different Cards</button>
@@ -1647,7 +1660,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
   <script src="chumash-vocab.js?v=20261126-chumash-1"></script>
   <script src="units.js?v=20261108-units-2"></script>
-  <script src="app.js?v=20261126-chumash-2"></script>
+  <script src="app.js?v=20261127-speaker-1"></script>
   <script src="review-categories.js?v=20261106-units-1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
