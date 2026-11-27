@@ -28,7 +28,7 @@ test('word list does not label or disable future available words',()=>{
   const items=[{id:'first',front:'א',english:'first'},{id:'later',front:'ב',english:'later'}], nodes={};
   const document={getElementById(id){return nodes[id]||=({innerHTML:'',textContent:'',children:[],appendChild(el){this.children.push(el)}})},createElement(){return {}}};
   const s={cards:{}};
-  const ctx=vm.createContext({currentTrack:'shorashim',student:()=>s,learningCatalog:()=>items,keyFor:(t,id)=>t+':'+id,document,selectedItemKey:null,escapeHTML:x=>x,reviewFilterLabel:()=>'Perek',loadEditorItem:()=>{}});
+  const ctx=vm.createContext({speakButtonHTML:()=>'',currentTrack:'shorashim',student:()=>s,learningCatalog:()=>items,keyFor:(t,id)=>t+':'+id,document,selectedItemKey:null,escapeHTML:x=>x,reviewFilterLabel:()=>'Perek',loadEditorItem:()=>{}});
   vm.runInContext(fn('renderWordList'),ctx);
   ctx.renderWordList();
   assert.equal(nodes.wordList.children.length,2);
