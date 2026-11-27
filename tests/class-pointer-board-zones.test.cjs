@@ -209,3 +209,14 @@ test('the zones window only ever shows names as text and works only on the teach
   assert.match(src, /if\(!B\|\|!B\.isTeacher\|\|!Z\)return/);
   for (const word of ['Draw a zone', 'Lock all zones', 'Unlock all zones', 'Remove all zones', 'One box for each student', 'Make boxes']) assert.ok(src.includes(word), word);
 });
+
+test('a student sees their own space clearly: bright outline, "Your space", dimmed rest, a note when they have none', () => {
+  const pdf = read('pdf-mode.js'), css = read('student-boards.css');
+  assert.match(pdf, /'Your space'/);
+  assert.match(pdf, /Your teacher hasn't given you a space yet\./);
+  assert.match(pdf, /board-zone-halo/);
+  assert.match(pdf, /function focusMyZone/);
+  assert.match(css, /\.board-zone-box\.mine\{stroke:#00c853;stroke-width:5/);
+  assert.match(css, /\.board-zone-dim\{fill-opacity:\.42\}/);
+  assert.match(css, /\.board-zone-notice/);
+});
