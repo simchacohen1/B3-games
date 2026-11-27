@@ -91,7 +91,7 @@
       const g = groups.get(r);
       g.keys.push(it.key);
       if (it.list && !g.lists.includes(it.list)) g.lists.push(it.list);
-      if (it.english && !g.englishAll.includes(it.english)) g.englishAll.push(it.english);
+      if (it.english && !g.englishAll.some(e => e.trim().toLowerCase() === String(it.english).trim().toLowerCase())) g.englishAll.push(it.english);
     });
     const rows = [...groups.values()];
     rows.forEach(g => { g.id = g.keys[0]; });

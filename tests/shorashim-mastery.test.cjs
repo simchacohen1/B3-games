@@ -33,6 +33,7 @@ test('same spelling in several lists is one row; same letters different vowels m
   assert.equal(sat.flags.length,0);
   assert.equal(g.find(x=>x.keys.includes('prefix:6')).keys.length,1);
   assert.equal(g.length,4);
+  assert.deepEqual(M.groupWords([{key:'shorashim:a',front:'אָמַר',english:'Said'},{key:'shorashim:b',front:'אָמַר',english:'said'}])[0].englishAll,['Said'],'same English in another case is shown once');
 });
 
 test('same spelling with different meanings stays one row but is flagged',()=>{
