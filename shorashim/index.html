@@ -1170,7 +1170,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
-<link rel="stylesheet" href="shorashim-hubs.css?v=20261127-simplify3">
+<link rel="stylesheet" href="shorashim-hubs.css?v=20261127-simplify4">
 <link rel="stylesheet" href="practice.css?v=20261127-mastery2">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap">
 <style id="shorashim-perek-menu-styles">
@@ -1308,7 +1308,10 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             <div id="learnListBar">
               <h2 id="learnHeading">Learn New Shorashim</h2>
               <span id="learnListTag" class="hidden" aria-live="polite"></span>
-              <button type="button" id="changeLearningPerekBtn" class="ghost small hidden">Switch list ▾</button>
+              <span id="switchListWrap" class="switch-list-wrap">
+                <button type="button" id="changeLearningPerekBtn" class="ghost small hidden" aria-haspopup="menu" aria-expanded="false">Switch list ▾</button>
+                <div id="switchListMenu" class="switch-list-menu hidden" role="menu" aria-label="Choose a list"></div>
+              </span>
             </div>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
@@ -1678,7 +1681,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="review-cycle-core.js?v=20261127-cycles2"></script>
   <script src="builtin-pictures.js?v=20261127-builtin1"></script>
   <script src="mastery-core.js?v=20261127-mastery1"></script>
-  <script src="app.js?v=20261127-builtin1-simplify3"></script>
+  <script src="app.js?v=20261127-builtin1-simplify4"></script>
   <script src="practice-activities.js?v=20261127-mastery2"></script>
   <script src="review-categories.js?v=20261127-cycles2-emoji1"></script>
   <script src="review-cycles.js?v=20261127-cycles3"></script>
