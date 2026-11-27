@@ -36,7 +36,7 @@ function run() {
 
 test('strip: green chips show how many times (×1, ×2); gray for no recording; Rashi readings only', () => {
   const { ctx, els } = run();
-  const now = Date.now(), yesterday = now - 30 * 3600 * 1000;
+  const now = Date.now(), startOfToday = new Date(now).setHours(0, 0, 0, 0), yesterday = startOfToday - 12 * 3600 * 1000; /* noon yesterday in the clock the page uses (fixed: now-30h fell two days back before 06:00 UTC) */
   ctx.rashiProgress = { s1: { lastActive: now, units: { zayin_letter: { attempts: 5, correct: 5 } } } }; /* practice must not turn s1 green */
   ctx.renderRecordings(
     [{ id: 'a', studentId: 's2', createdAt: now, sectionLabel: 'Vayeira 18:1' }, { id: 'b', studentId: 's2', createdAt: now - 1000, sectionLabel: 'Vayeira 18:2' }],
