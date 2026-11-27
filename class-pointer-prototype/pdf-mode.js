@@ -232,7 +232,6 @@
   // The box is plain text you can edit. Words given their own look sit in <span>s that carry it (data-c color, data-s size as a
   // multiple of the box's size, data-b bold, data-f font), so what you see while typing is what the board will show.
   // Typing never makes anything else: only plain text goes in, and Enter is a line break.
-  const PLAIN_EDIT=(()=>{try{const probe=document.createElement('div');probe.contentEditable='plaintext-only';return probe.contentEditable==='plaintext-only'}catch(_){return false}})();
   function styleOfNode(node,inherited){
     const own={};
     if(node.dataset){
@@ -368,7 +367,7 @@
       left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left;right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
     }
     const box=el('div','pdfTextEditInput','board-text-inline'+(fresh?' fresh':''));
-    box.dataset.stageUi='true';box.contentEditable=PLAIN_EDIT?'plaintext-only':'true';box.setAttribute('role','textbox');box.setAttribute('aria-multiline','true');
+    box.dataset.stageUi='true';box.contentEditable='true';box.setAttribute('role','textbox');box.setAttribute('aria-multiline','true');
     box.dir=fresh?'auto':rtl?'rtl':'ltr';box.spellcheck=false;
     box.setAttribute('aria-label',fresh?'Type the words for the board':'Change the words on the board');
     if(fresh)box.dataset.placeholder='Type here';

@@ -228,8 +228,8 @@ test('the teacher whiteboard offers paste, copy and editing of pasted text',()=>
   assert.match(pdfSource,/clip\.copyImage\(exportPng\(\)\)/);
   assert.match(pdfSource,/data-text-mark/);
   assert.doesNotMatch(pdfSource,/pdfTextEditDialog|openTextEditor/,'no popup: words are typed in a text box on the board');
-  assert.match(pdfSource,/const box=el\('textarea','pdfTextEditInput','board-text-inline'/);
-  assert.match(pdfSource,/replaceTextStroke\(stroke,text,size,bold,font,align\)/);
+  assert.match(pdfSource,/const box=el\('div','pdfTextEditInput','board-text-inline'/);
+  assert.match(pdfSource,/replaceTextStroke\(stroke,text,size,bold,font,align,spans,color\)/);
   assert.match(pdfSource,/B\.swapMarks\?\.\(block\.map\(item=>item\.id\),made\.strokes\)/);
   assert.doesNotMatch(pdfSource,/addEventListener\('paste'/);
 });

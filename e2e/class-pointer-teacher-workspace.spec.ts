@@ -330,7 +330,7 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   await page.mouse.click(content.x + content.width * 0.68, content.y + content.height * 0.55);
   // The words are typed in a text box on the board itself; there is no popup.
   await expect(page.locator('#pdfTextEditDialog')).toHaveCount(0);
-  await expect(page.locator('#pdfContent textarea.board-text-inline')).toBeVisible();
+  await expect(page.locator('#pdfContent div.board-text-inline')).toBeVisible();
   await page.locator('#pdfTextEditInput').fill('שלום עולם\nשורה שניה');
   await page.locator('#pdfTextEditInput').press('Control+Enter');
   const textMarks = page.locator('#pdfInk text[data-text-mark]');
@@ -346,6 +346,77 @@ test('teacher whiteboard draws solid pen shapes and adds/edits Hebrew multiline 
   await expect(page.locator('#pdfInk text[data-text-mark]')).toHaveCount(2);
   await expect(page.locator('#pdfInk text[data-text-mark]').nth(0)).toHaveText('תיקון ראשון');
   await expect(page.locator('#pdfInk text[data-text-mark]').nth(1)).toHaveText('תיקון שני');
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('some words in one text box can have their own color, bold and size, in English and Hebrew', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  await page.evaluate(() => (document.getElementById('openWhiteboard') as HTMLButtonElement).click());
+  await expect(page.locator('#pdfContent iframe.lesson-webpage')).toHaveCount(1);
+  await expect(page.locator('#fttAnnotate .fa-tool[aria-pressed="true"]')).toContainText('Select');
+  const content = await settledContentBox(page);
+  await choosePenShape(page, 'T Text box', 'text');
+  await page.mouse.click(content.x + content.width * 0.2, content.y + content.height * 0.3);
+  const box = page.locator('#pdfTextEditInput');
+  await expect(box).toBeVisible();
+  await box.pressSequentially('hello big world');
+  // Pick the word "big" with the keyboard, then color it blue and make it bold (the pen is red, so red would be no change).
+  await page.keyboard.press('Home');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Shift+ArrowRight');
+  await page.getByRole('button', { name: 'Blue words' }).click();
+  await page.getByRole('button', { name: 'Bold', exact: true }).click();
+  await box.press('Control+Enter');
+  const marks = page.locator('#pdfInk text[data-text-mark]');
+  await expect(marks).toHaveCount(1);
+  await expect(marks.first()).toHaveText('hello big world');
+  const red = marks.first().locator('tspan[fill="#1d4ed8"]');
+  await expect(red).toHaveCount(1);
+  await expect(marks.first().locator('tspan')).toHaveCount(3);
+  await expect(red).toHaveText('big');
+  await expect(red).toHaveAttribute('font-weight', '700');
+  // The words around it keep the box's own look.
+  await expect(marks.first().locator('tspan').first()).not.toHaveAttribute('fill', /.+/);
+
+  // Hebrew: one box, the whole line green, still read from the right.
+  await choosePenShape(page, 'T Text box', 'text');
+  await page.mouse.click(content.x + content.width * 0.6, content.y + content.height * 0.6);
+  await expect(box).toBeVisible();
+  await box.pressSequentially('שלום עולם');
+  await page.keyboard.press('Control+A');
+  await page.getByRole('button', { name: 'Green words' }).click();
+  await box.press('Control+Enter');
+  await expect(marks).toHaveCount(2);
+  const hebrew = marks.nth(1);
+  await expect(hebrew).toHaveText('שלום עולם');
+  await expect(hebrew).toHaveAttribute('direction', 'rtl');
+  await expect(hebrew.locator('tspan[fill="#2e7d32"]')).toHaveCount(1);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('a student view draws the styled pieces of a text mark, Hebrew from the right edge', async ({ browser }) => {
+  const context = await browser.newContext(); await wire(context);
+  const page = await context.newPage(); const errors = await openTeacher(page);
+  // The same call the student's page makes for a teacher text mark that has styled pieces.
+  const drawn = await page.evaluate(() => {
+    const C = (window as any).ClassPointerCore, NS = 'http://www.w3.org/2000/svg';
+    const svg = (name: string, attrs: Record<string, any>) => { const node = document.createElementNS(NS, name); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v)); return node; };
+    const stroke = C.cleanStroke({ tool: 'text', color: '#1f2937', size: 0.016, points: [{ x: 0.9, y: 0.2 }, { x: 0.3, y: 0.24 }], text: 'שלום עולם יפה', runs: [{ t: 'שלום ' }, { t: 'עולם', c: '#c62828', b: true, s: 1.5 }, { t: ' יפה' }] });
+    const root = svg('svg', { viewBox: '0 0 1000 1000', width: 1000, height: 1000 }); document.body.appendChild(root);
+    const text = C.richSvgText(svg, stroke, { x: 0, y: 0, px: 0.016 * 1000 * 2.4, fill: stroke.color, attrs: { transform: 'translate(900 200)', direction: 'rtl' } });
+    root.appendChild(text);
+    const spans = [...text.querySelectorAll('tspan')], box = (text as any).getBBox();
+    return { rich: C.richLine(stroke), spans: spans.map(s => ({ t: s.textContent, fill: s.getAttribute('fill'), weight: s.getAttribute('font-weight'), size: s.getAttribute('font-size') })), width: box.width, height: box.height, direction: text.getAttribute('direction') };
+  });
+  expect(drawn.rich).toBe(true);
+  expect(drawn.direction).toBe('rtl');
+  expect(drawn.spans.map(s => s.t).join('')).toBe('שלום עולם יפה');
+  const piece = drawn.spans.find(s => s.t === 'עולם')!;
+  expect(piece.fill).toBe('#c62828'); expect(piece.weight).toBe('700'); expect(Number(piece.size)).toBeGreaterThan(38.4);
+  expect(drawn.width).toBeGreaterThan(50); expect(drawn.height).toBeGreaterThan(20);
   expect(errors).toEqual([]);
   await context.close();
 });
