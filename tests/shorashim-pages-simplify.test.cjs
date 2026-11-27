@@ -45,3 +45,9 @@ test('learning page shows the current list as a big tag next to Switch list', ()
   assert.match(page, /id="learnListBar"[\s\S]*id="learnListTag"[\s\S]*id="changeLearningPerekBtn"[^>]*>Switch list ▾/);
   assert.match(app, /function updateLearnListTag/);
 });
+test('the Art Lab renderer that is actually live adds Chumash suggestions and honors the Block list', () => {
+  const rc = fs.readFileSync('shorashim/review-categories.js', 'utf8');
+  assert.match(rc, /FTT_CHUMASH_EMOJI\.suggest\(item\)/);
+  assert.match(rc, /blockedArtList\(\)/);
+  assert.match(rc, /art\.filter\(v => !blocked\.includes\(v\)\)/);
+});

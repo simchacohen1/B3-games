@@ -424,7 +424,14 @@
     const ills = document.getElementById('illustrationChoices');
     if (!emojis || !ills) return originalRenderArtChoices(item);
 
-    const art = (item.autoArt || genericArt(item.art)) ? smartArt(item) : (item.art || []);
+    let art = (item.autoArt || genericArt(item.art)) ? smartArt(item) : (item.art || []);
+    // Chumash Vocab words carry no art of their own: add suggestions from the meaning so the tab is never empty.
+    if (String(item.id || '').startsWith('chumash-vocab-') && window.FTT_CHUMASH_EMOJI) {
+      art = art.concat(window.FTT_CHUMASH_EMOJI.suggest(item).filter(e => !art.includes(e)));
+    }
+    // Teacher Block list: hide any blocked emoji or picture.
+    const blocked = (typeof blockedArtList === 'function') ? blockedArtList() : [];
+    art = art.filter(v => !blocked.includes(v));
     emojis.innerHTML = '';
     ills.innerHTML = '';
 
@@ -441,7 +448,7 @@
       emojis.appendChild(b);
     });
 
-    const choices = smartIllustrations(item);
+    const choices = smartIllustrations(item).filter(a => !blocked.includes(a.key || ('builtin:file:' + a.src)) && !blocked.includes(a.src));
     if (!choices.length) {
       ills.innerHTML = '<span class="mini-note">No illustration for this item yet.</span>';
       return;
