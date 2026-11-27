@@ -9,6 +9,7 @@ const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
 const balanceCore=require('./rewards-balance-core.cjs');
 const chayusPoints=require('./chayus-points-core.cjs');
+const shorashimWords=require('./shorashim-words-core.cjs');
 const posukReviewCore=require('./posuk-review-core.cjs');
 const submissionOpenCore=require('./submission-open-core.cjs');
 const letterMarks=require('./rashi-letter-marks-core.cjs');
@@ -1282,6 +1283,26 @@ async function chayusMeter(req,res,body,action){
   return res.status(result.ok?200:(result.status||400)).json(result.ok?result:{error:result.error});
 }
 
+// Shorashim review points: 1 point per 100 words reviewed (review and games together), at most 10 a day
+// (shorashim-words-core.cjs holds the rules). Quick off-switch: studentRewards/settings/shorashimWordPointsEnabled=false.
+async function shorashimWordPoints(req,res,body,action){
+  const practice=await requirePracticeStudent(req,shorashimWords.SOURCE);
+  if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+  const rewardStudentId=await chayusRewardStudentId(practice.studentId);
+  if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
+  const enabled=(await rtdb.ref(`${SR_ROOT}/settings/shorashimWordPointsEnabled`).get()).val()!==false;
+  const result=await shorashimWords.report({
+    enabled,store:chayusStore,studentId:practice.studentId,
+    words:action==='shorashim-words-report'?body.words:null,batchId:body.batchId,
+    award:({requestId,point,day})=>awardMilestoneImmediately({
+      requestId,rewardStudentId,studentId:practice.studentId,source:shorashimWords.SOURCE,amount:1,
+      reason:`Shorashim review — ${shorashimWords.WORDS_PER_POINT*point} words today`,
+      record:{shorashimDay:day,shorashimPoint:point},reviewedBy:'Shorashim review (automatic)'
+    })
+  });
+  return res.status(result.ok?200:(result.status||400)).json(result.ok?result:{error:result.error});
+}
+
 async function resolveRewardStudentId(posukStudentId){
   // Filter in code: the database has no ".indexOn": "b3StudentId" rule, and
   // the Admin SDK refuses unindexed orderByChild queries.
@@ -1834,6 +1855,7 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json(result);
         }
         if(action==="chayus-report"||action==="chayus-status")return await chayusMeter(req,res,body,action);
+        if(action==="shorashim-words-report"||action==="shorashim-words-status")return await shorashimWordPoints(req,res,body,action);
         if(action==="posuk-submit"){
           const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
           if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});

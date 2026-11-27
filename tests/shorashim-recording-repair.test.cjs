@@ -31,5 +31,5 @@ test('saved audio and daily submission survive Rewards outage',()=>{
  assert.ok(student.includes('Never destroy an already uploaded recording'));
  assert.ok(student.includes('if(oldData.audioURL&&oldData.storagePath)'));
  assert.ok(student.includes("status:'recorded'"));
- assert.ok(student.includes('Ask your teacher to connect its points request.'));
+ assert.ok(!student.includes('STUDENT_REWARDS_AUTO_AWARD_URL,{'));// recordings go to the teacher and no longer decide points
 });
