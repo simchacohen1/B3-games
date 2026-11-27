@@ -32,16 +32,22 @@
     if (body && typeof body.error === 'string' && status < 500) return body.error;
     return 'Could not do that right now. Try again in a minute.';
   }
+  function wakeService() {
+    return window.NigriAuth && window.NigriAuth.wake ? window.NigriAuth.wake(() => { if (!state.ready) set({ connecting: true }); }) : Promise.resolve(true);
+  }
   async function call(method, payload) {
+    await wakeService();
     const token = window.NigriAuth && await window.NigriAuth.getToken();
     if (!token) return { ok: false, message: describe(401) };
     let res;
     try {
-      res = await fetch(base() + '/nigri-login', {
+      const send = () => fetch(base() + '/nigri-login', {
         method, cache: 'no-store', credentials: 'omit',
         headers: Object.assign({ Authorization: 'Bearer ' + token }, payload ? { 'Content-Type': 'application/json' } : {}),
         body: payload ? JSON.stringify(payload) : undefined
       });
+      res = await send();
+      if (res.status === 502 || res.status === 503) { await wakeService(); res = await send(); }
     } catch (e) { return { ok: false, message: 'Could not reach the Nigri sync service.' }; }
     let body = null;
     try { body = await res.json(); } catch (e) { body = null; }
@@ -77,7 +83,7 @@
       box.appendChild(p);
       const msg = document.createElement('div'); msg.className = 'msg';
       if (!state.ready) {
-        msg.textContent = 'Checking…'; box.appendChild(msg);
+        msg.textContent = state.connecting ? 'Connecting to Nigri… the sync service wakes up each morning; this can take up to a minute.' : 'Checking…'; box.appendChild(msg);
       } else if (state.saved && !editing) {
         const row = document.createElement('div'); row.className = 'row';
         const ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = 'Connected ✓ (username ending …' + state.hint + ')';
@@ -121,7 +127,7 @@
     if (gate.reason === 'owner') { set({ role: 'owner', ready: true }); settleReady(state); return; }
     set({ role: 'teacher' });
     const r = await call('GET');
-    set(r.ok ? { saved: r.saved, hint: r.hint, ready: true, error: '' } : { saved: false, ready: true, error: r.message });
+    set(r.ok ? { saved: r.saved, hint: r.hint, ready: true, connecting: false, error: '' } : { saved: false, ready: true, connecting: false, error: r.message });
     settleReady(state);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { render(); start(); }, { once: true });
@@ -141,6 +147,7 @@
     if (state.role === 'owner') return { response: await ownerSend(), via: 'owner' };
     const reason = await cannotSync();
     if (reason) throw new Error(reason);
+    await wakeService();
     const token = window.NigriAuth && await window.NigriAuth.getToken();
     if (!token) throw new Error('Please sign in with your teacher Google account first.');
     // Teacher: his sign-in only, never the old shared key. Same server as his login box.
