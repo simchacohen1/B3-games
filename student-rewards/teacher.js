@@ -74,7 +74,20 @@ function normalizeClassNames(root){
     c.name=n;
   }
 }
-function allActiveClasses(){return C.activeClasses(state.root||{})}
+// The owner teaches his own classes (the ones assigned to his email in Owner Admin): every class list here shows only those.
+// Nothing changes for other teachers, and with no assigned classes the owner keeps the full list.
+function allActiveClasses(){
+  const list=C.activeClasses(state.root||{}),own=state.ownClassIds;
+  if(!own||!own.length)return list;
+  const mine=list.filter(c=>own.includes(c.id)||own.includes(String(state.root?.classes?.[c.id]?.b3ClassId||"").toLowerCase()));
+  return mine.length?mine:list;
+}
+async function ownerOwnClassIds(user){
+  try{
+    if(!window.B3OwnerTeacherView)await new Promise((ok,no)=>{const t=document.createElement("script");t.src="../owner-teacher-view.js?v=20261126-siteclass";t.onload=ok;t.onerror=no;document.head.appendChild(t)});
+    return (await window.B3OwnerTeacherView.readTeaching(db,"b3-2026",user)).classIds;
+  }catch(e){return null}
+}
 function activeClasses(){const all=allActiveClasses(),withStudents=all.filter(c=>C.classRoster(state.root||{},c.id).length);return withStudents.length?withStudents:all}
 // Every change to a balance goes through here: it never works from a balance that has not loaded yet
 // (treating it as 0 once turned 122 points into -5), and a negative change never raises a negative balance.
@@ -1129,6 +1142,7 @@ auth.onAuthStateChanged(async user=>{
   state.teacherMode=!user.email||user.email.toLowerCase()!==ADMIN.toLowerCase();
   NAV=state.teacherMode?TEACHER_NAV:OWNER_NAV;if(!NAV.includes(state.tab))state.tab="Today";
   state.user=user;
+  state.ownClassIds=state.teacherMode?null:await ownerOwnClassIds(user);
   try{await loadRoot()}catch(err){state.user=null;$("#loginView").classList.remove("hidden");$("#appView").classList.add("hidden");$("#loginError").textContent="Could not open Student Rewards: "+(err.message||String(err))+" Refresh the page to try again.";return}
   $("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");
   if(!state.teacherMode){const seeded=await ensureRewardModelV2();if(seeded)await loadRoot();}
