@@ -41,7 +41,7 @@
     const card = (studentObj.cards && studentObj.cards[itemKey]) || null;
     const own = Number(p[stageId]) || 0;
     if (stageId === 'learned') return Math.max(own, card && card.learnedAt ? 1 : 0);
-    // Review cycles (#962) keep their own per-word counter on the card.
+    // Regular review: the per-word counter that Review cycles (#962) keeps on the card.
     if (stageId === 'review') return Math.max(own, Number(card && card.reviewCount) || 0);
     return own;
   }

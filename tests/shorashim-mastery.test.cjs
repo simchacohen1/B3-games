@@ -10,7 +10,7 @@ test('recordPractice counts per word and stage without touching cards',()=>{
   assert.deepEqual(s.cards['shorashim:a'],{learnedAt:5,design:{x:1}});
   assert.equal(M.countFor(s,'shorashim:a','trace'),2);
   assert.equal(M.countFor(s,'shorashim:a','learned'),1,'learned comes from the existing card');
-  assert.equal(M.countFor({cards:{k:{reviewCount:4}},practice:{k:{review:2}}},'k','review'),4,'uses #962 per-word counts when larger');
+  assert.equal(M.countFor({cards:{k:{reviewCount:4}},practice:{k:{review:2}}},'k','review'),4,'review comes from the per-word counter of review cycles (#962)');
 });
 
 test('same spelling in several lists is one row; same letters different vowels merge only with the same meaning',()=>{
@@ -80,7 +80,7 @@ test('multiple choice: 4 distinct English choices, exactly one correct, picture 
 
 test('wiring: student app records every activity and game; dashboard tab exists',()=>{
   const app=read('app.js'),idx=read('index.html'),pa=read('practice-activities.js'),th=read('teacher.html'),tj=read('teacher.js');
-  ['learned','review','g_match','g_shoot','g_whack','g_race'].forEach(id=>assert.ok(app.includes(`recordPractice(`)&&app.includes(`'${id}'`),id));
+  ['learned','g_match','g_shoot','g_whack','g_race'].forEach(id=>assert.ok(app.includes(`recordPractice(`)&&app.includes(`'${id}'`),id));
   ['trace','mc','match'].forEach(id=>assert.ok(pa.includes(`recordPractice(`)&&pa.includes(`'${id}'`),id));
   assert.ok(app.includes("s.practice=s.practice&&typeof s.practice==='object'?s.practice:{}"));
   assert.ok(idx.indexOf('mastery-core.js')<idx.indexOf('app.js?v='));assert.ok(idx.includes('data-practice="trace"'));

@@ -6,6 +6,7 @@
   'use strict';
 
   let reviewTrack = 'shorashim';
+  window.B3ReviewTrack = () => reviewTrack;
 
   const TRACK_META = {
     shorashim: { label: 'Shorashim', empty: 'shorashim' },

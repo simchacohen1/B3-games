@@ -764,7 +764,7 @@ async function toggleShorashimRecording(){
 }
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function flipReview(){if(!reviewDeck.length)return;reviewFlipped=!reviewFlipped;if(reviewFlipped&&reviewDeck[reviewIndex])recordPractice(reviewDeck[reviewIndex].itemKey,'review');renderReviewCard(false);}
+function flipReview(){if(!reviewDeck.length)return;reviewFlipped=!reviewFlipped;renderReviewCard(false);}
 function qualifyCurrentCard(){
   if(!reviewDeck.length)return true;
   const c=reviewDeck[reviewIndex],dr=ensureDailyReview(),already=!!dr.seen[c.itemKey];
@@ -1044,6 +1044,7 @@ bindCloudLogin();
 /* Third-grade quick review controls */
 (function(){
   function quickStart(){
+    if(typeof startCycleReview==='function'){startCycleReview();return;}
     const checks=[...document.querySelectorAll('.review-pick-check')];
     if(!checks.some(x=>x.checked)){
       checks.forEach(x=>x.checked=true);
