@@ -821,7 +821,7 @@
     function refreshPresentationLock(){
       back.hidden=followingPresentation();
       back.textContent=presentationView?'Back to Fun Torah Tools':'Back to Activity';
-      if(followingPresentation() && lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none'}
+      if(followingPresentation() && lessonActive && !(idleOffer&&(smallMode||idleDismissed))){lessonOverlay.style.display='flex';reopen.style.display='none'}
     }
     window.addEventListener('ftt:follow-activity-changed',refreshPresentationLock);
     window.addEventListener('ftt:follow-policy-changed',refreshPresentationLock);
@@ -834,6 +834,39 @@
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null;syncWaiting()}
     // ---------- What the student sees when there is no picture, and the connection sign ----------
     let connState='ok',rtt=0,lastPong=0,pingTimer=null,waitTimer=null,connPill=null;
+    // ---------- The teacher may have left the share on ----------
+    // While the teacher is actively sharing, the picture stays in front (locked, as before). When the teacher's own
+    // check says it may have been left on (lesson.shareMayBeLeftOn), the student is offered two buttons: shrink it into a
+    // small corner window, or close it. He stays in his class; the next thing the teacher pushes opens again by itself.
+    let idleOffer=false,smallMode=false,idleDismissed=false;
+    const idleBtnCss='padding:10px 14px;border:0;border-radius:9px;font:inherit;cursor:pointer';
+    const shrinkBtn=document.createElement('button');shrinkBtn.type='button';shrinkBtn.id='fttShrinkTeacherShare';shrinkBtn.hidden=true;shrinkBtn.style.cssText=idleBtnCss+';background:#fef08a;color:#102748';
+    const closeShareBtn=document.createElement('button');closeShareBtn.type='button';closeShareBtn.id='fttCloseTeacherShare';closeShareBtn.hidden=true;closeShareBtn.textContent='Close';closeShareBtn.style.cssText=idleBtnCss+';background:white;color:#102748';
+    lessonToolbar.append(shrinkBtn,closeShareBtn);
+    function syncIdleButtons(){shrinkBtn.hidden=!idleOffer;closeShareBtn.hidden=!idleOffer;shrinkBtn.textContent=smallMode?'Make it big':'Make it small'}
+    function applySmall(on){
+      smallMode=on;const s=lessonOverlay.style;
+      if(on){
+        s.inset='auto';s.right='14px';s.bottom='14px';s.width='min(340px,70vw)';s.height='240px';s.borderRadius='14px';s.boxShadow='0 8px 28px #0008';s.overflow='hidden';
+        drawTools.style.display='none';lessonStatus.style.display='none';hitLayer.style.pointerEvents='none';
+      }else{
+        s.inset='0';s.right='';s.bottom='';s.width='';s.height='';s.borderRadius='';s.boxShadow='';s.overflow='';
+        drawTools.style.display='flex';lessonStatus.style.display='';redrawToolbar();
+      }
+      syncIdleButtons();
+    }
+    function setShareIdleOffer(flag){
+      const on=flag===true;if(on===idleOffer)return;
+      idleOffer=on;
+      // The teacher kept sharing or pushed something new: the picture is in front again, as while actively sharing.
+      if(!on){idleDismissed=false;if(smallMode)applySmall(false)}
+      syncIdleButtons();
+    }
+    shrinkBtn.addEventListener('click',()=>{idleDismissed=true;applySmall(!smallMode)});
+    closeShareBtn.addEventListener('click',()=>{
+      idleDismissed=true;userClosed=true;applySmall(false);
+      lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
+    });
     let overlayShownAt=0,playBlocked=false,userClosed=false;   // userClosed: the student pressed Back to Activity himself
     // Read only, for checking the sign from a test or the console.
     window.FTTConnectionSign={state:()=>({sign:connState,rtt,sinceLastAnswerMs:Date.now()-lastPong})};
@@ -950,7 +983,7 @@
       refreshPresentationLock();
       if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
       if(!message.active){if(message.id===lessonId){lessonActive=false;setPresenting(false);cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
-      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;setPresenting(true);userClosed=false;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
+      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;setPresenting(true);userClosed=false;idleDismissed=false;if(smallMode)applySmall(false);lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
@@ -1229,6 +1262,7 @@
       try{const liveClass=next?(next.__classId||classId):'';if((window.ClassPointerLiveClass||'')!==liveClass){window.ClassPointerLiveClass=liveClass;window.dispatchEvent(new Event('b3:live-class'))}}catch{}
       watchGrace(next);
       latestSession=next;
+      try{setShareIdleOffer(next?.shareMayBeLeftOn===true)}catch{}
       if(!next)classLink('wait',lastRows&&Object.keys(lastRows).length?'No open lesson right now (the last one is old or ended). Waiting for your teacher.':'Waiting for your teacher to open Class Pointer for your class ('+classId+').');
       else if(!admitted)classLink('wait','Found your teacher’s lesson. Connecting…');
       followSession(next);
