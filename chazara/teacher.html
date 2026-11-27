@@ -310,7 +310,8 @@ function refreshScopedViews(){
 // In the verified owner preview, the selected teacher's class was already checked
 // by the parent shell. The logged-in Firebase UID is the owner, not that teacher.
 // Normal teacher sessions must still reload their own live assignments.
-function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
+// The owner teaching his own classes (site-settings.js) has no teacher record: his classes come from his own invitation.
+function needsTeacherAssignmentRefresh(access){return access.role!=='admin'&&access.ownerTeacherView!==true&&!(window.B3_READ_ONLY_TEACHER_PREVIEW===true&&access.preview===true)}
 async function loadClassScope(user,access){
  const generation=++scopeGeneration;clearStudentListeners();teacherAccess=access;teacherScope=null;D={};R={};E={};P={};G={};pendingPointRequests={};$('teacherApp').classList.add('hidden');$('detail').classList.add('hidden');$('teacherGate').classList.remove('hidden');
  if(!access?.authorized){$('teacherGate').innerHTML='Sign in with your assigned teacher Google account. <button id="teacherLogin">Sign in with Google</button>';$('teacherLogin').onclick=()=>window.B3SiteSettings.signInWithGoogle();return;}
