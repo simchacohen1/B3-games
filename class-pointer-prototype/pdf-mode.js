@@ -91,18 +91,20 @@
   // Pasted words always come in the board's black, whatever color is chosen for drawing.
   const PASTE_INK='#1f2937';
   const sizeOfLabel=label=>Math.round(label/(TEXT_SCALE*TEXT_REF)*1e4)/1e4,labelOfSize=size=>Math.round(size*TEXT_SCALE*TEXT_REF);
-  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null,textBold=false,boldBtn=null,textFont='sans',fontSelect=null,shapeFill=false,textAlign='',alignBtns=[],arrangeBox=null;
+  let textSize=sizeOfLabel(24),textSizeBox=null,textSizeValue=null,textSizeLabel=null,textColorBox=null,textColorInput=null,textBold=false,boldBtn=null,textFont='sans',fontSelect=null,shapeFill=false,textAlign='',alignBtns=[],arrangeBox=null;
   const LAYER_CHOICES=[['front','To front','Bring to front: above everything else'],['forward','Forward','Bring forward: one layer up'],['backward','Backward','Send backward: one layer down'],['back','To back','Send to back: below everything else']];
   // What the size control works on: the words being typed, the picked words, or the next new words (Text tool).
   function textTarget(){
     if(!isTeacher)return null;
-    if(inlineEdit)return{kind:'typing',size:inlineEdit.size,bold:inlineEdit.bold===true,font:inlineEdit.font||'sans',align:inlineEdit.align||'',rtl:inlineEdit.rtl===true};
+    if(inlineEdit){const look=selectionLook(),open=inlineEdit;return{kind:'typing',partial:!!look,size:look?open.size*look.s:open.size,bold:look?look.b:open.bold===true,font:look?look.f:open.font||'sans',color:look?look.c:open.color,align:open.align||'',rtl:open.rtl===true}}
     const picked=selecting()?selectedStroke():null;
-    if(picked?.tool==='text')return{kind:'picked',size:picked.size,bold:picked.bold===true,font:picked.font||'sans',align:picked.align||'',rtl:picked.points[0].x>picked.points[1].x};
+    if(picked?.tool==='text')return{kind:'picked',color:picked.color,size:picked.size,bold:picked.bold===true,font:picked.font||'sans',align:picked.align||'',rtl:picked.points[0].x>picked.points[1].x};
     return $('teacherTool')?.value==='text'?{kind:'new',size:textSize,bold:textBold,font:textFont,align:textAlign,rtl:false}:null;
   }
   function setTextSize(size){
     const target=textTarget();if(!target)return;
+    // Words picked inside the typing box: only those words change, as a multiple of the box's own size.
+    if(target.kind==='typing'&&target.partial){styleSelected({s:Math.round(Math.max(C.RUN.MIN,Math.min(C.RUN.MAX_SIZE,size/inlineEdit.size))*100)/100});return}
     size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,size));textSize=size;
     if(target.kind==='typing'){inlineEdit.size=size;if(inlineEdit.create)inlineEdit.create.size=size;sizeInline()}
     else if(target.kind==='picked')resizeSelected(size);
@@ -111,6 +113,7 @@
   // Bold for the whole text mark (every line of it): the words being typed, the picked words, or the next new words.
   function setTextBold(next){
     const target=textTarget();if(!target)return;
+    if(target.kind==='typing'&&target.partial){styleSelected({b:next});return}
     textBold=next;
     if(target.kind==='typing'){inlineEdit.bold=next;sizeInline()}
     else if(target.kind==='picked')boldSelected(next);
@@ -136,9 +139,24 @@
   // The font for the whole text mark, like bold: the words being typed, the picked words, or the next new words.
   function setTextFont(next){
     const target=textTarget();if(!target||!Object.prototype.hasOwnProperty.call(C.FONTS,next))return;
+    if(target.kind==='typing'&&target.partial){styleSelected({f:next});return}
     textFont=next;
     if(target.kind==='typing'){inlineEdit.font=next;sizeInline()}
     else if(target.kind==='picked')fontSelected(next);
+    syncTextSize();
+  }
+  // Color for the words picked inside the typing box, or (nothing picked in it) for the whole text box, typed or picked on the board.
+  function setTextColor(hex){
+    const target=textTarget();if(!target||!/^#[0-9a-f]{6}$/i.test(hex))return;
+    hex=hex.toLowerCase();
+    if(target.kind==='typing'){
+      if(target.partial){styleSelected({c:hex});return}
+      inlineEdit.color=hex;if(inlineEdit.create)inlineEdit.create.color=hex;inlineEdit.box.style.color=hex;
+    }else if(target.kind==='picked'){
+      const stroke=selectedStroke();if(!stroke||stroke.tool!=='text')return;
+      const block=textBlock(stroke),made=reflow(block,{color:hex}),ids=made.strokes.length?B.swapMarks?.(block.map(item=>item.id),made.strokes):null;
+      if(ids){selectedId=ids[0];drawInk()}else B.status('That text could not be changed.');
+    }
     syncTextSize();
   }
   // The picked words laid out again in another font (the letters have other widths): the whole block changes together.
@@ -167,7 +185,7 @@
   function syncTextSize(){
     syncArrange();
     if(!textSizeBox)return;const target=textTarget();
-    textSizeBox.hidden=!target;if(target){if(document.activeElement!==textSizeValue)textSizeValue.value=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true));if(fontSelect)fontSelect.value=target.font||'sans';const effective=target.align||(target.rtl?'right':'left');for(const b of alignBtns)b.setAttribute('aria-pressed',String(b.dataset.align===effective))}
+    textSizeBox.hidden=!target;if(target){if(document.activeElement!==textSizeValue)textSizeValue.value=String(labelOfSize(target.size));boldBtn?.setAttribute('aria-pressed',String(target.bold===true));if(fontSelect)fontSelect.value=target.font||'sans';if(textSizeLabel)textSizeLabel.textContent=target.partial?'Picked words':'Text size';if(textColorBox)textColorBox.hidden=!(target.kind==='typing'||target.kind==='picked');if(textColorInput&&target.color&&document.activeElement!==textColorInput)textColorInput.value=target.color;const effective=target.align||(target.rtl?'right':'left');for(const b of alignBtns)b.setAttribute('aria-pressed',String(b.dataset.align===effective))}
   }
   let measurer=null;
   function width100(line){
@@ -190,7 +208,7 @@
   // Lay words out. opts: size, color, and center (new words) or left|right + top|bottom (placed words), boxW.
   function flow(text,opts){
     const clip=window.ClassPointerClipboard;if(!clip?.flowText)return{strokes:[],cut:false};
-    const made=clip.flowText(text,widthFor(opts&&opts.font,opts&&opts.bold),{aspect:W/Math.max(1,H),scale:TEXT_SCALE,block:newBlockId(),...opts});
+    const made=clip.flowText(text,widthFor(opts&&opts.font,opts&&opts.bold),{aspect:W/Math.max(1,H),scale:TEXT_SCALE,block:newBlockId(),runWidth:widthFor,...opts});
     return{...made,strokes:made.strokes.map(value=>C.cleanStroke(value)).filter(Boolean)};
   }
   // Where a block is: its box (fractions of the board), its size, the width the teacher chose (0 = as wide as
@@ -199,16 +217,135 @@
     const first=block[0],rtl=first.points[0].x>first.points[1].x,xs=block.flatMap(item=>item.points.map(q=>q.x)),boxW=first.boxW||0;
     const farLeft=Math.min(...xs),farRight=Math.max(...xs);
     const left=boxW&&rtl?Math.max(0,farRight-boxW):farLeft,right=boxW&&!rtl?Math.min(1,farLeft+boxW):farRight;
-    const top=first.points[0].y,bottom=Math.min(1,block[block.length-1].points[0].y+lineStep(first.size));
-    return{left,right,top,bottom,rtl,size:first.size,bold:first.bold===true,font:first.font||'sans',align:first.align||'',boxW,text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')};
+    const rich=block.some(item=>Array.isArray(item.runs)&&item.runs.length),last=block[block.length-1];
+    const top=first.points[0].y,bottom=Math.min(1,rich?Math.max(...block.map(item=>item.points[1].y)):last.points[0].y+lineStep(first.size));
+    return{left,right,top,bottom,rtl,size:first.size,bold:first.bold===true,font:first.font||'sans',align:first.align||'',boxW,...(rich&&window.ClassPointerClipboard?.blockSpans?window.ClassPointerClipboard.blockSpans(block):{text:window.ClassPointerClipboard?.blockText?.(block)||block.map(item=>item.text).join('\n')})};
   }
   // The block laid out again with something changed: size, boxW (0 = no chosen width), text. One corner stays
   // where it is: fixX 'left'|'right' (default: where the lines start), fixY 'top'|'bottom'.
   function reflow(block,patch={}){
     const f=blockFrame(block),size=Math.max(TEXT_MIN,Math.min(TEXT_MAX,patch.size||f.size)),boxW=patch.boxW!==undefined?patch.boxW:f.boxW;
     const fixX=patch.fixX||(f.rtl?'right':'left'),fixY=patch.fixY||'top';
-    return flow(patch.text!=null?patch.text:f.text,{size,color:block[0].color,boxW:boxW||undefined,bold:patch.bold!==undefined?patch.bold===true:f.bold,font:patch.font!==undefined?patch.font:f.font,align:patch.align!==undefined?(patch.align||undefined):(f.align||undefined),[fixX]:f[fixX],[fixY]:f[fixY]});
+    return flow(patch.text!=null?patch.text:f.text,{spans:patch.spans!==undefined?patch.spans:patch.text!=null?[]:f.spans||[],size,color:patch.color||block[0].color,boxW:boxW||undefined,bold:patch.bold!==undefined?patch.bold===true:f.bold,font:patch.font!==undefined?patch.font:f.font,align:patch.align!==undefined?(patch.align||undefined):(f.align||undefined),[fixX]:f[fixX],[fixY]:f[fixY]});
   }
+  // ---------- The typing box: words in several styles ----------
+  // The box is plain text you can edit. Words given their own look sit in <span>s that carry it (data-c color, data-s size as a
+  // multiple of the box's size, data-b bold, data-f font), so what you see while typing is what the board will show.
+  // Typing never makes anything else: only plain text goes in, and Enter is a line break.
+  function styleOfNode(node,inherited){
+    const own={};
+    if(node.dataset){
+      if(node.dataset.c)own.c=node.dataset.c;
+      if(node.dataset.s&&Number.isFinite(Number(node.dataset.s)))own.s=Number(node.dataset.s);
+      if(node.dataset.b==='1'||node.dataset.b==='0')own.b=node.dataset.b==='1';
+      if(node.dataset.f)own.f=node.dataset.f;
+    }
+    return Object.keys(own).length?{...inherited,...own}:inherited;
+  }
+  // The words in the box and the look of each character.
+  function readEditor(box){
+    let text='';const styles=[];
+    const add=(chars,style)=>{for(let i=0;i<chars.length;i++){text+=chars[i];styles.push(style)}};
+    const walk=(node,style)=>{
+      if(node.nodeType===3){add(node.nodeValue.replace(/\u00a0/g,' ').replace(/\r/g,''),style);return}
+      if(node.nodeType!==1)return;
+      if(node.tagName==='BR'){add('\n',style);return}
+      const own=styleOfNode(node,style),block=node!==box&&(node.tagName==='DIV'||node.tagName==='P');
+      if(block&&text&&!text.endsWith('\n'))add('\n',style);
+      for(const child of node.childNodes)walk(child,own);
+    };
+    for(const child of box.childNodes)walk(child,{});
+    return{text,styles};
+  }
+  function writeEditor(box,text,styles){
+    box.textContent='';
+    let i=0;
+    while(i<text.length){
+      const style=styles[i]||{},key=JSON.stringify(style);let j=i+1;
+      while(j<text.length&&JSON.stringify(styles[j]||{})===key)j++;
+      if(!Object.keys(style).length)box.append(document.createTextNode(text.slice(i,j)));
+      else{
+        const span=document.createElement('span');
+        if(style.c){span.dataset.c=style.c;span.style.color=style.c}
+        if(style.s){span.dataset.s=String(style.s);span.style.fontSize=style.s+'em'}
+        if(style.b===true||style.b===false){span.dataset.b=style.b?'1':'0';span.style.fontWeight=style.b?'700':'400'}
+        if(style.f){span.dataset.f=style.f;span.style.fontFamily=C.fontStack(style.f)}
+        span.textContent=text.slice(i,j);box.append(span);
+      }
+      i=j;
+    }
+  }
+  // Styled stretches as spans over the text, and back.
+  function spansOfStyles(styles){
+    const spans=[];let i=0;
+    while(i<styles.length){
+      const style=styles[i]||{},key=JSON.stringify(style);let j=i+1;
+      while(j<styles.length&&JSON.stringify(styles[j]||{})===key)j++;
+      if(Object.keys(style).length)spans.push({start:i,end:j,...style});
+      i=j;
+    }
+    return spans;
+  }
+  function stylesOfSpans(length,spans){
+    const styles=Array.from({length},()=>({}));
+    for(const span of spans||[])for(let i=Math.max(0,span.start);i<Math.min(length,span.end);i++){
+      if(span.c)styles[i].c=span.c;if(span.s)styles[i].s=span.s;if(span.b===true||span.b===false)styles[i].b=span.b;if(span.f)styles[i].f=span.f;
+    }
+    return styles;
+  }
+  // A character's look written the shortest way: whatever is the same as the box itself is left out.
+  function tidyStyle(style,open){
+    const out={};
+    if(style.c&&String(style.c).toLowerCase()!==String(open.color).toLowerCase())out.c=String(style.c).toLowerCase();
+    if(Number.isFinite(style.s)&&Math.abs(style.s-1)>.001)out.s=Math.round(style.s*100)/100;
+    if((style.b===true||style.b===false)&&style.b!==(open.bold===true))out.b=style.b;
+    if(style.f&&style.f!==open.font)out.f=style.f;
+    return out;
+  }
+  const editorOffset=(box,node,offset)=>{const range=document.createRange();range.selectNodeContents(box);try{range.setEnd(node,offset)}catch(_){return null}return range.toString().length};
+  function readEditorSelection(box){
+    const sel=window.getSelection?.();if(!sel||!sel.rangeCount)return null;
+    const range=sel.getRangeAt(0);if(!box.contains(range.startContainer)||!box.contains(range.endContainer))return null;
+    const start=editorOffset(box,range.startContainer,range.startOffset),end=editorOffset(box,range.endContainer,range.endOffset);
+    return start==null||end==null?null:{start:Math.min(start,end),end:Math.max(start,end)};
+  }
+  function setEditorSelection(box,start,end){
+    const find=target=>{
+      let left=target,last=null;const walker=document.createTreeWalker(box,NodeFilter.SHOW_TEXT);
+      for(let node=walker.nextNode();node;node=walker.nextNode()){const length=node.nodeValue.length;if(left<=length)return[node,left];left-=length;last=node}
+      return last?[last,last.nodeValue.length]:[box,0];
+    };
+    const [startNode,startAt]=find(start),[endNode,endAt]=find(end),range=document.createRange();
+    try{range.setStart(startNode,startAt);range.setEnd(endNode,endAt)}catch(_){return}
+    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+  }
+  const hasSelection=()=>!!inlineEdit?.sel&&inlineEdit.sel.end>inlineEdit.sel.start;
+  // How the first picked character looks (size as a multiple of the box's size), or null when nothing is picked.
+  function selectionLook(){
+    const open=inlineEdit;if(!open||!hasSelection())return null;
+    const {styles}=readEditor(open.box),style=styles[open.sel.start]||{};
+    return{s:style.s||1,b:style.b===undefined?open.bold===true:style.b,f:style.f||open.font||'sans',c:style.c||open.color};
+  }
+  // Give the picked words a look (patch: any of c, s, b, f).
+  function styleSelected(patch){
+    const open=inlineEdit;if(!open||!hasSelection())return false;
+    const {text,styles}=readEditor(open.box),{start,end}=open.sel;
+    for(let i=Math.max(0,start);i<Math.min(text.length,end);i++)styles[i]=tidyStyle({...styles[i],...patch},open);
+    writeEditor(open.box,text,styles);focusEditor();sizeInline();syncTextSize();
+    return true;
+  }
+  // Back to the typing box with the same words picked (after a control was used).
+  function focusEditor(){
+    const open=inlineEdit;if(!open)return;
+    open.box.focus();
+    if(open.sel)setEditorSelection(open.box,open.sel.start,open.sel.end);
+  }
+  document.addEventListener('selectionchange',()=>{
+    const open=inlineEdit;if(!open)return;
+    const now=readEditorSelection(open.box);
+    if(now&&(!open.sel||now.start!==open.sel.start||now.end!==open.sel.end)){open.sel=now;syncTextSize()}
+  });
+
   // ---------- Typing right on the board ----------
   // All typing happens in a plain text box laid on the board; there is no popup.
   //  • words that are already there (target = their text mark): the box sits on the block, same place, color,
@@ -217,26 +354,27 @@
   // Clicking anywhere else (or Ctrl+Enter) keeps what was typed; Escape drops it.
   function editInline(target){
     finishInline(true);
-    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null,bold=false,font='sans',align='';
+    const fresh=!target.id,margin=.04;let left,right,top,color,size,value='',rtl=false,block=null,bold=false,font='sans',align='',spans=[];
     if(fresh){
       const half=Math.max(.1,Math.min(target.point.x-margin,1-margin-target.point.x));
       size=target.size;bold=textBold;font=textFont;align=textAlign;color=target.color;left=Math.max(0,target.point.x-half);right=Math.min(1,target.point.x+half);
       top=Math.max(0,Math.min(1-lineStep(size),target.point.y-lineStep(size)/2));
     }else{
       block=textBlock(target,B.highlights?.()||strokes);const f=blockFrame(block);
-      size=f.size;bold=f.bold;font=f.font;align=f.align;color=block[0].color;value=f.text;rtl=f.rtl;top=f.top;
+      size=f.size;bold=f.bold;font=f.font;align=f.align;color=block[0].color;value=f.text;spans=f.spans||[];rtl=f.rtl;top=f.top;
       // A width the teacher chose is kept. Otherwise the box runs from where the lines start to the far edge of
       // the board, so a longer sentence has room; the words are laid out properly when the box closes.
       left=f.boxW?f.left:f.rtl?Math.min(margin,f.left):f.left;right=f.boxW?f.right:f.rtl?f.right:Math.max(1-margin,f.right);
     }
-    const box=el('textarea','pdfTextEditInput','board-text-inline'+(fresh?' fresh':''));
-    box.dataset.stageUi='true';box.value=value;box.maxLength=2000;box.dir=fresh?'auto':rtl?'rtl':'ltr';box.spellcheck=false;box.rows=1;
+    const box=el('div','pdfTextEditInput','board-text-inline'+(fresh?' fresh':''));
+    box.dataset.stageUi='true';box.contentEditable='true';box.setAttribute('role','textbox');box.setAttribute('aria-multiline','true');
+    box.dir=fresh?'auto':rtl?'rtl':'ltr';box.spellcheck=false;
     box.setAttribute('aria-label',fresh?'Type the words for the board':'Change the words on the board');
-    if(fresh)box.placeholder='Type here';
+    if(fresh)box.dataset.placeholder='Type here';
     Object.assign(box.style,{left:left*100+'%',top:top*100+'%',width:(right-left)*100+'%',color,textAlign:align||''});
-    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,bold,boldBefore:bold,font,fontBefore:font,align,alignBefore:align,rtl,before:value};
-    content.appendChild(box);sizeInline();drawInk();
-    box.focus();box.setSelectionRange(box.value.length,box.value.length);
+    inlineEdit={stroke:fresh?null:{...target,block},create:fresh?{point:target.point,top,color,size}:null,ids:new Set((block||[]).map(item=>item.id)),box,size,sizeBefore:size,bold,boldBefore:bold,font,fontBefore:font,align,alignBefore:align,color,colorBefore:color,beforeSpans:JSON.stringify(spans),sel:null,rtl,before:value};
+    content.appendChild(box);writeEditor(box,value,stylesOfSpans(value.length,spans));sizeInline();drawInk();
+    box.focus();setEditorSelection(box,value.length,value.length);
     // Nothing typed or clicked in the box may reach the lesson (shortcuts, the Delete key, drawing, panning).
     for(const type of ['pointerdown','pointermove','pointerup','click','dblclick','keyup','paste'])box.addEventListener(type,event=>event.stopPropagation());
     box.addEventListener('keydown',event=>{
@@ -246,7 +384,7 @@
       // Ctrl+B while typing: the whole text mark becomes bold, or plain again.
       else if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&String(event.key).toLowerCase()==='b'){event.preventDefault();toggleTextBold()}
     });
-    box.addEventListener('input',sizeInline);
+    box.addEventListener('input',()=>{sizeInline();const now=readEditorSelection(box);if(now)inlineEdit.sel=now;syncTextSize()});
     // Going to the size or bold control keeps the words open; anywhere else keeps what was typed.
     box.addEventListener('blur',event=>{if(event.relatedTarget&&textSizeBox?.contains(event.relatedTarget))return;finishInline(true)});
     B.status(fresh?'Type the words. Click anywhere else when you are done. Esc cancels.':'Type to change the words. Click anywhere else when you are done. Esc cancels.');
@@ -259,16 +397,16 @@
   }
   function finishInline(save){
     const open=inlineEdit;if(!open)return;inlineEdit=null;
-    const text=open.box.value;open.box.remove();
-    if(open.create){if(save&&text.trim())addTextStroke({...open.create,bold:open.bold,font:open.font,align:open.align},text)}
+    const {text,styles}=readEditor(open.box),spans=spansOfStyles(styles.map(style=>tidyStyle(style,open)));open.box.remove();
+    if(open.create){if(save&&text.trim())addTextStroke({...open.create,color:open.color,bold:open.bold,font:open.font,align:open.align},text,spans)}
     else if(save&&!text.trim())B.status('The words were kept. To remove them, pick them and press Delete.');
-    else if(save&&(text!==open.before||open.size!==open.sizeBefore||open.bold!==open.boldBefore||open.font!==open.fontBefore||open.align!==open.alignBefore))replaceTextStroke(open.stroke,text,open.size,open.bold,open.font,open.align);
+    else if(save&&(text!==open.before||JSON.stringify(spans)!==open.beforeSpans||open.size!==open.sizeBefore||open.bold!==open.boldBefore||open.font!==open.fontBefore||open.align!==open.alignBefore||open.color!==open.colorBefore))replaceTextStroke(open.stroke,text,open.size,open.bold,open.font,open.align,spans,open.color);
     drawInk();
   }
   window.addEventListener('resize',sizeInline);
   // New words where the typing box was: centered on the clicked spot, first line where the box's line was.
-  function addTextStroke(spot,text){
-    const made=flow(text,{size:spot.size,color:spot.color,bold:spot.bold===true,font:spot.font,align:spot.align||undefined,center:spot.point,top:spot.top});
+  function addTextStroke(spot,text,spans){
+    const made=flow(text,{spans:spans||[],size:spot.size,color:spot.color,bold:spot.bold===true,font:spot.font,align:spot.align||undefined,center:spot.point,top:spot.top});
     if(!made.strokes.length){B.status('Enter some text to add it to the whiteboard.');return false}
     // A student's words that would stick out of their own box are not added (the lines inside it are).
     const fit=made.strokes.filter(zoneAllowsStudent);
@@ -276,9 +414,9 @@
     if(fit.length<made.strokes.length){B.status(fit.length?'Only the words inside your box were added.':'Write inside your own box.');return !!fit.length}
     B.status(made.cut?'The words were too long. Only the first part was added.':'Whiteboard text added.');return true;
   }
-  function replaceTextStroke(stroke,text,size,bold,font,align){
+  function replaceTextStroke(stroke,text,size,bold,font,align,spans,color){
     // The new words go where the whole block was, in the same color and width (and size, unless it was changed).
-    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size,bold,font,align});
+    const block=stroke.block?.length?stroke.block:[stroke],made=reflow(block,{text,size,bold,font,align,spans:spans||[],color});
     if(!made.strokes.length){B.status('Enter some text to keep this text box.');return false}
     const ids=B.swapMarks?.(block.map(item=>item.id),made.strokes);
     if(!ids){selectedId=null;B.status('That whiteboard text is no longer available to edit.');return false}
@@ -358,6 +496,7 @@
         const shapePen=['pen','line','pen-arrow','rectangle','ellipse','triangle'].includes(stroke.tool);
         lc.strokeStyle=lc.fillStyle=stroke.color;lc.lineWidth=stroke.size*W*(shapePen?0.45:1);lc.lineCap=lc.lineJoin='round';
         if(stroke.tool==='box'){lc.fillRect(Math.min(first.x,last.x)*W,Math.min(first.y,last.y)*H,Math.abs(last.x-first.x)*W,Math.abs(last.y-first.y)*H);continue}
+        if(stroke.tool==='text'&&C.richLine(stroke)){C.drawRichText(lc,stroke,first.x*W,first.y*H,Math.max(4,stroke.size*W*2.4),first.x>last.x);continue}
         if(stroke.tool==='text'){
           lc.font=`${stroke.bold?'bold ':''}${Math.max(4,stroke.size*W*2.4)}px ${C.fontStack(stroke.font)}`;lc.textBaseline='top';lc.direction=/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr';
           (stroke.text||'').split('\n').forEach((line,index)=>lc.fillText(line,first.x*W,(first.y*H)+index*Math.max(4,stroke.size*W*2.4)*1.25));continue;
@@ -462,8 +601,8 @@
     textSizeValue.addEventListener('change',applyTypedSize);
     textSizeValue.addEventListener('keydown',event=>{
       event.stopPropagation();
-      if(event.key==='Enter'){event.preventDefault();applyTypedSize();inlineEdit?.box.focus()}
-      else if(event.key==='Escape'){event.preventDefault();syncTextSize();inlineEdit?.box.focus()}
+      if(event.key==='Enter'){event.preventDefault();applyTypedSize();focusEditor()}
+      else if(event.key==='Escape'){event.preventDefault();syncTextSize();focusEditor()}
     });
     for(const type of ['keyup','pointerdown','click'])textSizeValue.addEventListener(type,event=>event.stopPropagation());
     const smaller=button('A−','Smaller letters',()=>stepTextSize(-1),'pdf-btn pdf-textsize-btn'),bigger=button('A+','Bigger letters',()=>stepTextSize(1),'pdf-btn pdf-textsize-btn');
@@ -473,7 +612,7 @@
     // Font (David and Frank Ruehl for Hebrew, and others). Like bold, it applies to the whole text mark.
     fontSelect=el('select',null,'pdf-font-select');fontSelect.setAttribute('aria-label','Font');fontSelect.title='Font for the words';
     for(const [key,[label]] of Object.entries(C.FONTS)){const option=document.createElement('option');option.value=key;option.textContent=label;option.style.fontFamily=C.fontStack(key);fontSelect.append(option)}
-    fontSelect.addEventListener('change',()=>{setTextFont(fontSelect.value);inlineEdit?.box.focus()});
+    fontSelect.addEventListener('change',()=>{setTextFont(fontSelect.value);focusEditor()});
     for(const type of ['pointerdown','mousedown','keydown','keyup','click'])fontSelect.addEventListener(type,event=>{if(type==='keydown'||type==='keyup'||type==='click')event.stopPropagation()});
     // Left / Center / Right for the text box.
     for(const [value,label,title] of [['left','Left','Align the words to the left of their box'],['center','Center','Center the words in their box'],['right','Right','Align the words to the right of their box']]){
@@ -482,7 +621,20 @@
       for(const type of ['pointerdown','mousedown'])b.addEventListener(type,event=>event.preventDefault());
       alignBtns.push(b);
     }
-    textSizeBox.append(el('span',null,'pdf-label','Text size'),smaller,textSizeValue,bigger,boldBtn,fontSelect,...alignBtns);nav.appendChild(textSizeBox);
+    // Color: for the picked words inside the typing box, or for the whole box when none are picked. A few quick colors and any other.
+    textColorBox=el('span',null,'pdf-textcolor');textColorBox.setAttribute('role','group');textColorBox.setAttribute('aria-label','Word color');
+    for(const [hex,name] of [['#1f2937','Black'],['#c62828','Red'],['#1d4ed8','Blue'],['#2e7d32','Green'],['#ef6c00','Orange'],['#7b1fa2','Purple']]){
+      const swatch=el('button',null,'pdf-swatch');swatch.type='button';swatch.style.background=hex;swatch.title=name+' words';swatch.setAttribute('aria-label',name+' words');swatch.dataset.color=hex;
+      swatch.addEventListener('click',()=>setTextColor(hex));
+      for(const type of ['pointerdown','mousedown'])swatch.addEventListener(type,event=>event.preventDefault());
+      textColorBox.append(swatch);
+    }
+    textColorInput=el('input',null,'pdf-colorpick');textColorInput.type='color';textColorInput.value='#1f2937';textColorInput.title='Any other color for the words';textColorInput.setAttribute('aria-label','Pick a color for the words');
+    textColorInput.addEventListener('input',()=>setTextColor(textColorInput.value));
+    for(const type of ['pointerdown','mousedown','keydown','keyup','click'])textColorInput.addEventListener(type,event=>{if(type!=='pointerdown'&&type!=='mousedown')event.stopPropagation()});
+    textColorBox.append(textColorInput);
+    textSizeLabel=el('span',null,'pdf-label','Text size');
+    textSizeBox.append(textSizeLabel,smaller,textSizeValue,bigger,boldBtn,fontSelect,textColorBox,...alignBtns);nav.appendChild(textSizeBox);
     // Layers: shows while a picture, shape or words are picked.
     arrangeBox=el('span',null,'pdf-arrange');arrangeBox.hidden=true;arrangeBox.setAttribute('role','group');arrangeBox.setAttribute('aria-label','Layers');
     arrangeBox.append(el('span',null,'pdf-label','Layer'));
@@ -630,6 +782,7 @@
   function inkPath(stroke,color){
     const first=stroke.points[0],last=stroke.points[stroke.points.length-1];
     if(stroke.tool==='box')return svg('rect',{x:Math.min(first.x,last.x)*W,y:Math.min(first.y,last.y)*H,width:Math.abs(last.x-first.x)*W,height:Math.abs(last.y-first.y)*H,fill:color});
+    if(stroke.tool==='text'&&C.richLine(stroke))return C.richSvgText(svg,stroke,{x:first.x*W,y:first.y*H,px:Math.max(4,stroke.size*W*2.4),fill:color,attrs:{direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'}});
     if(stroke.tool==='text'){
       const text=svg('text',{x:first.x*W,y:first.y*H,'font-family':C.fontStack(stroke.font),'font-size':Math.max(4,stroke.size*W*2.4),...(stroke.bold?{'font-weight':'700'}:{}),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr','pointer-events':'visiblePainted','data-text-mark':'true'});
       (stroke.text||'').split('\n').forEach((line,index)=>{const span=svg('tspan',{x:first.x*W,dy:index?'1.25em':'0'});span.textContent=line;text.appendChild(span)});
@@ -2152,7 +2305,7 @@
   // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
   // Marks keep only "teacher" or "student" as their maker; no connection ids are saved.
   function savedStrokes(list){
-    return(list||[]).map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{}),...(s.font&&s.font!=='sans'?{font:s.font}:{}),...(C.TEXT_ALIGNS.includes(s.align)?{align:s.align}:{})}:{}),...(s.tool==='picture'&&s.image?{image:s.image}:{}),...(s.fill===true?{fill:true}:{})}));
+    return(list||[]).map(s=>({owner:s.owner==='teacher'?'teacher':'student',tool:s.tool,color:s.color,size:s.size,points:s.points.map(p=>({x:p.x,y:p.y})),...(s.tool==='text'?{text:s.text,...(s.bold===true?{bold:true}:{}),...(s.font&&s.font!=='sans'?{font:s.font}:{}),...(C.TEXT_ALIGNS.includes(s.align)?{align:s.align}:{}),...(Array.isArray(s.runs)&&s.runs.length?{runs:s.runs.map(run=>({...run})),...(s.block?{block:s.block}:{}),...(s.soft===true?{soft:true}:{}),...(s.boxW?{boxW:s.boxW}:{})}:{})}:{}),...(s.tool==='picture'&&s.image?{image:s.image}:{}),...(s.fill===true?{fill:true}:{})}));
   }
   function savedPictures(list){
     const out=[];

@@ -135,7 +135,7 @@
       },status:()=>{},callTeacher:null};
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
     // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
-    await load(new URL('class-pointer-prototype/classroom-core.js?v=hlshapes2',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/classroom-core.js?v=20261127-rt1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261127-sel1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/poll-core.js?v=2',root).href);
     await load(new URL('class-pointer-prototype/poll.js?v=2',root).href);
@@ -757,6 +757,7 @@
         // Words are drawn at the teacher's size: 2.4 times the mark size, as a fraction of the board width.
         // This layer is 1000 x 1000 stretched over the picture, so the text is scaled back up by the
         // picture's width/height to keep its letters undistorted.
+        else if(stroke.tool==='text'&&window.ClassPointerCore?.richLine?.(stroke)){mark=window.ClassPointerCore.richSvgText(svg,stroke,{x:0,y:0,px:Math.max(4,(Number(stroke.size)||.016)*1000*2.4),fill:color,attrs:{transform:`translate(${x1} ${y1}) scale(1 ${textRatio})`,direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'}})}
         else if(stroke.tool==='text'){mark=svg('text',{x:0,y:0,'font-family':window.ClassPointerCore?.fontStack?.(stroke.font)||'sans-serif',...(stroke.bold?{'font-weight':'700'}:{}),transform:`translate(${x1} ${y1}) scale(1 ${textRatio})`,'font-size':Math.max(4,(Number(stroke.size)||.016)*1000*2.4),fill:color,'dominant-baseline':'hanging',direction:/[\u0590-\u08ff]/.test(stroke.text||'')?'rtl':'ltr'});mark.textContent=stroke.text||'';}
         else {const drawn=stroke.tool==='underline'?[a,{x:b.x,y:a.y}]:points;mark=svg('path',{d:drawn.map((p,i)=>(i?'L':'M')+(p.x*1000)+' '+(p.y*1000)).join(' '),...attrs})}
         markLayer.appendChild(mark);

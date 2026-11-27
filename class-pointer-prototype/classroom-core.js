@@ -23,6 +23,60 @@
   };
   const fontStack=key=>(Object.prototype.hasOwnProperty.call(FONTS,key)?FONTS[key]:FONTS.sans)[1];
   const FILLABLE=['rectangle','ellipse','triangle'];
+  // ---------- Words in several styles (rich text) ----------
+  // One line of a text box may carry "runs": the line cut into pieces, each with its own look. A run is {t:words} plus only what
+  // is different from the text box itself: c (color), s (size, a multiple of the box's size), b (bold true/false), f (font).
+  // The runs of a line always add up to the line's text. A line without runs is drawn exactly as it always was.
+  const RUN={MAX:24,MIN:.4,MAX_SIZE:4,ASCENT:.86};
+  function cleanRuns(runs,text){
+    if(!Array.isArray(runs)||!runs.length||runs.length>RUN.MAX)return null;
+    const out=[];let joined='';
+    for(const raw of runs){
+      if(!raw||typeof raw.t!=='string')return null;
+      const t=raw.t.replace(/[\u0000-\u001f\u007f]/g,'');if(!t)return null;
+      const run={t};
+      if(typeof raw.c==='string'&&/^#[0-9a-f]{6}$/i.test(raw.c))run.c=raw.c.toLowerCase();
+      if(Number.isFinite(raw.s)&&raw.s>=RUN.MIN&&raw.s<=RUN.MAX_SIZE&&Math.abs(raw.s-1)>.001)run.s=Math.round(raw.s*100)/100;
+      if(raw.b===true||raw.b===false)run.b=raw.b;
+      if(typeof raw.f==='string'&&Object.prototype.hasOwnProperty.call(FONTS,raw.f))run.f=raw.f;
+      out.push(run);joined+=t;
+    }
+    return joined===text?out:null;
+  }
+  // What to draw for a line: [{t,font,bold,mult,color}], the line's own look filled in. Always at least one piece.
+  function runsOf(stroke){
+    const font=stroke&&Object.prototype.hasOwnProperty.call(FONTS,stroke.font)?stroke.font:'sans',bold=!!stroke&&stroke.bold===true;
+    if(stroke&&Array.isArray(stroke.runs)&&stroke.runs.length)return stroke.runs.map(run=>({t:String(run.t),font:run.f||font,bold:run.b===undefined?bold:run.b===true,mult:run.s||1,color:run.c||null}));
+    return[{t:String(stroke&&stroke.text||''),font,bold,mult:1,color:null}];
+  }
+  const richLine=stroke=>!!stroke&&stroke.tool==='text'&&Array.isArray(stroke.runs)&&stroke.runs.length>0;
+  const lineMult=stroke=>Math.max(...runsOf(stroke).map(run=>run.mult));
+  // An SVG <text> for a line with runs. (x,y) is the top left of the line's box and px the font size of the box's own letters;
+  // the pieces sit on one baseline under the tallest of them. attrs adds anything else the page needs (direction, transform...).
+  function richSvgText(svg,stroke,o){
+    const runs=runsOf(stroke),tall=Math.max(...runs.map(run=>run.mult)),font=stroke.font,bold=stroke.bold===true;
+    const text=svg('text',{x:o.x,y:o.y+tall*o.px*RUN.ASCENT,'font-family':fontStack(font),'font-size':o.px,...(bold?{'font-weight':'700'}:{}),fill:o.fill,'dominant-baseline':'alphabetic',style:'white-space:pre',...(o.attrs||{})});
+    for(const run of runs){
+      const span=svg('tspan',{});
+      if(run.color)span.setAttribute('fill',run.color);
+      if(run.mult!==1)span.setAttribute('font-size',String(o.px*run.mult));
+      if(run.bold!==bold)span.setAttribute('font-weight',run.bold?'700':'400');
+      if(run.font!==(Object.prototype.hasOwnProperty.call(FONTS,font)?font:'sans'))span.setAttribute('font-family',fontStack(run.font));
+      span.textContent=run.t;text.appendChild(span);
+    }
+    return text;
+  }
+  // The same on a canvas. (x,top) as above (for words that run right to left x is the right edge).
+  function drawRichText(ctx,stroke,x,top,px,rtl){
+    const runs=runsOf(stroke),tall=Math.max(...runs.map(run=>run.mult)),baseFill=ctx.fillStyle;
+    ctx.textBaseline='alphabetic';ctx.direction=rtl?'rtl':'ltr';ctx.textAlign=rtl?'right':'left';
+    let at=x;
+    for(const run of runs){
+      ctx.font=(run.bold?'bold ':'')+Math.max(4,px*run.mult)+'px '+fontStack(run.font);ctx.fillStyle=run.color||baseFill;
+      const width=ctx.measureText(run.t).width;ctx.fillText(run.t,at,top+tall*px*RUN.ASCENT);at+=rtl?-width:width;
+    }
+    ctx.fillStyle=baseFill;
+  }
   const TEXT_ALIGNS=['left','center','right'];
   // A picture on a whiteboard is a mark like any other (two corners, top-left then bottom-right), so it can be picked, moved, resized,
   // layered over or under words, saved and sent to the class. `image` is the picture itself (a small data: URL). On the wire the
@@ -50,7 +104,8 @@
       if(!ref)return null;
       return{tool:'picture',color:'#1f2937',size:0.016,points:value.points.map(({x,y})=>({x:Math.round(x*1e5)/1e5,y:Math.round(y*1e5)/1e5})),ref,...(hasImage?{image:value.image}:{})};
     }
-    const extra=value.tool!=='text'?{}:{text,...(typeof value.block==='string'&&/^[a-z0-9]{2,16}$/.test(value.block)?{block:value.block}:{}),...(value.soft===true?{soft:true}:{}),...(value.bold===true?{bold:true}:{}),...(Object.prototype.hasOwnProperty.call(FONTS,value.font)&&value.font!=='sans'?{font:value.font}:{}),...(Number.isFinite(value.boxW)&&value.boxW>=.05&&value.boxW<=1?{boxW:value.boxW}:{}),...(TEXT_ALIGNS.includes(value.align)?{align:value.align}:{})};
+    const runs=value.tool==='text'?cleanRuns(value.runs,text):null;
+    const extra=value.tool!=='text'?{}:{...(runs?{runs}:{}),text,...(typeof value.block==='string'&&/^[a-z0-9]{2,16}$/.test(value.block)?{block:value.block}:{}),...(value.soft===true?{soft:true}:{}),...(value.bold===true?{bold:true}:{}),...(Object.prototype.hasOwnProperty.call(FONTS,value.font)&&value.font!=='sans'?{font:value.font}:{}),...(Number.isFinite(value.boxW)&&value.boxW>=.05&&value.boxW<=1?{boxW:value.boxW}:{}),...(TEXT_ALIGNS.includes(value.align)?{align:value.align}:{})};
     // A shape can be filled with its own color (rectangle, circle, triangle).
     const fill=value.fill===true&&FILLABLE.includes(value.tool)?{fill:true}:{};
     return{tool:value.tool,color:strokeColor(value),size,points:value.points.map(({x,y})=>({x,y})),...extra,...fill};
@@ -169,6 +224,6 @@
     const scale=Math.min(width/videoWidth,height/videoHeight),w=videoWidth*scale,h=videoHeight*scale;
     return{w,h,left:(width-w)/2,top:(height-h)/2};
   }
-  const api={isHighlightShape,shapeTool,isPicture,pictureRef,PICTURE_MAX_CHARS,PICTURES_MAX,TEXT_ALIGNS,FONTS,fontStack,FILLABLE,TEXT_MIN,TEXT_MAX,cleanName,validPoint,canPoint,canWrite,pictureBox,colors,inkColors,tools,pointStyle,highlightTools,cleanStroke,HighlightStore};
+  const api={RUN,cleanRuns,runsOf,richLine,lineMult,richSvgText,drawRichText,isHighlightShape,shapeTool,isPicture,pictureRef,PICTURE_MAX_CHARS,PICTURES_MAX,TEXT_ALIGNS,FONTS,fontStack,FILLABLE,TEXT_MIN,TEXT_MAX,cleanName,validPoint,canPoint,canWrite,pictureBox,colors,inkColors,tools,pointStyle,highlightTools,cleanStroke,HighlightStore};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ClassPointerCore=api;
 })(typeof window==='undefined'?{}:window);

@@ -74,7 +74,7 @@ test('the font and Fill reach every place a mark is drawn: the board picture, th
   // students
   assert.match(share,/fill:stroke\.fill===true&&\['rectangle','ellipse','triangle'\]\.includes\(stroke\.tool\)\?color:'none'/);
   assert.match(share,/'font-family':window\.ClassPointerCore\?\.fontStack\?\.\(stroke\.font\)\|\|'sans-serif'/);
-  assert.match(share,/classroom-core\.js\?v=hlshapes2/,'student activity pages load the fonts');
+  assert.match(share,/classroom-core\.js\?v=20261127-rt1/,'student activity pages load the fonts');
   assert.match(highlighting,/'font-family':window\.ClassPointerCore\?\.fontStack\?\.\(stroke\.font\)\|\|'sans-serif'/);
   assert.match(highlighting,/'fill':stroke\.fill===true&&\['rectangle','ellipse','triangle'\]\.includes\(stroke\.tool\)\?color:'none'/);
   // saving a whiteboard keeps them
@@ -85,7 +85,7 @@ test('the font and Fill reach every place a mark is drawn: the board picture, th
 
 test('fonts: a font control beside bold works on typed, picked and new words, like bold does',()=>{
   assert.match(pdf,/fontSelect=el\('select',null,'pdf-font-select'\)/);
-  assert.match(pdf,/textSizeBox\.append\(el\('span',null,'pdf-label','Text size'\),smaller,textSizeValue,bigger,boldBtn,fontSelect,\.\.\.alignBtns\)/);
+  assert.match(pdf,/textSizeBox\.append\(textSizeLabel,smaller,textSizeValue,bigger,boldBtn,fontSelect,textColorBox,\.\.\.alignBtns\)/);
   assert.match(pdf,/function setTextFont\(next\)/);assert.match(pdf,/function fontSelected\(next\)/);
   assert.match(pdf,/if\(target\.kind==='typing'\)\{inlineEdit\.font=next;sizeInline\(\)\}/);
   assert.match(pdf,/open\.box\.style\.fontFamily=C\.fontStack\(open\.font\)/);
