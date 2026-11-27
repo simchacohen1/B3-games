@@ -51,3 +51,10 @@ test('the Art Lab renderer that is actually live adds Chumash suggestions and ho
   assert.match(rc, /blockedArtList\(\)/);
   assert.match(rc, /art\.filter\(v => !blocked\.includes\(v\)\)/);
 });
+
+test('Switch list is a dropdown under the button that switches lists on the same screen', () => {
+  assert.match(page, /id="switchListMenu"/);
+  assert.match(app, /function toggleSwitchListMenu/);
+  assert.match(app, /learned`:'No words assigned yet'/);
+  assert.ok(!/changePerek\.onclick=\(\)=>goScreen\('shorashimPerekScreen'\)/.test(app));
+});
