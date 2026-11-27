@@ -67,3 +67,12 @@ test('"All my classes" works only where a page asks for it (Chazara)',()=>{
   for(const f of ['assignment-center/teacher.html','student-report/index.html','follow-teacher/teacher.js','student-rewards/teacher.js','teacher-class-rosters.js','gematria/teacher.html','chayus-meter/teacher.html','class-pointer-prototype/dashboard.js','rashi-letters/teacher.html','shorashim/teacher.js','record_pesukim/teacher.html','weekly-quiz/teacher.html'])
     assert.doesNotMatch(read(f),/B3ClassGate[^\n]*allowAll|requireInUrl\([^\n]*,\s*true\s*\)/,f+' must require one class');
 });
+test('the owner\'s class pickers list only B3 ET and B3 WT; teachers see all their classes',()=>{
+  const ids=['et','wt','kriah','x'];
+  global.B3SiteSettings={getCurrentAccess:()=>({role:'admin'})};
+  assert.deepEqual(gate.pickable(ids),['et','wt']);
+  assert.deepEqual(gate.pickable(['a','b']),['a','b']);
+  global.B3SiteSettings={getCurrentAccess:()=>({role:'teacher'})};
+  assert.deepEqual(gate.pickable(ids),ids);
+  delete global.B3SiteSettings;
+});

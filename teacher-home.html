@@ -98,10 +98,11 @@ function setupTopBar(ids,snaps,access){
  bar.classList[rows.length?'remove':'add']('hidden');
  // One class choice for the whole teacher site (saved for this account). Teacher Home follows it live.
  window.__b3ClassLive=!previewActive;
- pick.innerHTML='<option value="all">All classes</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(lab(x))+'</option>').join('');
+ const pickRows=G?rows.filter(x=>G.pickable(rows.map(r=>r.id)).includes(x.id)):rows;
+ pick.innerHTML='<option value="all">All classes</option>'+pickRows.map(x=>'<option value="'+esc(x.id)+'">'+esc(lab(x))+'</option>').join('');
  const cards=document.querySelectorAll?[...document.querySelectorAll('#classes .class-card')]:[];
  const apply=()=>cards.forEach((c,i)=>{const id=rows[i]?.id;if(c.style)c.style.display=pick.value==='all'||id===pick.value?'':'none';});
- const show=id=>{pick.value=rows.some(x=>x.id===id)?id:'all';apply();};
+ const show=id=>{pick.value=pickRows.some(x=>x.id===id)?id:'all';apply();};
  pick.onchange=()=>{if(G&&!previewActive)G.setSite(pick.value);apply();};
  if(!previewActive&&G){
   // Follow a change made with the class button at the top, without reloading.

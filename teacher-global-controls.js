@@ -193,7 +193,9 @@
     if (!classMenu.hidden) { closeClassMenu(); return; }
     var g = gateApi(), current = pageClass();
     classMenu.replaceChildren();
-    var list = classes.map(function(row) { return {id: row.id, text: className(row.id)}; });
+    var shown = classes.map(function(row) { return row.id; });
+    if (g) shown = g.pickable(shown);
+    var list = shown.map(function(id) { return {id: id, text: className(id)}; });
     if (g && (g.allowAll || window.__b3ClassLive)) list.push({id: 'all', text: 'All classes'});
     list.forEach(function(item) {
       var b = el('button', '', item.text + (item.id === current ? ' ✓' : ''));

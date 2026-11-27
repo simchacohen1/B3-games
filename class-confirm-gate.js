@@ -50,6 +50,18 @@
     if (id !== ALL) { if (u) lsSet(LAST + u, id); lsSet(LAST + ANY, id); writeLast(id); }
     try { root.dispatchEvent(new root.CustomEvent('b3-class-changed', { detail: { id: id } })); } catch (e) {}
   }
+  // The owner's class pickers list only B3 ET and B3 WT; every other class is
+  // reached through Teacher Tools (a ?class= link still opens any class).
+  function isOwner() {
+    try { var a = root.B3SiteSettings && root.B3SiteSettings.getCurrentAccess && root.B3SiteSettings.getCurrentAccess(); return !!a && a.role === 'admin'; }
+    catch (e) { return false; }
+  }
+  function pickable(ids) {
+    ids = ids || [];
+    if (!isOwner()) return ids;
+    var two = ids.filter(function (id) { return id === 'et' || id === 'wt'; });
+    return two.length ? two : ids;
+  }
   function labelOf(id, names) { return label(id, names && names[id]); }
 
   // Pure decision, unit-tested: what should the screen show?
@@ -158,7 +170,7 @@
         sel.style.cssText = 'width:100%;padding:12px;font-size:17px;border-radius:10px;border:2px solid #94a3b8';
         var ph = doc.createElement('option'); ph.value = ''; ph.textContent = 'Choose a class\u2026'; sel.appendChild(ph);
         if (opts.allowAll) { var oa = doc.createElement('option'); oa.value = ALL; oa.textContent = 'All classes'; sel.appendChild(oa); }
-        ids.forEach(function (id) {
+        pickable(ids).forEach(function (id) {
           if (!SAFE.test(id)) return;
           var o = doc.createElement('option'); o.value = id; o.textContent = labelOf(id, names); sel.appendChild(o);
         });
@@ -241,7 +253,7 @@
 
   var api = {
     choose: choose, plan: plan, requireInUrl: requireInUrl, KEY: KEY,
-    label: label, getSite: readSite, getLast: readLast, setSite: setSite,
+    label: label, pickable: pickable, isOwner: isOwner, getSite: readSite, getLast: readLast, setSite: setSite,
     effective: '', allowAll: false
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.B3ClassGate = api;
