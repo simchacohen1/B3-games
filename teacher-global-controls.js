@@ -293,7 +293,7 @@
       '#fttTeacherQuickBar .ftt-quick-grip{cursor:grab;color:#94a3b8;font:800 14px Arial;letter-spacing:-2px;padding:6px 4px 6px 0;user-select:none;touch-action:none;align-self:stretch;display:inline-flex;align-items:center}',
       '#fttTeacherQuickBar .ftt-quick-grip:focus-visible{outline:3px solid #2563eb;border-radius:6px}',
       '#fttTeacherQuickBar.docked{position:static;transform:none;left:auto;top:auto;z-index:auto;background:transparent;box-shadow:none;padding:0;gap:6px;max-width:none;flex:none}',
-      '#fttTeacherQuickBar.docked .ftt-quick-grip{display:none}',
+      '#fttTeacherQuickBar.docked .ftt-quick-grip,#fttTeacherQuickBar.docked #fttTeacherQuickClass,#fttTeacherQuickBar #fttTeacherQuickClass[hidden]{display:none}',
       '#fttTeacherQuickBar.docked{gap:4px}#fttTeacherQuickBar.docked button{width:30px;height:30px;font-size:16px}',
       'body.teacher-view.ftt-quick-docked .cp-topbar.cp-topbar{gap:4px}body.ftt-quick-docked .cp-topbar .cp-topbar-btn,body.ftt-quick-docked .cp-topbar .cp-share-state{padding-left:10px;padding-right:10px}',
       // The picker's word "Class" is spelled out by its aria-label; hiding it gives the three buttons their room in the bar.
@@ -339,7 +339,7 @@
     var grip = el('span', 'ftt-quick-grip', '⋮⋮'); grip.setAttribute('role','button'); grip.tabIndex = 0;
     grip.title = 'Drag to move these buttons. Double-click to put them back.';
     grip.setAttribute('aria-label','Move the teacher buttons. Use the arrow keys, or drag. Press Home to put them back.');
-    bar.append(grip, lock, follow, pointer);
+    bar.append(grip, select, lock, follow, pointer);
     document.body.appendChild(bar);
     setupMove(grip);
     setInterval(dock, 500); dock();
@@ -395,6 +395,8 @@
       var opt = el('option','',row.name); opt.value=row.id;select.appendChild(opt);
     });
     select.value = allMode ? 'all' : selected;
+    // Teacher Home has its own class picker on the page; every other teacher page shows this one.
+    select.hidden = Boolean(document.getElementById('homeClassPick'));
     if (modalClassSelect) {
       modalClassSelect.replaceChildren();
       var blank2 = el('option','','Choose a class\u2026'); blank2.value=''; modalClassSelect.appendChild(blank2);

@@ -63,8 +63,8 @@ test("the list is grouped by day, newest day first, with class labels for ET and
   const days = [...list.innerHTML.matchAll(/<details class="gm-day"/g)].length;
   assert.equal(days, 3);
   assert.ok(list.innerHTML.indexOf("Today") < list.innerHTML.indexOf("Yesterday"));
-  assert.match(list.innerHTML, /gm-cls">ET</);
-  assert.match(list.innerHTML, /gm-cls">WT</);
+  assert.match(list.innerHTML, /gm-cls">B3 ET</);
+  assert.match(list.innerHTML, /gm-cls">B3 WT</);
   assert.match(list.innerHTML, /Needs grading/);
   assert.match(list.innerHTML, /🏅 10\/10/);
 });
