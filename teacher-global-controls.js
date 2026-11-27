@@ -11,7 +11,7 @@
 
   var loader = document.currentScript;
   var base = new URL('./', loader && loader.src || location.href);
-  var API = null, bar = null, select = null, lock = null, follow = null, pointer = null;
+  var API = null, bar = null, classBtn = null, classMenu = null, select = null, lock = null, follow = null, pointer = null;
   var homeFollow = null, homePointer = null, modal = null, modalTitle = null, modalClassSelect = null;
   var accessFrame = null, followFrame = null, activePanel = '';
   var classes = [], selected = '', identity = 0, authorized = false;
@@ -120,16 +120,98 @@
       if (onPointerPage()) btn.setAttribute('aria-current', 'page'); else btn.removeAttribute('aria-current');
     });
   }
+  function gateApi() { return window.B3ClassGate || null; }
+  // The teacher's site-wide class (single class only; 'all' is not a class a panel can act on).
+  function siteClass() {
+    var g = gateApi(); if (!g) return '';
+    var id = g.getSite();
+    if (id === 'all') id = g.getLast();
+    return classIsValid(id) ? id : '';
+  }
   function getPreferred() {
     try { return localStorage.getItem('b3ControlClass') || ''; } catch (_) { return ''; }
   }
+  // A choice made inside a quick panel is for that panel only. The class button
+  // (switchClass) is what changes the class for the whole site.
   function remember(id) {
     selected = id;
     try { localStorage.setItem('b3ControlClass', id); } catch (_) {}
   }
+  function className(id) {
+    var row = classes.find(function(c) { return c.id === id; });
+    var g = gateApi();
+    return g ? g.label(id, row && row.name) : (row ? row.name : String(id).toUpperCase());
+  }
+  // What the class button shows: the class this page is actually on.
+  function pageClass() {
+    var g = gateApi();
+    var linked = new URLSearchParams(location.search).get('class') || '';
+    var saved = g ? g.getSite() : '';
+    if (g && g.effective) {
+      // This page uses the class gate: show the site-wide class (or what the page fell back to).
+      if (classIsValid(saved)) return saved;
+      if (saved === 'all' && g.allowAll) return 'all';
+      return g.effective;
+    }
+    if (classIsValid(linked)) return linked;
+    if (saved === 'all' || classIsValid(saved)) return saved;
+    return '';
+  }
+  // A class named in the page link (?class=) is the teacher's class for the whole site.
+  function adoptLinkClass() {
+    var g = gateApi();
+    var linked = new URLSearchParams(location.search).get('class') || '';
+    // (Where the choice is "All classes", a link to the latest single class is just that page's fallback.)
+    if (g && classIsValid(linked) && g.getSite() !== linked && !(g.getSite() === 'all' && linked === g.getLast())) g.setSite(linked);
+  }
+  function syncClassButton() {
+    if (!classBtn) return;
+    var id = pageClass();
+    classBtn.textContent = '🏫 ' + (id ? className(id) : 'Choose class') + ' ▾';
+    classBtn.title = onPointerPage() ? 'The class cannot change during a live lesson' : 'Class for every teacher page. Click to switch.';
+    classBtn.disabled = onPointerPage();
+    classBtn.setAttribute('aria-label', 'Class: ' + (id ? className(id) : 'none chosen') + '. Switch class for all teacher pages.');
+  }
+  function closeClassMenu() {
+    if (classMenu) classMenu.hidden = true;
+    if (classBtn) classBtn.setAttribute('aria-expanded', 'false');
+  }
+  function switchClass(id) {
+    var g = gateApi();
+    closeClassMenu();
+    if (!g || (id !== 'all' && !classIsValid(id))) return;
+    if (id === pageClass()) return;
+    g.setSite(id);
+    // A page that follows the choice live (Teacher Home) does not need a reload.
+    if (window.__b3ClassLive) { syncClassButton(); return; }
+    var url = new URL(location.href);
+    if (id === 'all') url.searchParams.delete('class'); else url.searchParams.set('class', id);
+    location.assign(url.href);
+  }
+  function openClassMenu() {
+    if (!classMenu || onPointerPage()) return;
+    if (!classMenu.hidden) { closeClassMenu(); return; }
+    var g = gateApi(), current = pageClass();
+    classMenu.replaceChildren();
+    var shown = classes.map(function(row) { return row.id; });
+    if (g) shown = g.pickable(shown);
+    var list = shown.map(function(id) { return {id: id, text: className(id)}; });
+    if (g && (g.allowAll || window.__b3ClassLive)) list.push({id: 'all', text: 'All classes'});
+    list.forEach(function(item) {
+      var b = el('button', '', item.text + (item.id === current ? ' ✓' : ''));
+      b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.setAttribute('aria-checked', String(item.id === current));
+      b.addEventListener('click', function() { switchClass(item.id); });
+      classMenu.appendChild(b);
+    });
+    var r = classBtn.getBoundingClientRect();
+    classMenu.style.top = Math.round(r.bottom + 6) + 'px';
+    classMenu.style.left = Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 200))) + 'px';
+    classMenu.hidden = false;
+    classBtn.setAttribute('aria-expanded', 'true');
+    var first = classMenu.querySelector('button'); if (first) first.focus();
+  }
   function chosenLabel() {
-    var row = classes.find(function(c) { return c.id === currentClass(); });
-    return row ? row.name : currentClass().toUpperCase();
+    return className(currentClass());
   }
   function classUrl(path, classId, options) {
     var url = new URL(path, base);
@@ -275,6 +357,13 @@
       '#fttTeacherQuickBar.docked #fttTeacherQuickLock{background:#1f2937;box-shadow:0 0 0 1px #ffffff66}',
       '#fttTeacherQuickBar.docked button[aria-expanded=true],#fttTeacherQuickBar.docked button[aria-current=page]{background:#dbeafe;color:#1e3a8a}',
       '#fttTeacherQuickBar label{font-size:13px;font-weight:800}',
+      '#fttTeacherQuickBar #fttTeacherClassBtn{width:auto;height:34px;padding:0 12px;background:#e0f2fe;color:#075985;font:800 14px Arial;white-space:nowrap}',
+      '#fttTeacherQuickBar #fttTeacherClassBtn:disabled{cursor:default;opacity:.8}',
+      '#fttTeacherQuickBar.docked #fttTeacherClassBtn{height:30px;font-size:13px;background:#ffffff26;color:#fff}',
+      '#fttTeacherClassMenu{position:fixed;z-index:100400;min-width:170px;max-height:70vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 12px 36px #0f172a40;padding:6px;display:flex;flex-direction:column;gap:2px;font-family:Arial,sans-serif}',
+      '#fttTeacherClassMenu[hidden]{display:none!important}',
+      '#fttTeacherClassMenu button{width:auto;height:auto;border:0;background:#fff;color:#1e293b;text-align:left;padding:10px 12px;border-radius:9px;font:700 15px Arial;cursor:pointer;display:block}',
+      '#fttTeacherClassMenu button:hover,#fttTeacherClassMenu button:focus-visible,#fttTeacherClassMenu button[aria-checked=true]{background:#e0f2fe;outline:none}',
       '#fttTeacherQuickBar select{max-width:170px;min-width:130px;border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;color:#1e293b;background:#fff;font:700 14px Arial}',
       '#fttTeacherQuickBar button,.ftt-home-follow{border:0;border-radius:999px;width:34px;height:34px;padding:0;background:#f0ebff;color:#5c4592;font:800 18px Arial;cursor:pointer;white-space:nowrap;display:inline-grid;place-items:center}',
       '#fttTeacherQuickBar #fttTeacherQuickLock{background:#1f2937;color:white}',
@@ -312,8 +401,16 @@
     var grip = el('span', 'ftt-quick-grip', '⋮⋮'); grip.setAttribute('role','button'); grip.tabIndex = 0;
     grip.title = 'Drag to move these buttons. Double-click to put them back.';
     grip.setAttribute('aria-label','Move the teacher buttons. Use the arrow keys, or drag. Press Home to put them back.');
-    bar.append(grip, lock, follow, pointer);
-    document.body.appendChild(bar);
+    classBtn = el('button', '', '🏫 Choose class ▾'); classBtn.id = 'fttTeacherClassBtn'; classBtn.type = 'button';
+    classBtn.setAttribute('aria-haspopup', 'menu'); classBtn.setAttribute('aria-expanded', 'false');
+    classMenu = el('div'); classMenu.id = 'fttTeacherClassMenu'; classMenu.hidden = true; classMenu.setAttribute('role', 'menu');
+    classMenu.setAttribute('aria-label', 'Switch class for every teacher page');
+    classBtn.addEventListener('click', openClassMenu);
+    document.addEventListener('click', function(e) { if (classMenu && !classMenu.hidden && e.target !== classBtn && !classMenu.contains(e.target)) closeClassMenu(); });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && classMenu && !classMenu.hidden) { closeClassMenu(); classBtn.focus(); } });
+    window.addEventListener('b3-class-changed', syncClassButton);
+    bar.append(grip, classBtn, lock, follow, pointer);
+    document.body.appendChild(bar); document.body.appendChild(classMenu);
     setupMove(grip);
     setInterval(dock, 500); dock();
     select.addEventListener('change', function () { updatePanelClass(select.value); });
@@ -417,6 +514,7 @@
     teacherAnnotate(false);
     authorized = false; identity++; classes = []; selected = '';
     if (bar) bar.hidden = true;
+    closeClassMenu();
     if (homeFollow) {homeFollow.remove();homeFollow=null;}
     if (homePointer) {homePointer.remove();homePointer=null;}
     if (accessFrame) accessFrame.removeAttribute('src');
@@ -439,8 +537,12 @@
           return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():String(all[id].name||id)};
         });
       } else {
-        rows = (access.classIds||[]).filter(function(id){return ID.test(id);}).map(function(id){
-          return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():id};
+        var own = (access.classIds||[]).filter(function(id){return ID.test(id) && id !== '*';});
+        var names = await Promise.all(own.map(function(id){
+          return db.ref('b3Games/workspaces/'+workspace+'/classes/'+id+'/name').once('value').then(function(s){return s.val();}).catch(function(){return null;});
+        }));
+        rows = own.map(function(id,i){
+          return {id:id,name:(id==='et'||id==='wt')?id.toUpperCase():String(names[i]||id)};
         });
       }
       if (serial !== identity) return;
@@ -453,14 +555,15 @@
       var requested = new URLSearchParams(location.search).get('class');
       var preferred = getPreferred();
       var ids=rows.map(function(row){return row.id;});
-      // Never start on a class quietly: only a class named in the link is
-      // pre-selected; otherwise the bar shows "Choose a class\u2026".
-      selected = ids.includes(requested) ? requested : '';
+      // The panels act on the class in the link, else the teacher's site-wide class.
       authorized=true;
       teacherAnnotate(true);
+      selected = ids.includes(requested) ? requested : siteClass();
+      adoptLinkClass();
       setupUi();
       syncClassPicker();
       syncHomeButton(access);
+      syncClassButton();
     } catch(e) {
       if (serial===identity) reset();
       console.warn('Teacher quick controls unavailable:',e);
@@ -472,7 +575,9 @@
       changes.forEach(function(change) {
         Array.prototype.forEach.call(change.removedNodes, function(node) {
           if (node.id !== 'b3ClassGate') return;
-          try { gateClass = localStorage.getItem('b3LastConfirmedClass') || ''; } catch (_) { gateClass = ''; }
+          var g = gateApi();
+          gateClass = g && g.effective && g.effective !== 'all' ? g.effective : '';
+          syncClassButton();
         });
       });
     }).observe(document.body, {childList:true});
@@ -492,6 +597,11 @@
     if (!window.B3SiteSettings && !Array.from(document.scripts).some(function(s){return /(?:^|\/)site-settings\.js(?:\?|$)/.test(s.src||'');})) {
       var script=el('script');script.src=new URL('site-settings.js?v=20261020-quickbar',base).href;
       document.head.appendChild(script);
+    }
+    // The shared class gate holds the site-wide class; load it where the page has not.
+    if (!window.B3ClassGate && !Array.from(document.scripts).some(function(s){return /(?:^|\/)class-confirm-gate\.js(?:\?|$)/.test(s.src||'');})) {
+      var gs=el('script');gs.src=new URL('class-confirm-gate.js?v=20261126-site-class',base).href;
+      gs.onload=function(){if(authorized){adoptLinkClass();if(!selected)selected=siteClass();syncClassButton();}};document.head.appendChild(gs);
     }
     var ticker=setInterval(ready,100);
     ready();

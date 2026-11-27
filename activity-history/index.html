@@ -78,6 +78,7 @@ tbody tr.row:focus{outline:2px solid #2563eb;outline-offset:-2px}
 <script>window.firebase&&firebase.database||document.write('<script src="../vendor/firebase/12.15.0/firebase-database-compat.js"><\/script>')</script>
 <script src="../firebase-config.js?v=20261001-teacherauth"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
+<script src="../class-confirm-gate.js?v=20261126-site-class"></script>
 <script src="../backend/functions/student-tool-policy.js"></script>
 <script src="../private-media.js?v=20261015-private"></script>
 <script src="../student-report/quiz-history.js?v=20261026-simple-csv"></script>
@@ -221,7 +222,10 @@ function resolveClass(want){
 function fillSelects(){
  const keepS=$('fStudent').value,keepC=$('fClass').value;
  $('fClass').innerHTML='<option value="">All classes</option>'+classes.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');
- $('fClass').value=keepC||resolveClass(params.get('class'));
+ // Opens on the teacher's site-wide class (a ?class= link still wins); "All classes" when that is the choice.
+ const G=window.B3ClassGate;if(G)G.allowAll=true;
+ const siteWant=G&&G.getSite()!=='all'?G.getSite():'';
+ $('fClass').value=keepC||resolveClass(params.get('class')||siteWant);
  fillStudents(keepS);
  $('fTool').innerHTML='<option value="">'+(TOOL_LIST.length?'All of these':'All tools')+'</option>'+H.TOOLS.filter(t=>!TOOL_LIST.length||TOOL_LIST.includes(t.id)).map(t=>'<option value="'+t.id+'">'+esc(t.icon+' '+t.label)+'</option>').join('');
  if(FIXED_TOOL){$('fTool').value=FIXED_TOOL;$('fToolWrap').style.display='none'}
