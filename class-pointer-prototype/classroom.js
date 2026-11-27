@@ -71,6 +71,20 @@ function studentMessageToDocument(message){
 // The teacher's Select works on any mark. The store still files a changed mark under its own owner (a student's mark stays that
 // student's, with its id), so only the teacher's page, never a student's message, can change a mark that is not the sender's.
 function markOwner(id){return highlightStore.strokes.find(mark=>mark.id===id)?.owner||'\u0000none'}
+// Student zones on the teacher's whiteboard (board-zones-core.js). With zones on the page being shown, a student may only write,
+// move or erase inside a zone that is theirs. The check is made here, from who the connection belongs to, so a changed student
+// page cannot get around it. The teacher is never held back. No zones on the page: the board is free, as before.
+const Z=window.ClassPointerZones||null;
+let zoneState=null;
+const zonesOn=()=>!!Z&&!!zoneState&&Z.active(zoneState.zones);
+const zoneAllows=(member,stroke)=>!zonesOn()||Z.allows(zoneState.zones,zoneState.locked,Z.keyOf(member),stroke);
+function sendZones(member){
+  if(!Z||!member?.connection)return;
+  if(!zoneState&&!member.zonesSent)return;
+  member.zonesSent=!!zoneState;
+  send(member.connection,{type:'lesson-zones',...Z.forStudent(zoneState?.zones||[],zoneState?.locked,Z.keyOf(member))});
+}
+function publishZones(){for(const member of [...members.values(),...presence.values()])if(member.admitted)sendZones(member)}
 // A student picks, moves, resizes, recolors and deletes their OWN marks (activity-share.js Select). The store files every
 // mark under the connection that made it and only ever changes marks of the sender, so no message can reach another
 // student's marks or the teacher's. Each change is converted like a new mark. Returns true when something changed.
@@ -81,8 +95,17 @@ function replaceStudentMarks(member,changes){
   // A move of several marks is one step for the student's Undo.
   highlightStore.group(member.id,()=>{
     for(const change of changes.slice(0,60)){
-      if(!change||typeof change.id!=='string'||!editable(change.id)||!change.stroke||!C.cleanStroke(change.stroke))continue;
+      if(!change||typeof change.id!=='string'||!change.stroke||!C.cleanStroke(change.stroke))continue;
       const converted=member.presence?studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke:change.stroke;
+      const mark=highlightStore.strokes.find(item=>item.id===change.id);
+      // Inside a box of their own (zones on, not locked) a student may also move and resize the teacher's marks and pictures.
+      // Both where the mark is and where it goes must be wholly inside one of their boxes; everything else stays locked.
+      if(mark&&mark.owner!==member.id){
+        if(zonesOn()&&!zoneState.locked&&zoneAllows(member,mark)&&zoneAllows(member,converted)&&highlightStore.replace(mark.owner,change.id,converted))changed=true;
+        continue;
+      }
+      if(!editable(change.id))continue;
+      if(zonesOn()&&!(zoneAllows(member,mark)&&zoneAllows(member,converted)))continue;
       if(highlightStore.replace(member.id,change.id,converted))changed=true;
     }
   });
@@ -93,7 +116,7 @@ function eraseStudentMarks(member,ids){
   if(!Array.isArray(ids))return false;
   let changed=false;
   highlightStore.group(member.id,()=>{
-    for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark))){highlightStore.edit(member.id,'erase',id);changed=true}
+    for(const id of ids.slice(0,60))if(typeof id==='string'&&highlightStore.strokes.some(mark=>mark.owner===member.id&&mark.id===id&&canEditStudentMark(member,mark)&&zoneAllows(member,mark))){highlightStore.edit(member.id,'erase',id);changed=true}
   });
   return changed;
 }
@@ -247,6 +270,29 @@ document.addEventListener('class-pointer-teacher-signed-out',()=>{
   if(!isTeacher)return;activityTeacherAuthorized=false;activityTeacherEpoch++;stopSharing();window.ClassPointerPdf?.close(true);
   $('shareScreen').disabled=true;$('openBrowserTab').disabled=true;$('openWhiteboard').disabled=true;
 });
+// Another teacher window opened a newer lesson for this class: students moved to it and this lesson ends (one live lesson per class).
+let takenOverNow=false,takenOverNotice=null;
+function showTakenOver(detail){
+  if(!takenOverNotice){
+    takenOverNotice=document.createElement('div');takenOverNotice.id='cpTakenOverNotice';takenOverNotice.setAttribute('role','alert');
+    takenOverNotice.style.cssText='position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;background:#0f172acc;font:16px/1.5 system-ui,sans-serif';
+    const box=document.createElement('div');box.style.cssText='max-width:480px;margin:16px;padding:24px;border-radius:16px;background:#fff;color:#172033;text-align:center;box-shadow:0 12px 40px #0006';
+    const h=document.createElement('h2');h.textContent='This lesson was taken over';h.style.cssText='margin:0 0 8px;font-size:22px';
+    const p=document.createElement('p');p.className='cp-taken-text';p.style.cssText='margin:0 0 16px';
+    const back=document.createElement('button');back.type='button';back.textContent='Take this class back';back.style.cssText='min-height:44px;padding:0 18px;border:0;border-radius:10px;background:#1d4ed8;color:#fff;font:800 16px system-ui;cursor:pointer';
+    back.addEventListener('click',()=>{back.disabled=true;takenOverNow=false;endPromise.then(()=>{takenOverNotice.hidden=true;back.disabled=false;return startClass()})});
+    box.append(h,p,back);takenOverNotice.appendChild(box);document.body.appendChild(takenOverNotice);
+  }
+  const ownerBack=detail&&detail.byLead===true&&detail.mineLead===false;
+  takenOverNotice.querySelector('h2').textContent=ownerBack?'The class’s own teacher started their lesson':'This lesson was taken over';
+  takenOverNotice.querySelector('.cp-taken-text').textContent=ownerBack?'Students always see their own teacher’s lesson, so your lesson in this class has ended and nothing you share reaches them. You can open it again after the teacher ends their lesson.':'Another Class Pointer window (or teacher) opened this class after you, so the students moved to that lesson and this one has ended. Only one lesson can be live for a class at a time.';
+  takenOverNotice.querySelector('button').hidden=ownerBack;
+  takenOverNotice.hidden=false;
+}
+document.addEventListener('class-pointer-taken-over',event=>{
+  if(!isTeacher||!started&&!openingClass)return;
+  takenOverNow=true;endClass();showTakenOver(event&&event.detail);
+});
 document.addEventListener('class-pointer-teacher-restored',()=>{
   if(!isTeacher)return;activityTeacherAuthorized=true;
   $('shareScreen').disabled=!started||!activityTeacherAuthorized;$('openBrowserTab').disabled=!started||!activityTeacherAuthorized;$('openWhiteboard').disabled=!started;
@@ -293,7 +339,7 @@ function receiveStudent(connection){
         send(duplicate.connection,{type:'replaced'});
         setTimeout(()=>duplicate.connection.close(),300);
       }
-      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,tools:previousAccess?.tools||null,admitted:true,connection,lastPoint:0};if(!previousAccess)applyLevel(member,savedLevel(name));members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);window.ClassPointerBoards?.studentJoined(member);return;
+      clearTimeout(handshake);member={id:'student:'+connection.peer,peerId:connection.peer,name,studentId:window.ClassPointerDashboardCore?.validId(message.studentId)?message.studentId:(previousAccess?.studentId||null),color:previousAccess?.color||C.colors[colorIndex++%C.colors.length],allowed:previousAccess?.allowed||false,writeAllowed:previousAccess?.writeAllowed||false,tools:previousAccess?.tools||null,admitted:true,connection,lastPoint:0};if(!previousAccess)applyLevel(member,savedLevel(name));members.set(member.id,member);publish();send(connection,{type:'highlights',strokes:highlightStore.strokes});roster();if(screen)callStudent(member);window.ClassPointerPdf?.studentJoined(member);sendZones(member);window.ClassPointerBoards?.studentJoined(member);return;
   };
   let joinPending=false;
   connection.on('data',message=>{
@@ -340,9 +386,9 @@ function receiveStudent(connection){
     if(!member||(member.presence?presence.get(member.id):members.get(member.id))!==member)return;
     if(message.type==='poll-vote'){window.ClassPointerPoll?.fromStudent(member,message);return}
     if(typeof message.type==='string'&&message.type.startsWith('board-')){if(member.admitted)window.ClassPointerBoards?.fromStudent(member,message);return}
-    if(message.type==='highlight'&&live()&&selected(member)&&message.stroke?.tool!=='picture'&&writingAllowed(message.stroke?.tool,member)){if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
+    if(message.type==='highlight'&&live()&&selected(member)&&message.stroke?.tool!=='picture'&&writingAllowed(message.stroke?.tool,member)){if(!zoneAllows(member,message.stroke)){send(member.connection,{type:'lesson-zone-denied'});return}if(highlightStore.add(member.id,message.stroke))publishHighlights();else send(member.connection,{type:'highlight-error'});return}
     if(message.type==='edit-highlights'&&member.admitted&&(!member.presence||selected(member)&&memberTools(member)?.highlight||selected(member)&&memberTools(member)?.pen)){
-      if(['undo','clear'].includes(message.action)){highlightStore.edit(member.id,message.action);publishHighlights()}
+      if(['undo','clear'].includes(message.action)){if(zonesOn()&&zoneState.locked){send(member.connection,{type:'lesson-zone-denied'});return}highlightStore.edit(member.id,message.action);publishHighlights()}
       // Select edits only the sender's own marks. Highlight permission covers highlight shapes.
       else if(live()&&writingAllowed('select',member)){
         if(message.action==='replace'&&replaceStudentMarks(member,message.changes))publishHighlights();
@@ -371,7 +417,7 @@ function admitPresence(connection,verified,activity){
   if(Array.from(presence.values()).filter(entry=>entry.studentId===studentId).length>=6||presence.size>=120){send(connection,{type:'full'});setTimeout(()=>connection.close(),300);return null}
   const entry={id:'presence:'+connection.peer,presence:true,admitted:true,studentId,name,activity:cleanActivity(activity),connection,connectedAt:Date.now()};
   applyLevel(entry,savedLevel(name));presence.set(entry.id,entry);send(connection,{type:'present'});send(connection,{type:'lesson-tools',level:levelOf(entry)});send(connection,{type:'lesson-marks',points:state.points,strokes:highlightStore.strokes,members:state.members});sendActivityLesson(entry);
-  window.ClassPointerBoards?.studentJoined(entry);roster();
+  sendZones(entry);window.ClassPointerBoards?.studentJoined(entry);roster();
   return entry;
 }
 function dropPresence(entry,notice){
@@ -613,7 +659,7 @@ function endClass(){
   endPromise=Promise.resolve().then(()=>window.ClassPointerDashboard?.end()).then(()=>{
     closingClass=false;
     button.disabled=false;button.textContent='↻ Start another class';
-    status('Class ended. Click Start another class to reopen it.');
+    status(takenOverNow?'This lesson was taken over by another window. Click Start another class to take the class back.':'Class ended. Click Start another class to reopen it.');
   }).catch(error=>{
     closingClass=false;
     button.disabled=true;button.textContent='Classroom cleanup failed';
@@ -675,6 +721,8 @@ function joinClass(event){
       if(teacherConnection!==connection||!message)return;
       if(message.type==='poll-state'){if(admitted)window.ClassPointerPoll?.fromTeacher(message);return}
       if(window.ClassPointerBoards?.fromTeacher(message))return;
+      if(message.type==='lesson-zones'){window.ClassPointerPdf?.setStudentZones?.(message);return}
+      if(message.type==='lesson-zone-denied'){status('That part of the board is locked for you. Write inside your own box.');return}
       if(window.ClassPointerPdf?.handleMessage(message))return;
       if(message.type==='pictures'){receivePictures(message.items);return}
       if(message.type==='highlights'){lastWireStrokes=message.strokes;highlighter?.receive(resolvePictures(message.strokes));return}
@@ -822,6 +870,12 @@ function editOwnHighlightShape(id,stroke){
   send(teacherConnection,stroke?{type:'edit-highlights',action:'replace',changes:[{id,stroke}]}:{type:'edit-highlights',action:'erase',ids:[id]});
   return true;
 }
+// Several of my own marks at once (a block of words moved together).
+function editOwnHighlightShapes(list){
+  if(!Array.isArray(list)||!list.length||!window.ClassPointerPdf?.active()||!live()||!writingAllowed('select')||!teacherConnection?.open)return false;
+  send(teacherConnection,{type:'edit-highlights',action:'replace',changes:list.slice(0,60).map(([id,stroke])=>{const {image,...rest}=stroke||{};return{id,stroke:rest}})});
+  return true;
+}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
 window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   // What the lesson shows now: 'screen', 'pdf', 'webpage', 'whiteboard' or null (used by classroom-annotate.js).
@@ -844,12 +898,20 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   reorderMarks(ids,how){if(!isTeacher||!Array.isArray(ids)||!ids.length)return false;const changed=highlightStore.group('teacher',()=>highlightStore.reorder('teacher',ids,how));if(changed)publishHighlights();return changed},
   replaceMark(id,stroke){if(!isTeacher)return editOwnHighlightShape(id,stroke);if(!highlightStore.group('teacher',()=>highlightStore.replace(markOwner(id),id,stroke)))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
-  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
+  replaceMarks(list){if(!isTeacher)return editOwnHighlightShapes(list);if(!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},
   // Teacher only: put the marks of a saved whiteboard back for everyone (pdf-mode.js importWhiteboard).
-  restoreMarks(list){if(!isTeacher)return;state.points={};highlightStore.restore(list);publishHighlights();publish()}};
+  restoreMarks(list){if(!isTeacher)return;state.points={};highlightStore.restore(list);publishHighlights();publish()},
+  // Teacher only: the zones of the whiteboard page on show (none: the board is free). Every student is told which are theirs.
+  setZones(list,locked){if(!isTeacher||!Z)return;zoneState=Array.isArray(list)&&list.length?{zones:list,locked:locked===true}:null;publishZones()},
+  // The students who are here, for giving a zone to one of them: [{key,name}].
+  zoneStudents(){
+    const seen=new Map();
+    for(const member of [...members.values(),...presence.values()])if(member.admitted){const key=Z?.keyOf(member);if(key&&!seen.has(key))seen.set(key,{key,name:member.name})}
+    return Array.from(seen.values()).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  }};
 // Mouse mode comes from two places: holding Shift, and the toolbar's Pointer or Select tool. With the Pointer tool the page is used
 // normally AND the class still sees the dot (navPointer); holding Shift is the plain mouse with no dot, as before.
 function setNavigation(on,pointer=false){toolNav=!!on;toolPointer=!!pointer;applyNavigation()}

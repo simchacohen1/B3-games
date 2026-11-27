@@ -372,8 +372,8 @@ function pointHistoryHTML(){
   return `<section class="panel points-history-panel"><div class="points-history-head"><div><h2>⭐ Points History</h2><p>Total Points ${acct.totalPoints} ★ · Redeemed ${acct.redeemed} ★ · Current Balance ${acct.currentBalance} ★</p></div><strong>${acct.currentBalance} ★</strong></div>${rows.length?`<div class="points-history-list">${rows.map(r=>`<article class="points-history-row"><div><b>${e(r.title)}</b>${r.detail?`<small>${e(r.detail)}</small>`:''}<small>${r.when?e(new Date(r.when).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})):''}</small></div><strong class="points-history-amount ${r.amount<0?'negative':'positive'}">${r.amount>0?'+':''}${r.amount} ★</strong></article>`).join('')}</div>`:'<p>No point activity yet.</p>'}</section>`;
 }
 function progressHTML(){
-  const rows=allRatingRows(),pct=C.cumulativeProgress(rows)??0,g=grouped(),hist=history(),cats=['Davening','Learning','Participation'];
-  return `<div class="student-score"><strong>${pct}%</strong><span>Your overall progress</span></div><div class="categories">${Object.entries(g).map(([name,x])=>{const p=x.possible?Math.round(x.earned/x.possible*100):0;return `<article><span>${e(name)}</span><b>${p}%</b><u><i style="width:${Math.min(110,p)}%;background:${e(state.student.color)}"></i></u><small>${x.earned} of ${x.possible} progress points</small></article>`}).join('')}</div>${pointHistoryHTML()}<section class="panel"><h2>Daily History</h2>${hist.length?`<div class="historytable"><div class="historyrow historyhead"><span>Date</span>${cats.map(c=>`<span>${c}</span>`).join('')}<span>Points earned</span></div>${hist.map(d=>`<div class="historyrow ${d.status==='absent'?'absentrow':''}"><strong>${e(C.formatDate(d.date))}</strong>${d.status==='absent'?`<span>Absent</span><span>—</span><span>—</span><span>0 ★</span>`:cats.map(c=>{const r=d.ratings[c]||'—';return `<span><b class="ratingpill ${C.ratingClass(r)}">${e(r)}</b></span>`}).join('')+`<span class="points-pill">${d.points} ★</span>`}</div>`).join('')}</div>`:'<p>No saved school days yet.</p>'}</section>`;
+  const hist=history(),cats=['Davening','Learning','Participation'];
+  return `${pointHistoryHTML()}<section class="panel"><h2>Daily History</h2>${hist.length?`<div class="historytable"><div class="historyrow historyhead"><span>Date</span>${cats.map(c=>`<span>${c}</span>`).join('')}<span>Points earned</span></div>${hist.map(d=>`<div class="historyrow ${d.status==='absent'?'absentrow':''}"><strong>${e(C.formatDate(d.date))}</strong>${d.status==='absent'?`<span>Absent</span><span>—</span><span>—</span><span>0 ★</span>`:cats.map(c=>{const r=d.ratings[c]||'—';return `<span><b class="ratingpill ${C.ratingClass(r)}">${e(r)}</b></span>`}).join('')+`<span class="points-pill">${d.points} ★</span>`}</div>`).join('')}</div>`:'<p>No saved school days yet.</p>'}</section>`;
 }
 function rewardsHTML(){
   const balance=state.serverRewardBalance!==null?Number(state.serverRewardBalance):(Number(state.student.rewardBalance)||0),
@@ -398,7 +398,14 @@ function myActivityRows(){
     const p=p0||{};
     rows.push({kind:'purchase',key,cancelKey:p.id||key,name:state.root.rewards?.[p.rewardId]?.name||'Reward',type:'Personal reward',cost:Number(p.cost)||0,status:String(p.status||'pending'),when:historyTime(p.requestedAt)});
   }
-  for(const [key,c0] of Object.entries(state.root?.contributions||{})){
+  // The server history also lists every class contribution. If the direct read of the contribution
+  // records is blocked or empty, fall back to it so a boy never sees his contributions vanish.
+  const contributions={...(state.root?.contributions||{})};
+  for(const h of state.activityPointHistory||[]){
+    if(String(h?.source||'')!=='class-reward-contribution'||!h.id||contributions[h.id])continue;
+    contributions[h.id]={amount:Math.abs(Number(h.actualAmount??h.amount??0)),rewardName:h.rewardName,modeNames:h.modeNames,createdAt:h.createdAt,refundedAt:h.refundedAt||null,refundedAmount:h.refundedAmount};
+  }
+  for(const [key,c0] of Object.entries(contributions)){
     const c=c0||{},modes=Array.isArray(c.modeNames)&&c.modeNames.length?` — ${c.modeNames.join(', ')}`:'';
     rows.push({kind:'contribution',key,name:`${c.rewardName||'Class reward'}${modes}`,type:'Class contribution',cost:Math.abs(Number(c.amount)||0),status:c.refundedAt?'refunded':'contributed',when:historyTime(c.createdAt)});
   }
@@ -482,6 +489,7 @@ async function contributeClassReward(rewardId,inputId,buttonEl){
   }catch(err){C.toast(err.message||String(err),'error')}
   finally{state.busy=false;render()}
 }
+function withTimeout(p,ms,msg){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))])}
 async function redeem(rewardId){
   if(teacherPreview){
     const reward=state.root.rewards[rewardId],cost=Number(reward?.cost)||0;
@@ -501,13 +509,15 @@ async function redeem(rewardId){
   try{
     const user=auth.currentUser;
     if(!user)throw new Error('Please sign in again.');
-    const token=await user.getIdToken();
-    const r=await fetch(C.REDEEM_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({rewardId})});
-    const j=await r.json();
+    const token=await withTimeout(user.getIdToken(),15000,'Could not check your sign-in. Check your connection and try again.');
+    const r=await fetch(C.REDEEM_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({rewardId}),signal:AbortSignal.timeout(25000)});
+    const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(j.error||'Could not request reward');
     C.toast('Reward requested!');
-    await load();
-  }catch(err){C.toast(err.message||String(err),'error')}
+    // Free the buttons right away; refreshing the list must never keep them frozen.
+    state.busy=false;
+    load().catch(()=>{}).finally(()=>renderTab());
+  }catch(err){C.toast(err&&err.name==='TimeoutError'?'That took too long. Check My purchases to see if it went through, then try again.':(err.message||String(err)),'error')}
   finally{state.busy=false;renderTab()}
 }
 async function cancelRequest(requestId){
@@ -525,12 +535,13 @@ async function cancelRequest(requestId){
   try{
     const user=auth.currentUser;
     if(!user)throw new Error('Please sign in again.');
-    const token=await user.getIdToken();
-    const r=await fetch(C.CANCEL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({requestId})});
+    const token=await withTimeout(user.getIdToken(),15000,'Could not check your sign-in. Check your connection and try again.');
+    const r=await fetch(C.CANCEL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({requestId}),signal:AbortSignal.timeout(25000)});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(j.error||'Could not cancel that request');
     C.toast(`Request canceled — ${cost} ★ returned.`);
-    await load();
+    state.busy=false;
+    load().catch(()=>{}).finally(()=>renderTab());
   }catch(err){C.toast(err.message||String(err),'error')}
   finally{state.busy=false;renderTab()}
 }

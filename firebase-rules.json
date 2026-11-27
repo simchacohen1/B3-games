@@ -536,6 +536,21 @@
       "privateAuth": {
         ".read": "auth != null && auth.token.email == 'simcha5770@gmail.com'",
         ".write": "auth != null && auth.token.email == 'simcha5770@gmail.com'"
+      },
+      "classRewardContributionsByStudent": {
+        ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+        "$studentId": {
+          ".read": "auth != null && (auth.token.studentRewardsStudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)"
+        }
+      },
+      "refundRequests": {
+        ".read": "auth != null && (auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+        "$studentId": {
+          ".read": "auth != null && (auth.token.studentRewardsStudentId == $studentId || auth.token.email == 'simcha5770@gmail.com' && auth.token.email_verified == true || root.child('b3Games/admins/' + auth.uid + '/active').val() == true)",
+          "$requestId": {
+            ".write": "auth != null && auth.token.studentRewardsStudentId == $studentId && (newData.exists() && newData.child('status').val() == 'pending' && (!data.exists() || data.child('status').val() == 'pending') || !newData.exists() && data.child('status').val() == 'pending')"
+          }
+        }
       }
     },
     "b3Private": {

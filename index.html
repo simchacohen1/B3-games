@@ -753,6 +753,7 @@ document.addEventListener("DOMContentLoaded",function(){
     "student-rewards":"student-rewards/teacher.html",
     "weekly-quiz":"weekly-quiz/teacher.html",
     "sefer-hamitzvos":"sefer-hamitzvos/index.html",
+    "chayus-meter":"chayus-meter/teacher.html",
     "halacha":"halacha/index.html?teacher=1&v=20261007-teacher-sync"
   };
   const pairedTeacherHrefs=new Set(Object.values(teacherVersionByGame).map(h=>h.split("?")[0]));
@@ -1919,7 +1920,12 @@ document.addEventListener("DOMContentLoaded",function(){
     if(btn.disabled)return;
     // startTestLinkSignIn passes {testLink:true}; clicks pass an Event.
     const testLink=arguments[0]?.testLink===true;
-    btn.disabled=true;setLoginMsg("Checking…");
+    // Tell the extra script the sols.tools copy adds (it never loads here) not to reload the page while we sign in. Firebase reports the
+    // new user before we have saved who it is, and a reload then empties the form: the student has to type everything twice.
+    globalThis.__b3SignInBusy=true;
+    btn.disabled=true;setLoginMsg("Signing in…");
+    // A slow connection: say so, and tell the student to wait rather than retype.
+    const slowNote=setTimeout(()=>{if(el("loginMsg").textContent==="Signing in…")setLoginMsg("Still signing in… this is slow today. Please wait, you do not need to type it again.");},6000);
     try{
       const studentName=el("studentNameInput").value;
       const r=await checkStudentAccess(studentName,el("classPinInput").value);
@@ -1947,13 +1953,13 @@ document.addEventListener("DOMContentLoaded",function(){
         if(!picked){setLoginMsg("");return;}
         if(picked!==r.classId)entry={...r,classId:picked,customToken:""};
       }
-      setLoginMsg("Opening your games…");await enterStudent(entry);setLoginMsg("");
+      setLoginMsg("Signing in…");await enterStudent(entry);setLoginMsg("");
       // A student who opened a direct activity link (e.g. a teacher-assigned
       // Weekly Quiz) before signing in goes straight back to it.
       let returnTo="";try{returnTo=sessionStorage.getItem("b3StudentReturnTo")||"";sessionStorage.removeItem("b3StudentReturnTo");}catch(e){}
       if(returnTo&&/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+\.html(\?[A-Za-z0-9_=&%.-]*)?$/.test(returnTo)){location.replace(new URL(returnTo,location.href).href);return;}
     }catch(e){console.error(e);setLoginMsg(e&&e.message?e.message:"Could not check your login. Try again.");}
-    finally{btn.disabled=false;}
+    finally{clearTimeout(slowNote);globalThis.__b3SignInBusy=false;btn.disabled=false;}
   }
 
   let actingStudentRestoreInFlight=false;
@@ -2797,7 +2803,7 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 },{once:true});
 </script>
-<script defer src="class-pointer-prototype/activity-share.js?v=20261125-wb3"></script>
+<script defer src="class-pointer-prototype/activity-share.js?v=20261127-sel1"></script>
 </body>
 </html>
 

@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
+const H = require("../rashi-letters/history-core.js");
 
 const html = fs.readFileSync("record_pesukim/teacher.html", "utf8");
 const queueSource = fs.readFileSync("record_pesukim/grading-queue.js", "utf8");
@@ -10,14 +11,16 @@ const end = html.indexOf("async function closeGradeOpen(");
 assert.ok(start > 0 && end > start, "marking list code is present");
 
 function load(now) {
-  const list = {innerHTML: ""};
-  const window = {};
+  const els = {};
+  const el = id => els[id] || (els[id] = {id, innerHTML: "", textContent: "", disabled: false});
+  const window = {RashiHistoryCore: H};
   vm.runInNewContext(queueSource, {window});
   const ctx = {
+    window,
     B3PosukGradingQueue: window.B3PosukGradingQueue,
     B3SubmissionOpenCore: {isPosukOpen: () => true},
     studentsMap: {}, teacherAccess: {role: "teacher"}, POSUK_GOLD_POINTS: 10,
-    document: {getElementById: id => id === "gradeList" ? list : null, addEventListener() {}},
+    document: {getElementById: el, querySelectorAll: () => [], addEventListener() {}},
     escapeHtml: s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]),
     formatDuration: s => Math.round(s) + "s", gradeRefLabel: s => "Perek " + s.perek + " · Posuk " + s.startPosuk,
     gradeScoreOf: s => s.status === "pending" ? null : s.score,
@@ -26,7 +29,7 @@ function load(now) {
   };
   vm.createContext(ctx);
   vm.runInContext(html.slice(start, end), ctx);
-  return {ctx, list};
+  return {ctx, el, list: {get innerHTML() { return el("gradeWaiting").innerHTML + "\n" + el("gradeEarlier").innerHTML; }}};
 }
 
 const noon = new Date(2026, 10, 25, 12, 0, 0).getTime();        // Wednesday
@@ -39,34 +42,54 @@ const items = [
 ];
 const roster = {a: {name: "Fictional Aaron", classId: "et"}, b: {name: "Fictional Ben", classId: "wt"}};
 
-test("filters: today / this week / all, one boy, needs grading / graded", () => {
+test("waiting: every waiting recording, or only the boy picked in the strip; earlier: marked ones by period and search", () => {
   const {ctx} = load(noon);
   ctx.__d = {items, roster, scope: ["et", "wt"], openConfigs: {}}; vm.runInContext("gradeData = __d", ctx);
-  const ids = () => vm.runInContext("gradeFiltered().map(s => s.id).sort().join()", ctx);
-  vm.runInContext("gradeView.range='all'; gradeView.status='pending'", ctx);
-  assert.equal(ids(), "1,2,4");
-  vm.runInContext("gradeView.range='today'", ctx);
-  assert.equal(ids(), "1,2");
+  const waiting = () => vm.runInContext("gradeWaiting().map(s => s.id).sort().join()", ctx);
+  const earlier = () => vm.runInContext("gradeEarlier().map(s => s.id).sort().join()", ctx);
+  assert.equal(waiting(), "1,2,4");
+  assert.equal(earlier(), "3");
   vm.runInContext("gradeView.sid='b'", ctx);
-  assert.equal(ids(), "2");
-  vm.runInContext("gradeView.sid=''; gradeView.range='all'; gradeView.status='graded'", ctx);
-  assert.equal(ids(), "3");
-  vm.runInContext("gradeView.status='all'", ctx);
-  assert.equal(ids(), "1,2,3,4");
+  assert.equal(waiting(), "2");
+  assert.equal(earlier(), "");
+  vm.runInContext("gradeView.sid=''; gradeView.range='today'", ctx);
+  assert.equal(earlier(), "", "the marked one is from yesterday");
+  vm.runInContext("gradeView.range='yesterday'", ctx);
+  assert.equal(earlier(), "3");
+  vm.runInContext("gradeView.range='all'; gradeView.text='posuk 3'", ctx);
+  assert.equal(earlier(), "3");
+  vm.runInContext("gradeView.text='nothing like this'", ctx);
+  assert.equal(earlier(), "");
 });
 
-test("the list is grouped by day, newest day first, with class labels for ET and WT together", () => {
-  const {ctx, list} = load(noon);
+test("waiting recordings are clean cards with Play and Grade; earlier is grouped by day, newest first, with class labels", () => {
+  const {ctx, list, el} = load(noon);
   ctx.__d = {items, roster, scope: ["et", "wt"], openConfigs: {}}; vm.runInContext("gradeData = __d", ctx);
-  vm.runInContext("gradeView.range='all'; gradeView.status='all'; gradeView.sid=''", ctx);
+  vm.runInContext("gradeView.range='all'; gradeView.sid=''; gradeView.text=''", ctx);
   vm.runInContext("renderGradeList()", ctx);
-  const days = [...list.innerHTML.matchAll(/<details class="gm-day"/g)].length;
-  assert.equal(days, 3);
-  assert.ok(list.innerHTML.indexOf("Today") < list.innerHTML.indexOf("Yesterday"));
-  assert.match(list.innerHTML, /gm-cls">ET</);
-  assert.match(list.innerHTML, /gm-cls">WT</);
-  assert.match(list.innerHTML, /Needs grading/);
-  assert.match(list.innerHTML, /🏅 10\/10/);
+  const w = el("gradeWaiting").innerHTML;
+  assert.equal([...w.matchAll(/class="gm-item wt-card"/g)].length, 3);
+  assert.equal([...w.matchAll(/data-playopen="1">▶ Play</g)].length, 3);
+  assert.equal([...w.matchAll(/class="wt-grade"/g)].length, 3);
+  assert.match(w, /Today, /);
+  assert.equal(el("gradeWaitingN").textContent, "3");
+  assert.match(el("gradeStartBtn").textContent, /Start marking \(3\)/);
+  const e = el("gradeEarlier").innerHTML;
+  assert.equal([...e.matchAll(/<details class="gm-day"/g)].length, 1);
+  assert.match(e, /Yesterday/);
+  assert.match(e, /🏅 10\/10/);
+  assert.doesNotMatch(e, /Needs grading/, "waiting ones are only in the waiting list");
+  assert.match(w, /gm-cls">ET</);
+  assert.match(w, /gm-cls">WT</);
+  // older days are listed newest first
+  const more = items.concat([{sid: "b", id: "5", status: "scored", score: 7, submittedAt: day(3), perek: 1, startPosuk: 5}]);
+  ctx.__d2 = {items: more, roster, scope: ["et", "wt"], openConfigs: {}}; vm.runInContext("gradeData = __d2; renderGradeList()", ctx);
+  const e2 = el("gradeEarlier").innerHTML;
+  assert.ok(e2.indexOf("Yesterday") < e2.indexOf("Sunday"));
+  vm.runInContext("gradeView.sid='b'; renderGradeList()", ctx);
+  assert.match(el("gradeWaiting").innerHTML, /Fictional Ben/);
+  assert.doesNotMatch(el("gradeWaiting").innerHTML, /Fictional Aaron/);
+  assert.doesNotMatch(list.innerHTML, /Fictional Aaron/);
 });
 
 test("the pill is one link to the marking view for all of my classes", () => {
@@ -91,7 +114,7 @@ test("the page has the full-width scrubber, speed buttons and the progress-view 
 function loadMarking() {
   const els = {};
   const el = id => els[id] || (els[id] = {id, hidden: false, innerHTML: "", textContent: "", onclick: null, firstElementChild: null});
-  const window = {};
+  const window = {RashiHistoryCore: H};
   vm.runInNewContext(queueSource, {window});
   const buttons = {};
   const card = {
@@ -100,7 +123,7 @@ function loadMarking() {
     querySelector: sel => { const m = /data-pts="(\d+)"/.exec(sel); return m ? buttons[m[1]] : null; },
   };
   const ctx = {
-    B3PosukGradingQueue: window.B3PosukGradingQueue, B3SubmissionOpenCore: {isPosukOpen: () => true}, B3PrivateMedia: {attach() {}},
+    window, B3PosukGradingQueue: window.B3PosukGradingQueue, B3SubmissionOpenCore: {isPosukOpen: () => true}, B3PrivateMedia: {attach() {}},
     studentsMap: {}, teacherAccess: {role: "teacher"}, POSUK_GOLD_POINTS: 10, console, setTimeout, clearTimeout, Promise,
     document: {
       getElementById: el, activeElement: null, querySelectorAll: () => [], addEventListener() {},
@@ -125,7 +148,7 @@ function loadMarking() {
     ],
     roster: {a: {name: "Fictional Aaron", classId: "et"}, b: {name: "Fictional Ben", classId: "wt"}}, scope: ["et", "wt"], openConfigs: {},
   };
-  vm.runInContext("gradeData = __d; gradeView.range='all'; gradeView.status='pending'", ctx);
+  vm.runInContext("gradeData = __d; gradeView.range='all'; gradeView.sid=''", ctx);
   // each render makes a fresh card whose number buttons record the pick and mark the recording graded, like the real save does
   const origRender = vm.runInContext("renderMarking", ctx);
   return {ctx, els, el, card, buttons};

@@ -12,6 +12,7 @@
 html,body{margin:0;min-height:100%;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
 .top{max-width:980px;margin:0 auto;padding:18px 12px 10px}
 .back{display:inline-block;margin-bottom:12px;color:var(--accent);font-weight:700;text-decoration:none}
+.back[hidden]{display:none}
 .back:hover,.back:focus{text-decoration:underline}
 h1{margin:0 0 6px;font-size:30px;color:#15315b}
 .intro{margin:0;color:var(--muted);line-height:1.5}
@@ -24,11 +25,13 @@ h1{margin:0 0 6px;font-size:30px;color:#15315b}
      The meter itself (panel.js) is shown just below <main>. Sound stays on this computer. -->
 <main class="top">
   <a class="back" href="../index.html">← Back to Learning Island</a>
+  <a class="back teacher-only" id="teacherReport" href="teacher.html" hidden style="margin-left:14px">📊 Teacher report</a>
   <h1>🔥 My Chayus Meter</h1>
   <p class="intro">Turn it on while you daven. It counts the time your voice is heard, and you move up 10 levels, earning a point for each level. Your voice stays on this computer.</p>
 </main>
 <script defer src="../chayus-meter/core.js?v=20261125-chayus3"></script>
 <script defer src="../chayus-meter/points.js?v=20261125-chayus3"></script>
 <script defer src="../chayus-meter/panel.js?v=20261125-chayus3"></script>
+<script defer src="../chayus-meter/teacher-link.js?v=20261127-trlink"></script>
 </body>
 </html>

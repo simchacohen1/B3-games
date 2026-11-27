@@ -106,6 +106,10 @@ main:has([data-view="tool-access-overview"]:not(.hidden)){max-width:1400px}
 .access-overview-bulk button,.access-overview-undo button{padding:8px 12px;border-radius:9px;border:1px solid #94a3b8;background:#fff;font:inherit;font-weight:700;cursor:pointer}
 .access-overview-bulk button.give{background:#166534;border-color:#166534;color:#fff}
 .access-overview-bulk button.take{background:#b91c1c;border-color:#b91c1c;color:#fff}
+.access-overview-tools{flex:1 1 100%;margin:0;padding:6px 10px;border:1px solid #cbd5e1;border-radius:9px;background:#fff}
+.access-overview-tools legend{font-weight:700;padding:0 4px}
+.access-overview-tools label{display:inline-flex;align-items:center;gap:5px;margin:3px 14px 3px 0;cursor:pointer}
+.access-overview-tools label.all{font-weight:700}
 .access-overview-bulk button:disabled{opacity:.45;cursor:not-allowed}
 .access-overview-undo{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #86efac;color:#14532d;font-weight:700}
 .access-overview-undo[hidden],.access-overview-bulk[hidden]{display:none}
@@ -279,10 +283,13 @@ main:has([data-view="roster"]:not(.hidden)){max-width:1180px}
   <button id="toolAccessDownload" type="button" disabled>Download CSV</button>
 </div>
 <div class="access-overview-bulk" id="toolAccessBulk">
-  <button type="button" id="toolAccessSelectAll">Select all shown</button>
+  <button type="button" id="toolAccessSelectAll">Select all teachers</button>
   <button type="button" id="toolAccessClearSel">Clear selection</button>
   <span id="toolAccessSelCount" role="status">0 selected</span>
-  <select id="toolAccessTool" aria-label="Tool to change"><option value="">Choose a tool…</option></select>
+  <fieldset class="access-overview-tools" id="toolAccessTools"><legend>Tools to change</legend>
+   <label class="all"><input type="checkbox" id="toolAccessToolsAll"> Select all tools</label>
+   <span id="toolAccessToolList"></span>
+  </fieldset>
   <button type="button" id="toolAccessGive" class="give" disabled>Give to selected</button>
   <button type="button" id="toolAccessRemove" class="take" disabled>Remove from selected</button>
 </div>
@@ -1479,23 +1486,27 @@ function renderToolAccessOverview(){
   return {items,sharedWith:[...sharedWith],teachersChanged:[...teachersChanged]};
  }
  function describe(p,tool,give,teacherIds){
-  const word=give?"Give":"Remove",prep=give?"to":"from";
+  const word=give?"Give":"Remove",prep=give?"to":"from",tools=[].concat(tool);
   if(!p.items.length)return null;
   const who=teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teacher"+(p.teachersChanged.length===1?"":"s");
-  let text=word+" "+toolName(tool)+" "+prep+" "+who+"?\n\nThis changes "+p.items.length+" class"+(p.items.length===1?"":"es")+": "+p.items.map(i=>bulkClassName(i.classId)).join(", ")+".";
+  const what=tools.length===1?toolName(tools[0]):tools.length+" tools";
+  let text=word+" "+what+" "+prep+" "+who+"?"+(tools.length>1?"\n\n"+tools.map(toolName).join(", ")+".":"")+"\n\nThis makes "+p.items.length+" change"+(p.items.length===1?"":"s")+" in "+new Set(p.items.map(i=>i.classId)).size+" class"+(new Set(p.items.map(i=>i.classId)).size===1?"":"es")+": "+[...new Set(p.items.map(i=>bulkClassName(i.classId)))].join(", ")+".";
   if(p.sharedWith.length)text+="\n\nThose classes are also used by "+p.sharedWith.length+" other teacher"+(p.sharedWith.length===1?"":"s")+" ("+p.sharedWith.map(teacherName).join(", ")+"), who "+(give?"get":"lose")+" it too.";
   return text;
  }
  async function apply(teacherIds,tool,give){
   if(!isOwner(auth.currentUser)){q("status").textContent="Only the owner can change tool access.";return}
-  const p=plan(teacherIds,tool,give),message=describe(p,tool,give,teacherIds);
-  if(!message){q("status").textContent=toolName(tool)+" is already "+(give?"given":"removed")+" for "+(teacherIds.length===1?teacherName(teacherIds[0]):"the selected teachers")+".";return}
+  const tools=[].concat(tool);if(!tools.length||!teacherIds.length)return;
+  const parts=tools.map(t=>plan(teacherIds,t,give));
+  const p={items:parts.flatMap(x=>x.items),sharedWith:[...new Set(parts.flatMap(x=>x.sharedWith))],teachersChanged:[...new Set(parts.flatMap(x=>x.teachersChanged))]};
+  const message=describe(p,tools,give,teacherIds);
+  if(!message){q("status").textContent=(tools.length===1?toolName(tools[0]):"These tools")+" "+(tools.length===1?"is":"are")+" already "+(give?"given":"removed")+" for "+(teacherIds.length===1?teacherName(teacherIds[0]):"the selected teachers")+".";return}
   if(!confirm(message))return;
   const updates={};
   for(const i of p.items)updates["b3Games/workspaces/"+WS+"/classes/"+i.classId+"/toolGrants/"+i.tool]=i.next;
   try{await db.ref().update(updates)}catch(error){console.error(error);q("status").textContent="Could not save. Nothing was changed.";return}
   for(const i of p.items){classData[i.classId].toolGrants=Object.assign({},classData[i.classId].toolGrants,{[i.tool]:i.next})}
-  toolAccessLastChange={text:(give?"Gave ":"Removed ")+toolName(tool)+(give?" to ":" from ")+(teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teachers")+" ("+p.items.length+" class"+(p.items.length===1?"":"es")+").",items:p.items};
+  toolAccessLastChange={text:(give?"Gave ":"Removed ")+(tools.length===1?toolName(tools[0]):tools.length+" tools")+(give?" to ":" from ")+(teacherIds.length===1?teacherName(teacherIds[0]):p.teachersChanged.length+" teachers")+" ("+p.items.length+" change"+(p.items.length===1?"":"s")+").",items:p.items};
   q("status").textContent="Saved ✓";
   renderToolAccessOverview();
  }
@@ -1508,9 +1519,13 @@ function renderToolAccessOverview(){
   toolAccessLastChange=null;q("status").textContent="Undone ✓";
   renderToolAccessOverview();
  }
+ const pickedTools=()=>[...document.querySelectorAll("#toolAccessToolList [data-tool-pick]:checked")].map(b=>b.dataset.toolPick);
  window.updateToolAccessBulk=function(){
-  const n=toolAccessSelected.size,tool=q("toolAccessTool").value,sel=q("toolAccessTool");
-  if(sel.options.length<2)PLATFORM_TOOLS.forEach(([id,name])=>sel.add(new Option(name,id)));
+  const n=toolAccessSelected.size,list=q("toolAccessToolList");
+  if(!list.children.length)list.innerHTML=PLATFORM_TOOLS.map(([id,name])=>'<label><input type="checkbox" data-tool-pick="'+safe(id)+'"> '+safe(name)+'</label>').join("");
+  const picked=pickedTools(),total=PLATFORM_TOOLS.length,all=q("toolAccessToolsAll");
+  all.checked=picked.length===total;all.indeterminate=picked.length>0&&picked.length<total;
+  const tool=picked.length;
   q("toolAccessSelCount").textContent=n+(n===1?" teacher selected":" teachers selected");
   q("toolAccessGive").disabled=!(n&&tool);q("toolAccessRemove").disabled=!(n&&tool);
   q("toolAccessClearSel").disabled=!n;
@@ -1518,9 +1533,12 @@ function renderToolAccessOverview(){
  };
  q("toolAccessSelectAll").onclick=()=>{toolAccessIds.forEach(id=>toolAccessSelected.add(id));renderToolAccessOverview()};
  q("toolAccessClearSel").onclick=()=>{toolAccessSelected.clear();renderToolAccessOverview()};
- q("toolAccessTool").onchange=updateToolAccessBulk;
- q("toolAccessGive").onclick=()=>apply([...toolAccessSelected],q("toolAccessTool").value,true);
- q("toolAccessRemove").onclick=()=>apply([...toolAccessSelected],q("toolAccessTool").value,false);
+ q("toolAccessTools").addEventListener("change",e=>{
+  if(e.target.id==="toolAccessToolsAll")document.querySelectorAll("#toolAccessToolList [data-tool-pick]").forEach(b=>{b.checked=e.target.checked});
+  updateToolAccessBulk();
+ });
+ q("toolAccessGive").onclick=()=>apply([...toolAccessSelected],pickedTools(),true);
+ q("toolAccessRemove").onclick=()=>apply([...toolAccessSelected],pickedTools(),false);
  q("toolAccessUndo").onclick=undo;
  q("toolAccessRows").addEventListener("change",e=>{
   const box=e.target.closest("[data-pick]");if(!box)return;
@@ -1529,7 +1547,7 @@ function renderToolAccessOverview(){
  });
  q("toolAccessRows").addEventListener("click",e=>{
   const cell=e.target.closest(".tool-cell");if(!cell)return;
-  apply([cell.dataset.teacher],cell.dataset.tool,cell.getAttribute("aria-pressed")!=="true");
+  apply([cell.dataset.teacher],[cell.dataset.tool],cell.getAttribute("aria-pressed")!=="true");
  });
 })();
 q("toolAccessSearch").addEventListener("input",renderToolAccessOverview);

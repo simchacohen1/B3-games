@@ -5,7 +5,9 @@ const rtdb = admin.database();
 
 const teacherClassScope=require("./teacher-class-scope");
 const rewardsStore=require('./rewards-store.cjs');
+const balanceCore=require('./rewards-balance-core.cjs');
 const chayusPoints=require('./chayus-points-core.cjs');
+const shorashimWords=require('./shorashim-words-core.cjs');
 const studentTools=require('./student-tool-policy.js');
 const {authorizePracticeStudent}=require('./student-practice-auth.cjs');
 const rashiCore=require('./rashi-recording-core.cjs');
@@ -137,11 +139,11 @@ async function requireTeacher(req){
     }
     const row=await get('b3Games/workspaces/b3-2026/teachers/'+decoded.uid);
     if(!row||row.active===false)return {ok:false,error:'This teacher account is not active.'};
-    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
+    const actions=['rashi-list-pending','rashi-week-grades','rashi-approve','rashi-reject','rashi-letter-marks','rashi-letter-stats','chayus-class-history','rashi-delete','list-chazara-pending','approve-point-request','reject-point-request','teacher-add-chazara','teacher-delete-chazara','teacher-reject-chazara-recording','teacher-set-recording-full-review','posuk-grade','posuk-delete','posuk-word-marks'];
     if(!actions.includes(req.body?.action))return {ok:false,error:'This action is available only to the owner.'};
     const classIds=Object.keys(row.classIds||{}).filter(id=>id!=='*'&&row.classIds[id]===true);
     const act=String(req.body?.action||'');
-    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':'chazara');
+    const scope=await teacherClassScope.roster(get,{authorized:true,role:'teacher',classIds},classId,act.startsWith('rashi-')?'rashi-letters':act.startsWith('posuk-')?'posuk-practice-scroll':act.startsWith('chayus-')?(['et','wt'].includes(classId)?'chazara':'chayus-meter'):'chazara');
     return {ok:true,email,decoded,owner:false,scope};
   }catch(err){
     console.warn("Teacher token verification failed",err);
@@ -153,6 +155,7 @@ async function authorizeChazaraAction(teacher,body){
  if(!teacher.scope)return;
  const scope=teacher.scope,action=body.action;
  if(action==='list-chazara-pending')return;
+ if(String(action).startsWith('chayus-'))return; // read-only; the handler uses the selected class roster
  if(String(action).startsWith('rashi-'))return; // the Rashi handlers check class scope themselves
  if(action==='posuk-grade'||action==='posuk-delete'||action==='posuk-word-marks')return; // posuk-review-core checks the student against this scope
  if(action==='repair-shorashim-recording'){
@@ -395,7 +398,7 @@ async function rashiPostPoints({requestId,rewardStudentId,studentId,amount,reaso
     const existing=(await ref.get()).val()||{};
     return {ok:true,newlyPosted:false,status:existing.status||'approved'};
   }
-  const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)+amount);
+  const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),amount);
   if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return {ok:false,error:'Could not update the point balance.'};}
   const balanceAfter=Number(bal.snapshot.val()||0);
   await ref.update({status:'approved',actualAmount:amount,balanceAfter,approvedAutomatically:true,reviewedBy:'Rashi Letters',reviewedAt:Date.now()});
@@ -436,7 +439,7 @@ async function rashiLetterMarks(teacher,body){
   let balanceAfter=null;
   if(delta!==0){
     if(!rewardStudentId){await restore('Missing reward student ID');throw Object.assign(new Error('Could not find this student in Student Rewards.'),{code:409});}
-    const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)+delta);
+    const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),delta);
     if(!bal.committed){await restore('Balance update did not commit');throw Object.assign(new Error('Could not update the point balance.'),{code:409});}
     balanceAfter=Number(bal.snapshot.val()||0);
   }
@@ -482,7 +485,7 @@ async function rashiDelete(teacher,body){
   const rewardStudentId=String((lock.snapshot.val()||{}).rewardStudentId||'');
   let takenBack=0;
   if(before.paid>0&&rewardStudentId){
-    const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>Number(cur||0)-before.paid);
+    const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),-before.paid);
     if(!bal.committed){await reqRef.update({status:before.status,reviewStartedAt:null,gradeFromStatus:null,lastError:'Balance update did not commit'});throw Object.assign(new Error('Could not update the point balance.'),{code:409});}
     takenBack=before.paid;
   }
@@ -595,6 +598,9 @@ async function studentPointHistory(studentId){
         classId:item.classId || null,
         rewardId:item.rewardId || null,
         rewardName:item.rewardName || null,
+        modeNames:item.modeNames || null,
+        refundedAt:item.refundedAt || null,
+        refundedAmount:item.refundedAmount ?? null,
         balanceAfter:item.balanceAfter ?? null,
       });
     });
@@ -981,7 +987,7 @@ async function contributeToClassReward(studentId,rewardId,amount,preferredClassI
     createdAt:Date.now(),
     balanceAfter,
   };
-  await contributionRef.set(contribution).catch(err=>console.warn('Could not save class reward contribution history',err));
+  for(let attempt=0;attempt<4;attempt++){try{await contributionRef.set(contribution);break}catch(err){console.error('Could not save class reward contribution history (attempt '+(attempt+1)+')',err,JSON.stringify(contribution));if(attempt<3)await new Promise(r=>setTimeout(r,300*(attempt+1)))}}
 
   const latestRoot=(await rtdb.ref(SR_ROOT).get()).val()||{};
   const latestGoal=classRewardGoalFromRoot(latestRoot,studentId,classId,rewardId);
@@ -1184,18 +1190,14 @@ async function approvePendingRequest(requestId,reviewedBy){
   const amount=Number(item.amount || 0);
   let applied=0;
   const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-  const bal=await balRef.transaction(cur=>{
-    const old=Number(cur || 0);
-    const next=Math.max(0,old+amount);
-    applied=next-old;
-    return next;
-  });
+  const bal=await balanceCore.change(balRef,amount,{clamp:true});
   if(!bal.committed){
     await ref.update({status:"pending",lastError:"Balance update did not commit",reviewStartedAt:null});
     return {ok:false,error:"Could not update the point balance."};
   }
+  applied=bal.applied;
   const balanceAfter=Number(bal.snapshot.val() || 0);
-  await ref.update({status:"approved",actualAmount:applied,balanceAfter,reviewedBy,reviewedAt:Date.now(),lastError:null});
+  await ref.update({status:"approved",actualAmount:applied,balanceAfter,balanceBefore:bal.before,reviewedBy,reviewedAt:Date.now(),lastError:null});
   await mirrorChazaraPointStatus(item,"approved");
   return {ok:true,status:"approved",actualAmount:applied,balanceAfter,studentName:item.studentName || rewardStudentId};
 }
@@ -1220,10 +1222,11 @@ async function awardMilestoneImmediately({requestId,rewardStudentId,studentId,so
   const tx=await ref.transaction(cur=>cur?undefined:seed);
   if(!tx.committed){const existing=(await ref.get()).val()||{};return{ok:true,newlyAwarded:false,requestId,status:existing.status||'approved',amount:Number(existing.actualAmount??existing.amount??amount)}}
   let applied=0;
-  const bal=await rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`).transaction(cur=>{const old=Number(cur||0),next=Math.max(0,old+amount);applied=next-old;return next});
+  const bal=await balanceCore.change(rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`),amount,{clamp:true});
   if(!bal.committed){await ref.update({status:'error',lastError:'Balance update did not commit'});return{ok:false,error:'Could not add the reward points.'}}
+  applied=bal.applied;
   const balanceAfter=Number(bal.snapshot.val()||0);
-  await ref.update({status:'approved',actualAmount:applied,balanceAfter,approvedAutomatically:true,reviewedBy:reviewedBy||'Verified teacher action',reviewedAt:Date.now()});
+  await ref.update({status:'approved',actualAmount:applied,balanceAfter,balanceBefore:bal.before,approvedAutomatically:true,reviewedBy:reviewedBy||'Verified teacher action',reviewedAt:Date.now()});
   return{ok:true,newlyAwarded:true,requestId,status:'approved',amount:applied,balanceAfter};
 }
 
@@ -1263,6 +1266,26 @@ async function chayusMeter(req,res,body,action){
       requestId,rewardStudentId,studentId:practice.studentId,source:chayusPoints.SOURCE,amount:1,
       reason:`Chayus Meter — Level ${level}: ${name}`,
       record:{chayusDay:day,chayusLevel:level},reviewedBy:'Chayus Meter (automatic)'
+    })
+  });
+  return res.status(result.ok?200:(result.status||400)).json(result.ok?result:{error:result.error});
+}
+
+// Shorashim review points: 1 point per 100 words reviewed (review and games together), at most 10 a day
+// (shorashim-words-core.cjs holds the rules). Quick off-switch: studentRewards/settings/shorashimWordPointsEnabled=false.
+async function shorashimWordPoints(req,res,body,action){
+  const practice=await requirePracticeStudent(req,shorashimWords.SOURCE);
+  if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
+  const rewardStudentId=await chayusRewardStudentId(practice.studentId);
+  if(!rewardStudentId)return res.status(404).json({error:'Could not match this student to Student Rewards.'});
+  const enabled=(await rtdb.ref(`${SR_ROOT}/settings/shorashimWordPointsEnabled`).get()).val()!==false;
+  const result=await shorashimWords.report({
+    enabled,store:chayusStore,studentId:practice.studentId,
+    words:action==='shorashim-words-report'?body.words:null,batchId:body.batchId,
+    award:({requestId,point,day})=>awardMilestoneImmediately({
+      requestId,rewardStudentId,studentId:practice.studentId,source:shorashimWords.SOURCE,amount:1,
+      reason:`Shorashim review — ${shorashimWords.WORDS_PER_POINT*point} words today`,
+      record:{shorashimDay:day,shorashimPoint:point},reviewedBy:'Shorashim review (automatic)'
     })
   });
   return res.status(result.ok?200:(result.status||400)).json(result.ok?result:{error:result.error});
@@ -1570,13 +1593,12 @@ async function reverseRecordingPointsForTeacherRejection(studentId,eventId,event
 
   let applied=0;
   const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-  const bal=await balRef.transaction(cur=>{
-    const old=Number(cur||0),next=Math.max(0,old+requested);applied=next-old;return next;
-  });
+  const bal=await balanceCore.change(balRef,requested,{clamp:true});
   if(!bal.committed){
     await reversalRef.update({status:"error",lastError:"Balance reversal did not commit"});
     return {ok:false,error:"Could not remove the linked reward points."};
   }
+  applied=bal.applied;
   const balanceAfter=Number(bal.snapshot.val()||0);
   await reversalRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedAt:Date.now(),lastError:null});
   await eventRef.update({
@@ -1710,13 +1732,12 @@ async function handleRemoval(studentId,eventId){
     }
     let applied=0;
     const balRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
-    const bal=await balRef.transaction(cur=>{
-      const old=Number(cur||0),next=Math.max(0,old+requested);applied=next-old;return next;
-    });
+    const bal=await balanceCore.change(balRef,requested,{clamp:true});
     if(!bal.committed){
       await reversalRef.update({status:"error",lastError:"Balance reversal did not commit"});
       return {ok:false,error:"Could not remove the linked reward points."};
     }
+    applied=bal.applied;
     const balanceAfter=Number(bal.snapshot.val()||0);
     await reversalRef.update({status:"approved",actualAmount:applied,balanceAfter,reviewedAt:Date.now(),lastError:null});
     await eventRef.update({removalPointRequestId:requestId,removalPointRequestStatus:"approved",pointReversedAt:Date.now(),pointReversalAmount:applied});
@@ -1822,6 +1843,7 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json(result);
         }
         if(action==="chayus-report"||action==="chayus-status")return await chayusMeter(req,res,body,action);
+        if(action==="shorashim-words-report"||action==="shorashim-words-status")return await shorashimWordPoints(req,res,body,action);
         if(action==="posuk-submit"){
           const practice=await requirePracticeStudent(req,posukReviewCore.SOURCES.submit);
           if(!practice.ok)return res.status(practice.status||401).json({error:practice.error});
@@ -1859,6 +1881,12 @@ exports.studentRewardsAutoAward = onRequest(
           return res.status(200).json(result);
         }
         await authorizeChazaraAction(teacher,body);
+        if(action==="chayus-class-history"){
+          // Read only: each student's recorded Chayus Meter days (level, counted minutes, points) for the selected class.
+          if(!teacher.scope||!teacher.scope.selected)return res.status(400).json({error:'Choose a class.'});
+          const history=await chayusPoints.classHistory({get:async p=>(await rtdb.ref(p).get()).val(),students:teacher.scope.students,days:body.days,nowMs:Date.now()});
+          return res.status(200).json({ok:true,classId:teacher.scope.selected,...history});
+        }
         if(action==="read-rewards-data"){
           const data=await readStudentRewardsData(body.classId||"all");
           return res.status(200).json({ok:true,...data});

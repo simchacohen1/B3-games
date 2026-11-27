@@ -125,7 +125,7 @@
     boardStage.style.cssText='position:fixed;inset:0;z-index:2147483636;display:none;background:#e8eef7';
     document.body.append(boardStage);
     const boardCss=document.createElement('link');boardCss.rel='stylesheet';
-    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261124-pages1',root).href;
+    boardCss.href=new URL('class-pointer-prototype/student-boards.css?v=20261127-sel1',root).href;
     document.head.append(boardCss);
     window.ClassPointerBridge={isTeacher:false,embedded:true,embeddedStage:boardStage,
       sendTeacher:message=>{
@@ -136,12 +136,12 @@
     // Shared drawing toolbar: shown only while this student shares his screen or has his whiteboard open.
     // The whiteboard's fonts (a student sees the teacher's words in the font the teacher chose).
     await load(new URL('class-pointer-prototype/classroom-core.js?v=hlshapes2',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261125-wb3',root).href).catch(()=>{});
+    await load(new URL('class-pointer-prototype/annotation-toolbar.js?v=20261127-sel1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/poll-core.js?v=2',root).href);
     await load(new URL('class-pointer-prototype/poll.js?v=2',root).href);
     await load(new URL('class-pointer-prototype/board-tiles-core.js?v=20261123-tiles2',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/board-pages-core.js?v=20261124-pages1',root).href).catch(()=>{});
-    await load(new URL('class-pointer-prototype/student-boards.js?v=20261125-wb3',root).href);
+    await load(new URL('class-pointer-prototype/student-boards.js?v=20261127-sel1',root).href);
     // Save and My files for the student's own whiteboard.
     await load(new URL('class-pointer-prototype/saved-work-core.js?v=20261124-pages1',root).href).catch(()=>{});
     await load(new URL('class-pointer-prototype/saved-work.js?v=20261125-wb3',root).href).catch(()=>{});
@@ -822,7 +822,7 @@
     function refreshPresentationLock(){
       back.hidden=followingPresentation();
       back.textContent=presentationView?'Back to Fun Torah Tools':'Back to Activity';
-      if(followingPresentation() && lessonActive){lessonOverlay.style.display='flex';reopen.style.display='none'}
+      if(followingPresentation() && lessonActive && !(idleOffer&&(smallMode||idleDismissed))){lessonOverlay.style.display='flex';reopen.style.display='none'}
     }
     window.addEventListener('ftt:follow-activity-changed',refreshPresentationLock);
     window.addEventListener('ftt:follow-policy-changed',refreshPresentationLock);
@@ -835,6 +835,39 @@
     function closeLessonCall(){cancelLater(lessonReceiveTimer);lessonReceiveTimer=null;const old=lessonCall;lessonCall=null;try{old?.close()}catch{}lessonVideo.srcObject=null;syncWaiting()}
     // ---------- What the student sees when there is no picture, and the connection sign ----------
     let connState='ok',rtt=0,lastPong=0,pingTimer=null,waitTimer=null,connPill=null;
+    // ---------- The teacher may have left the share on ----------
+    // While the teacher is actively sharing, the picture stays in front (locked, as before). When the teacher's own
+    // check says it may have been left on (lesson.shareMayBeLeftOn), the student is offered two buttons: shrink it into a
+    // small corner window, or close it. He stays in his class; the next thing the teacher pushes opens again by itself.
+    let idleOffer=false,smallMode=false,idleDismissed=false;
+    const idleBtnCss='padding:10px 14px;border:0;border-radius:9px;font:inherit;cursor:pointer';
+    const shrinkBtn=document.createElement('button');shrinkBtn.type='button';shrinkBtn.id='fttShrinkTeacherShare';shrinkBtn.hidden=true;shrinkBtn.style.cssText=idleBtnCss+';background:#fef08a;color:#102748';
+    const closeShareBtn=document.createElement('button');closeShareBtn.type='button';closeShareBtn.id='fttCloseTeacherShare';closeShareBtn.hidden=true;closeShareBtn.textContent='Close';closeShareBtn.style.cssText=idleBtnCss+';background:white;color:#102748';
+    lessonToolbar.append(shrinkBtn,closeShareBtn);
+    function syncIdleButtons(){shrinkBtn.hidden=!idleOffer;closeShareBtn.hidden=!idleOffer;shrinkBtn.textContent=smallMode?'Make it big':'Make it small'}
+    function applySmall(on){
+      smallMode=on;const s=lessonOverlay.style;
+      if(on){
+        s.inset='auto';s.right='14px';s.bottom='14px';s.width='min(340px,70vw)';s.height='240px';s.borderRadius='14px';s.boxShadow='0 8px 28px #0008';s.overflow='hidden';
+        drawTools.style.display='none';lessonStatus.style.display='none';hitLayer.style.pointerEvents='none';
+      }else{
+        s.inset='0';s.right='';s.bottom='';s.width='';s.height='';s.borderRadius='';s.boxShadow='';s.overflow='';
+        drawTools.style.display='flex';lessonStatus.style.display='';redrawToolbar();
+      }
+      syncIdleButtons();
+    }
+    function setShareIdleOffer(flag){
+      const on=flag===true;if(on===idleOffer)return;
+      idleOffer=on;
+      // The teacher kept sharing or pushed something new: the picture is in front again, as while actively sharing.
+      if(!on){idleDismissed=false;if(smallMode)applySmall(false)}
+      syncIdleButtons();
+    }
+    shrinkBtn.addEventListener('click',()=>{idleDismissed=true;applySmall(!smallMode)});
+    closeShareBtn.addEventListener('click',()=>{
+      idleDismissed=true;userClosed=true;applySmall(false);
+      lessonOverlay.style.display='none';reopen.style.display=lessonActive?'block':'none';
+    });
     let overlayShownAt=0,playBlocked=false,userClosed=false;   // userClosed: the student pressed Back to Activity himself
     // Read only, for checking the sign from a test or the console.
     window.FTTConnectionSign={state:()=>({sign:connState,rtt,sinceLastAnswerMs:Date.now()-lastPong})};
@@ -951,7 +984,7 @@
       refreshPresentationLock();
       if(!admitted||typeof message.id!=='string'||!message.id||message.id.length>120||typeof message.active!=='boolean')return;
       if(!message.active){if(message.id===lessonId){lessonActive=false;setPresenting(false);cancelLater(lessonRetryTimer);lessonRetryTimer=null;cancelLater(pendingLessonTimer);const waiting=pendingLessonCall;pendingLessonCall=null;try{waiting?.close()}catch{}closeLessonCall();lessonOverlay.style.display='none';reopen.style.display='none'}return}
-      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;setPresenting(true);userClosed=false;lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
+      if(lessonId!==message.id||!lessonActive){closeLessonCall();lessonId=message.id;lessonActive=true;setPresenting(true);userClosed=false;idleDismissed=false;if(smallMode)applySmall(false);lessonRetries=0;cancelLater(lessonRetryTimer);lessonRetryTimer=null;lessonReceiveTimer=later(retryLesson,15000);lessonStatus.textContent='Connecting to your teacher…';lessonOverlay.style.display='flex';watchWaiting();reopen.style.display='none'}
       if(pendingLessonCall?.metadata?.presentationId===lessonId){const waiting=pendingLessonCall;pendingLessonCall=null;cancelLater(pendingLessonTimer);acceptLesson(waiting)}
     }
     function stopPresence(){
@@ -1035,7 +1068,7 @@
       // The sharing tab never joins the class itself; the student's own tab does that.
       if(persistentShareWindow)return;
       if(!next){presenceTarget='';presenceDelay=0;stopPresence();return}
-      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;schedulePresence(400)}
+      if(next.roomId!==presenceTarget){presenceTarget=next.roomId;presenceDelay=0;presenceFailures=0;admitted=false;classLink('wait','Your teacher’s class moved to a new lesson. Joining it…');schedulePresence(400)}
     }
     window.addEventListener('pagehide',stopPresence);
     // The teacher locked Class Pointer for this class (Locks panel): leave the lesson and stop sharing at once. When it opens
@@ -1203,7 +1236,7 @@
     function current(rows){
       return Object.entries(rows||{}).filter(([key,v])=>v&&v.roomId===key&&/^class-pointer-[a-f0-9-]{36}$/.test(key)
         &&Number.isFinite(v.createdAt)&&Date.now()-v.createdAt<14400000&&Date.now()-v.createdAt>=-60000&&!teacherGone(v))
-        .sort((a,b)=>b[1].createdAt-a[1].createdAt||(a[0]<b[0]?1:-1))[0]?.[1]||null;
+        .sort((a,b)=>((b[1].leadTeacher!==false)-(a[1].leadTeacher!==false))||b[1].createdAt-a[1].createdAt||(a[0]<b[0]?1:-1))[0]?.[1]||null;
     }
     // No database event arrives when the grace period runs out, so look again at that moment.
     function watchGrace(next){
@@ -1230,6 +1263,7 @@
       try{const liveClass=next?(next.__classId||classId):'';if((window.ClassPointerLiveClass||'')!==liveClass){window.ClassPointerLiveClass=liveClass;window.dispatchEvent(new Event('b3:live-class'))}}catch{}
       watchGrace(next);
       latestSession=next;
+      try{setShareIdleOffer(next?.shareMayBeLeftOn===true)}catch{}
       if(!next)classLink('wait',lastRows&&Object.keys(lastRows).length?'No open lesson right now (the last one is old or ended). Waiting for your teacher.':'Waiting for your teacher to open Class Pointer for your class ('+classId+').');
       else if(!admitted)classLink('wait','Found your teacher’s lesson. Connecting…');
       followSession(next);
@@ -1239,7 +1273,8 @@
     // Say which, instead of showing a scary error to every student of a class that simply does not use Class Pointer.
     function explainRefusal(error,forClass){
       const code=error?.code||error?.message||'database refused';
-      if(!/permission_denied/i.test(String(code))){classLink('bad','Can’t connect – your class’s lesson list could not be read ('+code+'). Retrying.');return}
+      const denied=/permission_denied/i.test(String(code));
+      if(!denied){classLink('bad','Can’t connect – your class’s lesson list could not be read ('+code+'). Retrying.');return}
       const generic=()=>{if(forClass===classId)classLink('bad','Can’t connect – the lesson list is blocked for your sign-in (PERMISSION_DENIED). Either Class Pointer is not turned on for your class ('+forClass+'), or you are signed in for a different class. Sign out and sign in again, or tell your teacher.')};
       try{
         firebase.database().ref('b3Games/workspaces/'+ws+'/classes/'+forClass+'/toolGrants/class-pointer').once('value').then(snapshot=>{

@@ -31,7 +31,7 @@ const newContext=(overrides={})=>{
     splitKey:key=>key.split(':'),
     ...overrides
   });
-  ['bookletCatalog','chumashCatalog','getItem','visibleCatalog','learningCatalog','nextLearningUncreated','unitKeyOf','unitLabels','studentUnits','currentLearningUnit'].forEach(name=>vm.runInContext(fn(name),ctx));
+  ['bookletCatalog','chumashCatalog','chumashExtra','getItem','visibleCatalog','learningCatalog','nextLearningUncreated','unitKeyOf','unitLabels','studentUnits','currentLearningUnit'].forEach(name=>vm.runInContext(fn(name),ctx));
   return {ctx,s};
 };
 
@@ -92,10 +92,10 @@ test('unit choices are generated, booklet tile, week dropdown, source load order
   assert.match(html,/id="bookletWeekSelect"/);
   for(let n=1;n<=30;n++)assert.match(html,new RegExp('<option value="'+n+'">Week '+n+'</option>'));
   assert.match(html,/data-review-perek="booklet"/);
-  assert.match(html,/Change List/);
+  assert.match(html,/Switch list/);
   assert.ok(html.indexOf('app.js?v=')>0&&html.indexOf('booklet-3rd-grade.js?v=')<html.indexOf('app.js?v='));
   assert.ok(appBuildDate()>=20261019,'app.js cache-bust label must be on or after the booklet release');
-  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261126-chumash1'));
+  assert.ok(teacherHtml.indexOf('booklet-3rd-grade.js?v=')<teacherHtml.indexOf('teacher.js?v=20261127-block-all2'));
   assert.match(review,/reviewPerekFilter === 'booklet'/);
   assert.match(teacher,/window\.FTT_BOOKLET_SHORASHIM\.find/);
   assert.doesNotMatch(app,/\`\$\{learningPerek/);

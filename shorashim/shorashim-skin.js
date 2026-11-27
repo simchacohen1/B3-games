@@ -38,11 +38,34 @@
     h1.innerHTML = LOGO + '<span class="sk-words"><span>Shorashim</span><span>Learning Lab</span></span>';
   }
 
+  /* Top tracker: two numbers for the signed-in student.
+     Learned  = words where a picture was drawn or saved (the card has been learned).
+     Mastered = words with Learned + Tracing + Multiple choice + Matching done (mastery tracking).
+     Read-only: nothing here writes progress. */
+  var trk = { at: 0, timer: 0, learned: -1, mastered: -1 };
+  function trackerCounts() {
+    var M = window.ShorashimMastery;
+    if (!M || typeof student !== "function" || typeof visibleCatalog !== "function") return null;
+    var s = student();
+    if (!s) return null;
+    var seen = {}, items = [];
+    function add(key, it) {
+      if (!it || seen[key]) return;
+      seen[key] = 1;
+      items.push({ key: key, track: "shorashim", front: it.front || "", english: it.english || "" });
+    }
+    visibleCatalog("shorashim").forEach(function (it) { add("shorashim:" + it.id, it); });
+    if (typeof chumashExtra === "function") chumashExtra().forEach(function (it) { add("shorashim:" + it.id, it); });
+    Object.keys(s.cards || {}).concat(Object.keys(s.practice || {})).forEach(function (k) {
+      if (k.indexOf("shorashim:") === 0 && !seen[k] && typeof getItem === "function") add(k, getItem(k));
+    });
+    var sum = M.summarizeStudent(s, M.groupWords(items));
+    return { learned: sum.stages.learned, mastered: sum.mastered };
+  }
+
   function progressPill() {
     var actions = document.querySelector(".topbar-actions");
-    var src = document.getElementById("availableCount");
-    if (!actions || !src) return;
-
+    if (!actions) return;
     var pill = actions.querySelector(".sk-progress");
     if (!pill) {
       pill = document.createElement("div");
@@ -50,24 +73,22 @@
       pill.hidden = true;
       pill.innerHTML =
         '<span class="sk-trophy" aria-hidden="true">🏆</span>' +
-        '<div class="sk-count"><b>0 / 0</b><small>LEARNED</small></div>' +
-        '<div class="sk-bar"><i></i></div>' +
-        '<span class="sk-pct">0%</span>';
+        '<div class="sk-count" data-kind="learned"><b>0</b><small>LEARNED</small></div>' +
+        '<div class="sk-count" data-kind="mastered"><b>0</b><small>MASTERED</small></div>';
       actions.insertBefore(pill, actions.firstChild);
     }
-
-    var m = String(src.textContent || "").match(/(\d+)\s*\/\s*(\d+)/);
-    if (!m) { pill.hidden = true; return; }
-    var done = +m[1], total = +m[2];
-    var pct = total ? Math.round((done / total) * 100) : 0;
-    pill.hidden = false;
-    setText(pill.querySelector(".sk-count b"), done + " / " + total);
-    setText(pill.querySelector(".sk-pct"), pct + "%");
-    var bar = pill.querySelector(".sk-bar i");
-    if (bar) {
-      var w = Math.max(pct, done ? 4 : 0) + "%";
-      if (bar.style.width !== w) bar.style.width = w;
+    // Working this out is a bit heavy, so do it at most twice a second.
+    var wait = 500 - (Date.now() - trk.at);
+    if (wait > 0) {
+      if (!trk.timer) trk.timer = setTimeout(function () { trk.timer = 0; progressPill(); }, wait);
+      return;
     }
+    trk.at = Date.now();
+    var c = trackerCounts();
+    if (!c) { pill.hidden = true; return; }
+    pill.hidden = false;
+    setText(pill.querySelector('[data-kind="learned"] b'), String(c.learned));
+    setText(pill.querySelector('[data-kind="mastered"] b'), String(c.mastered));
   }
 
   function friendlyLabels() {

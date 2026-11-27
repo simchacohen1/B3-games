@@ -15,6 +15,7 @@ const rtdb = admin.database();
 const SR_ROOT = 'studentRewards';
 const PRESENCE_ROOT = 'b3Games/classGalleryPresence';
 const TAG_ENABLED_PATH = 'b3Games/classGalleryPresenceSettings/tagEnabled';
+const balanceCore = require('./rewards-balance-core.cjs');
 const SPEND_CAP = 12;
 const GLOBAL_COOLDOWN_MS = 4000;
 
@@ -272,11 +273,7 @@ exports.classGalleryPowerPurchase=onRequest(
 
       const balanceRef=rtdb.ref(`${SR_ROOT}/students/${rewardStudentId}/rewardBalance`);
       let insufficient=false;
-      const balanceTx=await balanceRef.transaction(cur=>{
-        const balance=num(cur);
-        if(balance<power.cost){insufficient=true;return;}
-        return balance-power.cost;
-      });
+      const balanceTx=await balanceCore.change(balanceRef,-power.cost,{guard:balance=>{insufficient=balance<power.cost;return !insufficient;}});
       if(!balanceTx.committed){
         await rollbackSpend(spendRef,purchaseId,power.cost);
         return res.status(409).json({error:insufficient?'You do not have enough points for that power.':'Could not update your point balance.'});
@@ -289,7 +286,7 @@ exports.classGalleryPowerPurchase=onRequest(
         await writePurchaseHistory({purchaseId,powerId,power,rewardStudentId,b3StudentId,studentName:identity.studentName,balanceAfter,spent,now,targetStudentId:effectResult.targetStudentId||targetStudentId});
       }catch(err){
         console.error('Could not apply Tag power after charge',err);
-        await balanceRef.transaction(cur=>num(cur)+power.cost).catch(()=>{});
+        await balanceCore.change(balanceRef,power.cost).catch(()=>{});
         await rollbackSpend(spendRef,purchaseId,power.cost);
         return res.status(409).json({error:err?.message||'Could not activate that power. Your points were returned.'});
       }

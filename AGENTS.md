@@ -47,6 +47,7 @@ If GitHub is unavailable, say that the overlap check could not be completed.
   branch with current main, so staging always matches live plus the new change.
   Never deploy an old branch to staging.
 - Keep staging-only settings (Storage rules, CORS, test accounts) in place.
+- Sessions may always read `staging/test-credentials.local.json` (fictional staging accounts only) to run staging tests. Never use it for real accounts, and never commit or post its values.
 - Every session that deploys for testing must use its own Firebase Hosting
   preview channel on `fun-torah-tools-staging`, named after its branch (for
   example `firebase hosting:channel:deploy <branch-name> --project fun-torah-tools-staging`,

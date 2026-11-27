@@ -83,7 +83,7 @@ function ensurePerekUnitsAnd19(){
   const list=state.catalog.shorashim=Array.isArray(state.catalog.shorashim)?state.catalog.shorashim:[];
   let tagged=0;
   for(const item of list){
-    if(!item.perek){
+    if(!item.perek&&!/^chumash-vocab-l\d/.test(String(item.id||''))){
       item.perek=String(item.id||'').startsWith('19-')?19:18;
       tagged++;
     }
@@ -107,6 +107,14 @@ teacherArtStyle.textContent=`
 .teacher-art-preview{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .teacher-art-chip{font-size:28px;line-height:1;border:1px solid #d7dbea;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer}
 .teacher-art-chip:hover{background:#fff3f3;border-color:#e39b9b}
+.picture-grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
+.picture-cell{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid #d7dbea;background:#fff;border-radius:10px;padding:6px 8px}
+.picture-emoji{font-size:30px;line-height:1.1}
+.picture-img{width:34px;height:34px;object-fit:contain}
+.picture-btn{padding:2px 7px;font-size:11px;border-radius:8px;font-weight:700}
+.picture-cell{gap:3px;padding:4px 6px}
+.picture-count{font-size:1.1rem;font-weight:800;margin:4px 0}
+.picture-group{margin:12px 0 2px}
 `;
 document.head.appendChild(teacherArtStyle);
 const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -127,9 +135,12 @@ const UNSUITABLE_ART_CHOICES=new Set([
   '👩‍👦','👩‍👧','👩‍👧‍👦','👩‍👦‍👦','👩‍👧‍👧','👨‍👧','👨‍👧‍👦'
 ]);
 
+// Pictures the teacher blocked (settings.blockedArt). A blocked picture is never offered again.
+function blockedArtList(){const b=(typeof state!=='undefined'&&state&&state.settings&&state.settings.blockedArt);return Array.isArray(b)?b:b&&typeof b==='object'?Object.values(b):[];}
 function isClassSafeArtChoice(value){
   const v=String(value||'').trim();
   if(!v) return false;
+  if(blockedArtList().includes(v)) return false;
   if(UNSUITABLE_ART_CHOICES.has(v)) return false;
 
   // A simple boy/child icon is useful for literal vocabulary such as נַעַר.
@@ -437,7 +448,9 @@ async function fillArtForShorashim(items,{onProgress=()=>{},useAI=false}={}){
     const pool=sanitizeSuggestionPool([...(ai.get(String(item.id))||[]),...smartArtCandidatesFor(item.english,item.front)]);
     const art=sanitizeClassArt(pool);
     if(art.length){
-      item.art=art; item.artPool=pool; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
+      // Automatic pictures go straight to students (blocked pictures are already filtered out).
+      // Pictures a teacher already selected are never touched here.
+      item.art=art; item.artPool=pool; delete item.pendingArt; item.autoArt=false; item.aiArtGenerated=ai.has(String(item.id));
       item.aiArtGeneratedAt=Date.now(); changed++;
     }else item.autoArt=true;
   }
@@ -459,6 +472,12 @@ function mergeCatalogWithoutReplacingPictures(current,local){
     const existing=list[index.get(id)];
     if(existing&&!existing.perek&&candidate.perek)existing.perek=candidate.perek;
     const art=sanitizeClassArt(candidate.art);
+    // The per-word "waiting for approval" step is off: pictures waiting from before go to students.
+    if(existing&&existing.pendingArt){
+      const waiting=sanitizeClassArt(existing.pendingArt);
+      if(!sanitizeClassArt(existing.art).length&&waiting.length){existing.art=waiting;existing.autoArt=false;}
+      delete existing.pendingArt;
+    }
     if(existing&&!sanitizeClassArt(existing.art).length&&art.length){
       existing.art=art; existing.autoArt=false; existing.aiArtGenerated=!!candidate.aiArtGenerated;
       existing.aiArtGeneratedAt=candidate.aiArtGeneratedAt||timestamp;
@@ -468,6 +487,101 @@ function mergeCatalogWithoutReplacingPictures(current,local){
   return next;
 }
 
+// Chumash Vocab Level 1/2/3 (shorashim/chumash-vocab.js) are copied into the class catalog once,
+// with the SAME word ids, so student progress saved under shorashim:chumash-vocab-lN-NNN carries
+// over. The version flag lives in Firebase, so a word the teacher deletes later stays deleted.
+const CHUMASH_VOCAB_SEED_VERSION=1;
+function ensureChumashVocabLists(){
+  if(legacyScoped()||Number(state.settings.chumashVocabSeedVersion||0)>=CHUMASH_VOCAB_SEED_VERSION)return[];
+  const source=Array.isArray(window.FTT_CHUMASH_VOCAB)?window.FTT_CHUMASH_VOCAB:[];
+  const list=state.catalog.shorashim=Array.isArray(state.catalog.shorashim)?state.catalog.shorashim:[];
+  const have=new Set(list.map(i=>String(i&&i.id)));
+  const added=[];
+  for(const w of source){
+    if(!w||have.has(String(w.id)))continue;
+    const item={id:w.id,front:w.front,english:w.english,hebrew:w.front,listName:w.listName,art:[],artPool:[],hidden:false,source:w.source};
+    list.push(item);added.push(item);
+  }
+  return added;
+}
+/* ===== Blocked pictures: one simple list for the whole class ===== */
+const blockedSettingsPath=()=>`${teacherSettingsPath()}/blockedArt`;
+// Every picture a student can see on any word (any track/list), once each, in first-seen order:
+// emojis, uploaded/drawn/AI pictures, built-in drawings, and each word's suggested pictures.
+function usedPictureList(){
+  const seen=new Set(),out=[];
+  const add=a=>{for(const v of (Array.isArray(a)?a:(a&&typeof a==='object'?Object.values(a):[]))){const x=String(v||'').trim();if(x&&!seen.has(x)&&isClassSafeArtChoice(x)){seen.add(x);out.push(x);}}};
+  const take=i=>{if(i){add(i.art);add(i.artPool);add(i.pendingArt);}};
+  for(const t of Object.keys(state.catalog||{}))for(const i of (Array.isArray(state.catalog[t])?state.catalog[t]:[]))take(i);
+  for(const l of [window.FTT_BOOKLET_SHORASHIM,window.FTT_CHUMASH_VOCAB])for(const i of (Array.isArray(l)?l:[]))take(i);
+  const bi=window.FTT_BUILTIN_PICTURES;if(bi)add(bi.allBuiltIn().map(p=>p.key));
+  return out;
+}
+const PICTURE_GROUPS=['Animals','People','Food','Nature','Objects','Places','Symbols','Uploaded / Drawn / AI pictures'];
+function pictureGroupOf(v){
+  if(/^(data:|https?:|builtin:)/.test(v))return PICTURE_GROUPS[7];
+  const has=re=>re.test(v);
+  if(has(/[\u{1F600}-\u{1F644}\u{1F466}-\u{1F487}\u{1F440}-\u{1F465}\u{1F645}-\u{1F64F}\u{1F90C}-\u{1F93E}\u{1F9B0}-\u{1F9B3}\u{1F9D0}-\u{1F9DF}\u{1F4AA}\u{1F5E3}\u261D\u270A-\u270D\u{1FAC0}-\u{1FAE8}]/u))return 'People';
+  if(has(/[\u{1F400}-\u{1F43F}\u{1F980}-\u{1F9A2}\u{1F577}\u{1F578}\u{1F54A}\u{1F9A3}-\u{1F9AF}\u{1FAB0}-\u{1FABF}]/u))return 'Animals';
+  if(has(/[\u{1F345}-\u{1F37F}\u{1F32D}-\u{1F32F}\u{1F950}-\u{1F96F}\u{1F9C0}-\u{1F9CB}\u{1FAD0}-\u{1FADF}\u2615]/u))return 'Food';
+  if(has(/[\u{1F3D4}-\u{1F3F0}\u{1F5FA}-\u{1F5FF}\u{1F680}-\u{1F6C5}\u{1F306}-\u{1F30B}\u26EA\u26F2\u26FA\u{1F3A0}-\u{1F3A2}]/u))return 'Places';
+  if(has(/[\u{1F300}-\u{1F344}\u{1F490}\u2600-\u2604\u2614\u2618\u2744\u26A1\u26C4\u26C5\u{1F33A}-\u{1F33F}\u{1F319}-\u{1F31F}]/u))return 'Nature';
+  if(has(/[\u2190-\u21FF\u2300-\u23FF\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\u2900-\u2BFF\u{1F500}-\u{1F53D}\u{1F7E0}-\u{1F7EB}\u{1F170}-\u{1F251}\u20E3\u{1F4A0}-\u{1F4AF}\u{1F493}-\u{1F49F}\u203C\u00A9\u00AE]/u))return 'Symbols';
+  return 'Objects';
+}
+function pictureCellHtml(v,btn){
+  const bi=window.FTT_BUILTIN_PICTURES,p=/^builtin:/.test(v)&&bi?bi.allBuiltIn().find(x=>x.key===v):null;
+  const face=p?`<img class="picture-img" src="${esc(p.src)}" alt="${esc(p.label)}" title="${esc(p.label)}">`:/^(data:|https?:)/.test(v)?`<img class="picture-img" src="${esc(v)}" alt="Picture">`:`<span class="picture-emoji">${esc(v)}</span>`;
+  return `<span class="picture-cell">${face}${btn}</span>`;
+}
+// After a block, a word that lost a picture gets another from its own suggestions, or none.
+function refillItemArt(item,hadCount){
+  let art=sanitizeClassArt(item.art);
+  if(art.length<hadCount){
+    const extra=suggestionPoolOf(item).filter(x=>!art.includes(x));
+    art=[...art,...extra].slice(0,Math.min(hadCount,ART_STUDENT_MAX));
+    if(!art.length)art=sanitizeClassArt(smartArtCandidatesFor(item.english,item.front));
+  }
+  item.art=art;item.artPool=suggestionPoolOf(item);delete item.pendingArt;
+}
+async function setBlockedPictures(list){
+  state.settings.blockedArt=list;
+  await db.ref(blockedSettingsPath()).set(list.length?list:null);
+}
+function allCatalogItems(){return Object.keys(state.catalog||{}).flatMap(t=>Array.isArray(state.catalog[t])?state.catalog[t]:[]);}
+async function blockPicture(v){
+  v=String(v||'').trim();if(!v||blockedArtList().includes(v))return;
+  const had=new Map();
+  for(const i of allCatalogItems())if(i&&Array.isArray(i.art))had.set(i,i.art.filter(x=>String(x).trim()).length);
+  state.settings.blockedArt=[...blockedArtList(),v]; // from here every picture filter drops it
+  for(const i of allCatalogItems()){
+    if(!i)continue;
+    const touched=[i.art,i.artPool,i.pendingArt].some(a=>Array.isArray(a)&&a.includes(v));
+    if(touched)refillItemArt(i,had.get(i)||0);
+  }
+  status('☁️ Saving…','syncing');
+  await setBlockedPictures(state.settings.blockedArt);
+  await saveCatalog();
+  renderCatalog();
+}
+async function unblockPicture(v){
+  await setBlockedPictures(blockedArtList().filter(x=>x!==v));
+  status('☁️ Saved');
+  renderCatalog();
+}
+function renderPictureBlockPanel(){
+  const box=$('teacherPictureBlockPanel');if(!box)return;
+  const used=usedPictureList(),blocked=blockedArtList();
+  const groups=new Map(PICTURE_GROUPS.map(g=>[g,[]]));
+  for(const v of used)groups.get(pictureGroupOf(v)).push(v);
+  const blockBtn=v=>`<button type="button" class="danger picture-btn" data-block-art="${esc(v)}">Block</button>`;
+  const sections=PICTURE_GROUPS.filter(g=>groups.get(g).length).map(g=>`<h4 class="picture-group">${esc(g)} <span class="mini-note">(${groups.get(g).length})</span></h4><div class="picture-grid">${groups.get(g).map(v=>pictureCellHtml(v,blockBtn(v))).join('')}</div>`).join('');
+  box.innerHTML=`<h3>🖼️ Pictures used for words</h3><p id="pictureCount" class="picture-count">${used.length} picture${used.length===1?'':'s'}${blocked.length?` · ${blocked.length} blocked`:''}</p><p class="mini-note">Every picture a student can see on any word, once each, including suggested pictures. <b>Block</b> removes it from every word and it is never used again, including new automatic pictures. Students' progress, points and recordings are not changed.</p>
+  <div id="pictureGrid">${sections||'<span class="mini-note">No pictures yet.</span>'}</div>
+  <h3>🚫 Blocked <span class="mini-note">(${blocked.length})</span></h3><div id="blockedGrid" class="picture-grid">${blocked.map(v=>pictureCellHtml(v,`<button type="button" class="ghost picture-btn" data-unblock-art="${esc(v)}">Unblock</button>`)).join('')||'<span class="mini-note">Nothing blocked.</span>'}</div>`;
+  box.querySelectorAll('[data-block-art]').forEach(b=>b.onclick=()=>blockPicture(b.dataset.blockArt));
+  box.querySelectorAll('[data-unblock-art]').forEach(b=>b.onclick=()=>unblockPicture(b.dataset.unblockArt));
+}
 function splitKey(k){const i=k.indexOf(':');return[k.slice(0,i),k.slice(i+1)]}function itemFor(key){const[t,id]=splitKey(key);return(state.catalog[t]||[]).find(x=>x.id===id)||(t==='shorashim'&&Array.isArray(window.FTT_BOOKLET_SHORASHIM)?window.FTT_BOOKLET_SHORASHIM.find(x=>x.id===id):null)||(t==='shorashim'&&Array.isArray(window.FTT_CHUMASH_VOCAB)?window.FTT_CHUMASH_VOCAB.find(x=>x.id===id):null)||null}function fmtSec(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);return h?`${h}h ${m}m`:m?`${m}m`:`${sec}s`}function dateLabel(ts){if(!ts)return'Never';return new Date(ts).toLocaleString()}function today(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function learned(s,type){return Object.values(s.cards||{}).filter(c=>c.learnedAt&&(!type||c.itemType===type)&&itemFor(c.itemKey)&&!itemFor(c.itemKey).hidden)}function reviewDone(s){const r=s.dailyReview||{};const total=learned(s).length;const seen=r.date===today()?Object.keys(r.seen||{}).length:0;return{total,seen,complete:!!total&&r.date===today()&&seen>=total}}
 function status(t,k=''){const e=$('teacherCloudStatus');e.textContent=t;e.className='cloud-status '+k}
@@ -523,19 +637,29 @@ async function loadAll(){
   const p18Added=needsCatalogSeed?ensurePerek18FinalShorashim():[];
   const unitMigration=needsCatalogSeed?ensurePerekUnitsAnd19():{tagged:0,added:[]};
   if(needsCatalogSeed)state.settings.catalogSeedVersion=CATALOG_SEED_VERSION;
+  const chumashAdded=ensureChumashVocabLists();
+  if(chumashAdded.length)state.settings.chumashVocabSeedVersion=CHUMASH_VOCAB_SEED_VERSION;
+  let promoted=0;
+  for(const i of (state.catalog.shorashim||[])){ // waiting-for-approval step is off: waiting pictures go to students
+    if(!i||!i.pendingArt)continue;
+    const w=sanitizeClassArt(i.pendingArt);
+    if(!sanitizeClassArt(i.art).length&&w.length)i.art=w;
+    delete i.pendingArt;promoted++;
+  }
   const needsArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden&&!sanitizeClassArt(i.art).length);
   let repaired=0;
   if(needsArt.length){
     status(`☁️ Checking matching pictures for ${needsArt.length} words…`,'syncing');
     repaired=await fillArtForShorashim(needsArt);
   }
-  if(repaired||p18Added.length||unitMigration.tagged||unitMigration.added.length){
+  if(promoted||repaired||chumashAdded.length||p18Added.length||unitMigration.tagged||unitMigration.added.length){
     const saved=await db.ref(`${SPACE}/catalog`).transaction(current=>mergeCatalogWithoutReplacingPictures(current,state.catalog));
     if(saved.committed)state.catalog=withAllTracks(saved.snapshot.val()||state.catalog);
   }
   const stillMissingArt=(state.catalog.shorashim||[]).filter(i=>!i.hidden && !sanitizeClassArt(i.art).length).length;
   if(stillMissingArt)console.warn(`${stillMissingArt} Shorashim words need teacher-selected pictures; no paid API request was made automatically.`);
   if(needsCatalogSeed)await db.ref(`${SPACE}/settings/catalogSeedVersion`).set(CATALOG_SEED_VERSION);
+  if(chumashAdded.length)await db.ref(`${SPACE}/settings/chumashVocabSeedVersion`).set(CHUMASH_VOCAB_SEED_VERSION);
   $('teacherMinReview').value=String(state.settings.minReviewMs||500);
   renderStudentSiteControl();
   renderAll();
@@ -550,7 +674,7 @@ async function loadAll(){
   status(updates.length?`☁️ Connected • ${updates.join(' • ')}`:'☁️ Connected');
   applyRequestedTeacherView();
 }
-function renderAll(){renderDashboard();renderCatalog();renderLeaderboard()}
+function renderAll(){renderDashboard();renderCatalog();renderLeaderboard();if(window.renderShorashimMastery)window.renderShorashimMastery()}
 /* ===== Perakim, lists and labels: all teacher-configurable ===== */
 function refreshPerekFilter(){
   const sel=$('teacherPerekFilter');if(!sel)return;
@@ -708,8 +832,10 @@ function bindLegacyScopedListeners(initialGlobalSettings={}){
   scopedStudentIds.forEach(id=>on(`${ROOT}/leaderboards/match/8/${id}`,snap=>{if(snap.exists())state.leaderboards.match['8'][id]=snap.val();else delete state.leaderboards.match['8'][id];renderLeaderboard();}));
 }
 function renderDashboard(){const arr=Object.entries(state.students),total=arr.reduce((n,[,s])=>n+learned(s).length,0),done=arr.filter(([,s])=>reviewDone(s).complete).length,time=arr.reduce((n,[,s])=>n+(s.totalActiveSeconds||0),0);$('teacherStats').innerHTML=[['Students',arr.length],['Learned cards',total],['Class study time',fmtSec(time)],['Review complete today',`${done}/${arr.length}`]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('');const body=$('teacherStudentsBody');body.innerHTML='';arr.sort((a,b)=>(a[1].name||a[0]).localeCompare(b[1].name||b[0])).forEach(([id,s])=>{const r=reviewDone(s),tr=document.createElement('tr');tr.innerHTML=`<td><b>${esc(s.name||id)}</b></td><td>${learned(s,'shorashim').length}</td><td>${learned(s,'prefix').length+learned(s,'suffix').length}</td><td>${fmtSec(s.totalActiveSeconds)}</td><td>${r.total?`${r.seen}/${r.total}${r.complete?' ✓':''}`:'—'}</td><td>${dateLabel(s.lastActive)}</td>`;tr.onclick=()=>openStudent(id);body.appendChild(tr)})}
-function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)]].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
-function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)}</div></div>`}
+function openStudent(id){const s=state.students[id];if(!s)return;const cards=learned(s);$('studentDetail').classList.remove('hidden');$('studentDetail').innerHTML=`<div class="student-detail-head"><div><div class="eyebrow">Student details</div><h2>${esc(s.name||id)}</h2></div><button id="closeStudentCloud" class="ghost">Close</button></div><div class="teacher-grid">${[['Shorashim',learned(s,'shorashim').length],['Affixes',learned(s,'prefix').length+learned(s,'suffix').length],['Study time',fmtSec(s.totalActiveSeconds)],['Sessions',(s.sessions||[]).length+(s.activeSession?1:0)],...cycleStats(s)].map(([a,b])=>`<div class="tstat"><span>${a}</span><b>${b}</b></div>`).join('')}</div><h3>Learning history</h3><div>${cards.slice().sort((a,b)=>b.learnedAt-a.learnedAt).map(c=>{const i=itemFor(c.itemKey);return`<div class="history-row-cloud"><b dir="rtl">${esc(i?.front||c.itemId)}</b><span>${esc(i?.english||'')}</span><span>${esc(c.itemType)}${c.itemType==='shorashim'&&i?` • ${perekLabel(i)}`:''}</span><span>${dateLabel(c.learnedAt)}</span><span>${reviewCountText(c)}</span></div>`}).join('')||'<p>No learned cards yet.</p>'}</div><h3>Card gallery</h3><div class="teacher-gallery">${cards.map(cardHTML).join('')}</div>`;$('closeStudentCloud').onclick=()=>$('studentDetail').classList.add('hidden');$('studentDetail').scrollIntoView({behavior:'smooth'})}
+function reviewCountText(c){const n=window.B3ReviewCycles?window.B3ReviewCycles.reviewCountOf(c):Math.max(0,Math.floor(Number(c&&c.reviewCount)||0));return n?`Reviewed ${n}×`:'Not reviewed yet'}
+function cycleStats(s){const R=window.B3ReviewCycles;if(!R)return[];const out=[];[['shorashim','Review cycle'],['prefix','Prefix cycle'],['suffix','Suffix cycle']].forEach(([t,label])=>{const keys=learned(s,t).map(c=>c.itemKey);if(!keys.length)return;const p=R.peek(s,t,keys);out.push([label,`#${p.cycle} · ${p.left} left`])});return out}
+function cardHTML(c){const i=itemFor(c.itemKey);if(!i)return'';const d=c.design||{},arts=(d.arts||[]).map(a=>a.kind==='illustration'?`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;width:${(a.size||84)*.55}px;height:${(a.size||84)*.4}px"><img src="${esc(a.value)}"></div>`:`<div class="art" style="left:${a.left||50}%;top:${a.top||66}%;font-size:${(a.size||84)*.55}px">${a.value||''}</div>`).join('');return`<div class="teacher-card-mini"><div class="teacher-card-face" style="background:${d.backgroundColor||'#fff9e8'}"><div class="term" style="left:${d.hebrewPos?.left||50}%;top:${d.hebrewPos?.top||28}%;font-size:${Math.min(34,(d.hebrewSize||58)*.55)}px;color:${d.hebrewColor||'#222'}">${esc(i.front)}</div>${arts}${d.drawing?`<img class="drawing" src="${esc(d.drawing)}">`:''}</div><div class="teacher-card-meta">${esc(i.english)}${c.itemType==='shorashim'?` • ${perekLabel(i)}`:''} • ${dateLabel(c.learnedAt)} • ${reviewCountText(c)}</div></div>`}
 function listNameOf(i){return i.listName||'Main List'}
 function namedLists(){
   state.settings.namedLists=state.settings.namedLists||{};
@@ -723,6 +849,7 @@ function needsTeacherApproval(item){const n=commonnessOf(item);return currentTra
 async function toggleTeacherApproval(id){const item=(state.catalog[currentTrack]||[]).find(x=>x.id===id);if(!item)return;item.teacherApproved=item.teacherApproved!==true;renderCatalog();await saveCatalog();}
 function renderCatalog(){
   currentTrack=$('teacherTrack').value;
+  renderPictureBlockPanel();
   refreshNamedLists();
   refreshPerekFilter();
   renderBookletControl();
@@ -749,6 +876,7 @@ function renderCatalog(){
         <div class="mini-note">${currentTrack==='shorashim'?`<span class="unit-pill">${perekLabel(i)}</span> • `:''}${i.pasuk?`Pasuk ${esc(i.pasuk)} • `:''}${i.hidden?'Hidden from future learning':'Active'} • ${esc(chosen)}</div>
         ${approvalBlock}
         ${duplicateBlock}
+        
         ${artBlock}
       </div>
       <div class="mini-actions">
@@ -1330,7 +1458,7 @@ async function togglePictureChoice(id,artValue){
   }else{
     item.art=[...selected,v];
   }
-  item.autoArt=false;
+  item.autoArt=false;delete item.pendingArt;
   renderCatalog();
   await saveCatalog();
 }

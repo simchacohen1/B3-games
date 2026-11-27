@@ -99,9 +99,25 @@ details.review-options[open]{text-align:left}
 #gamesScreen .game-menu-grid,#gamesScreen .hero-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;max-width:1100px;margin-left:auto;margin-right:auto}
 body.shorashim-review-active .review-mode-banner{display:none!important}
 /* Learn header: Back, Home, title (the strip was built for two items) */
-html body.shorashim-learning-active #learnScreen .section-head{grid-template-columns:auto auto minmax(0,1fr)!important;justify-content:start!important}
+html body.shorashim-learning-active #learnScreen .section-head{grid-template-columns:auto auto minmax(0,1fr) auto!important;justify-content:start!important}
 html body.shorashim-learning-active #learnScreen .section-head .backBtn{min-height:40px!important;font-size:17px!important;font-weight:900;min-width:0!important}
 
 /* Confirmation shown after a recording is sent (the small status line is hidden while reviewing) */
 .review-sent-note{grid-column:1/-1;margin:10px auto 0;padding:14px 22px;border-radius:20px;background:#e6f8ea;border:3px solid #55a56a;color:#1d5c2c;font-size:22px;font-weight:900;text-align:center}
 .review-sent-note.hidden{display:none}
+
+/* Review page: flashcards stay the main thing; the other ways to review sit in a column on the side. */
+#reviewScreen.active{display:grid;grid-template-columns:minmax(0,1fr) 250px;column-gap:18px;align-items:start}
+#reviewScreen.active>*{grid-column:1}
+#reviewScreen.active>.section-head{grid-column:1/-1}
+#reviewScreen.active>.review-more-ways{grid-column:2;grid-row:2 / span 14}
+.review-more-ways{padding:14px}
+.review-more-ways h3{margin:0 0 4px;font-size:1.05rem}
+.review-more-ways .mini-note{margin:0 0 10px}
+.review-more-ways .rmw-label{margin:12px 0 6px;font-weight:800;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:#6b78a6}
+.review-more-ways .rmw-group{display:flex;flex-direction:column;gap:8px}
+.review-more-ways button{text-align:left;font-weight:700}
+body.shorashim-review-active #reviewScreen.active{display:block}
+body.shorashim-review-active .review-more-ways{display:none}
+@media(max-width:900px){#reviewScreen.active{display:block}.review-more-ways .rmw-group{flex-direction:row;flex-wrap:wrap}}
+#changeLearningPerekBtn{white-space:nowrap;font-weight:800;border:2px solid #d9def5}

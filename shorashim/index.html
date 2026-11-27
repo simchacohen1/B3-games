@@ -6,7 +6,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="../guest-mode.js?v=20261011-guest"></script>
-  <script src="../game-gate.js?v=20261021-follow-unblock" data-game-id="shorashim"></script>
+  <script src="../game-gate.js?v=20261126-gate-streams1" data-game-id="shorashim"></script>
   <title>Shorashim · SOLS</title>
 <link rel="icon" type="image/svg+xml" href="/assets/favicons/shorashim.svg">
   <style>
@@ -1019,6 +1019,17 @@ body.shorashim-review-active #chooseReviewCardsBtn {
 .perek-badge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:11px;font-style:normal;font-weight:900;white-space:nowrap}
 .review-perek-filter.hidden{display:none!important}
 </style>
+<style id="speaker-button-v1">
+/* Speaker button (English meaning read aloud) */
+.speak-btn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-left:8px;border-radius:999px;border:2px solid #9fb4f2;background:#eef2ff;font-size:24px;line-height:1;cursor:pointer;vertical-align:middle;user-select:none}
+.speak-btn:hover,.speak-btn:focus-visible{background:#dbe4ff;outline:3px solid #6b87e8}
+.speak-btn-big{min-width:64px;min-height:64px;font-size:34px;margin:0}
+#backCard{position:relative}
+#backCard .speak-btn-big{position:absolute;right:12px;bottom:12px;z-index:5}
+.review-card-wrap{position:relative}
+.review-card-wrap .speak-btn-big{position:absolute;left:50%;bottom:14px;margin-left:calc(min(760px,92vw)/2 - 78px);z-index:5}
+.speak-btn.hidden{display:none}
+</style>
 <style id="shorashim-recording-points-v1">.shorashim-challenge-box{margin:12px 0 16px;padding:14px 16px;border:2px solid #f59e0b;border-radius:16px;background:#fffbeb}.shorashim-challenge-box label{display:block;font-size:16px}.shorashim-challenge-box input{transform:scale(1.35);margin-right:8px}.shorashim-record-box{max-width:760px;margin:14px auto 0;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid #c7d2fe;border-radius:16px;background:#eef2ff}.shorashim-record-box .mini-note{max-width:520px}</style>
 <style id="review-record-flow-fix">
 #activeReviewRecording{align-items:center;justify-content:center;margin:4px 0 10px;gap:10px}
@@ -1159,7 +1170,9 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
-<link rel="stylesheet" href="shorashim-hubs.css?v=20261126-inner2">
+<link rel="stylesheet" href="shorashim-hubs.css?v=20261127-simplify2">
+<link rel="stylesheet" href="practice.css?v=20261127-mastery2">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap">
 <style id="shorashim-perek-menu-styles">
   .perek-choice-grid{margin:26px auto 0}
   .perek-choice{min-height:215px;align-items:center;justify-content:center;text-align:center;gap:12px;border:2px solid #c7d2fe}
@@ -1225,16 +1238,17 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
         <section id="studentHome" class="screen active">
           <div class="hub-grid hub-two" aria-label="Main menu">
-            <button type="button" class="hub-card hub-new" data-go="shorashimPerekScreen" data-track="shorashim">
+            <button type="button" class="hub-card hub-new" data-learn-direct="1" data-track="shorashim">
               <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🌱</span><span class="hub-emoji">📖</span></span>
               <strong>New Shorashim</strong>
               <span class="hub-sub">Learn new Hebrew words with pictures and practice.</span>
               <span class="hub-cta">Learn New Words ▶</span>
             </button>
-            <button type="button" class="hub-card hub-review" data-go="reviewHubScreen">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span><span class="hub-emoji">🎮</span></span>
+            <button type="button" class="hub-card hub-review" data-review-mode="regular">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji big">🔁</span></span>
               <strong>Review</strong>
-              <span class="hub-sub">Practice what you learned, record Chazara, or play games.</span>
+              <span class="hub-sub">Practice the words you learned and earn points.</span>
+              <span class="hub-cycle hidden" id="homeCycleLeft"></span>
               <span class="hub-cta">Start Reviewing ▶</span>
             </button>
           </div>
@@ -1294,7 +1308,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
             <div>
               <h2 id="learnHeading">Learn New Shorashim</h2>
             </div>
-            <button type="button" id="changeLearningPerekBtn" class="ghost hidden">← Change List</button>
+            <button type="button" id="changeLearningPerekBtn" class="ghost small hidden">🔀 Switch list</button>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
@@ -1372,6 +1386,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                     <div class="flashcard editable" id="backCard">
                       <div class="card-label">BACK</div>
                       <div id="englishText" class="movable english-text" tabindex="0"></div>
+                      <button id="learnSpeakBtn" type="button" class="speak-btn speak-btn-big" data-speak="" aria-label="Hear the English meaning">🔊</button>
                       <div id="backExamples" class="card-examples back-examples"></div>
                     </div>
                   </div>
@@ -1446,63 +1461,50 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           </div>
         </section>
 
-        <section id="reviewHubScreen" class="screen">
-          <div class="section-head">
-            <button class="backBtn ghost">← Home</button>
-            <div><div class="eyebrow">Review</div><h2>How do you want to review?</h2></div>
-          </div>
-          <div class="hub-grid hub-two" aria-label="Review choices">
-            <button type="button" class="hub-card hub-record" data-review-mode="regular">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎙️</span></span>
-              <strong>Record Chazara</strong>
-              <span class="hub-sub">Pictures allowed</span>
-              <span class="hub-pts">2 points</span>
-            </button>
-            <button type="button" class="hub-card hub-nohints" data-review-mode="no-hints">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🏆</span></span>
-              <strong>No Hints Challenge</strong>
-              <span class="hub-sub">No pictures or drawings</span>
-              <span class="hub-pts">3 points</span>
-            </button>
-            <button type="button" class="hub-card hub-practice" data-review-mode="practice">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🔁</span></span>
-              <strong>Practice Only</strong>
-              <span class="hub-sub">No recording</span>
-              <span class="hub-pts none">No points</span>
-            </button>
-            <button type="button" class="hub-card hub-games" id="gamesHomeCard" data-go="gamesScreen">
-              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎮</span></span>
-              <strong>Games</strong>
-              <span class="hub-sub" id="gamesHomeMessage">Choose a practice game.</span>
-            </button>
-          </div>
-        </section>
-
         <section id="reviewScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
-            <div><h2>Review</h2></div>
+            <button class="backBtn ghost">← Home</button>
+            <div><h2>Review</h2><div class="hub-cycle hidden" id="hubCycleLeft"></div></div>
             <div id="dailyReviewBadge" class="session-status"></div>
           </div>
+          <aside id="reviewMoreWays" class="card-panel review-more-ways" aria-label="Other ways to review">
+            <h3>More ways to review</h3>
+            <p class="mini-note">These count toward review and points too.</p>
+            <div class="rmw-group">
+              <button type="button" class="ghost" data-more-practice="trace">✍️ Tracing</button>
+              <button type="button" class="ghost" data-more-practice="mc">🅰️ Multiple Choice</button>
+              <button type="button" class="ghost" data-more-practice="match">🔗 Matching</button>
+            </div>
+            <div class="rmw-label">Games</div>
+            <div class="rmw-group">
+              <button type="button" class="ghost" data-more-game="match">🧩 Match</button>
+              <button type="button" class="ghost" data-more-game="shoot">🎯 Target Shoot</button>
+              <button type="button" class="ghost" data-more-game="whack">🔨 Whack-a-Word</button>
+              <button type="button" class="ghost" data-more-game="race">🏎️ Word Race</button>
+            </div>
+          </aside>
 
-          <div id="reviewModeBanner" class="review-mode-banner" aria-live="polite"></div>
           <div class="review-choice-panel">
-            <div class="review-choice-title">Choose how you want to review:</div>
-            <div class="review-choice-grid">
-              <button type="button" id="regularChazaraChoice" class="review-choice points-choice active">
-                <span class="choice-icon">🎙️</span><strong>Record Chazara</strong><span>Pictures allowed</span><b>2 points</b>
-              </button>
-              <button type="button" id="noHintsChazaraChoice" class="review-choice challenge-choice">
-                <span class="choice-icon">🏆</span><strong>No Hints Challenge</strong><span>No pictures or drawings</span><b>3 points</b>
-              </button>
-              <button type="button" id="practiceOnlyChoice" class="review-choice practice-choice">
-                <span class="choice-icon">🔁</span><strong>Practice Only</strong><span>No recording needed</span><b>No points</b>
-              </button>
+            <div class="review-options-row" role="group" aria-label="Review options">
+              <button type="button" id="hidePicturesToggle" class="review-toggle" aria-pressed="false"><span class="toggle-icon">🙈</span><strong>Hide pictures</strong><span class="toggle-state"></span></button>
+              <button type="button" id="recordMyselfToggle" class="review-toggle" aria-pressed="false"><span class="toggle-icon">🎙️</span><strong>Record myself</strong><span class="toggle-state"></span></button>
+            </div>
+            <div id="wordPointsLine" class="word-points-line" aria-live="polite"></div>
+            <div id="cycleBox" class="cycle-box hidden">
+              <div id="cycleLeftLine" class="cycle-left" aria-live="polite"></div>
+              <div class="cycle-count-title">How many do you want to review now?</div>
+              <div id="cycleCountBtns" role="group" aria-label="How many words to review now">
+                <button type="button" data-count="10" aria-pressed="false">10</button>
+                <button type="button" data-count="20" aria-pressed="false">20</button>
+                <button type="button" data-count="50" aria-pressed="false">50</button>
+                <button type="button" data-count="100" aria-pressed="false">100</button>
+                <button type="button" data-count="all" aria-pressed="false">All</button>
+              </div>
             </div>
             <div class="kid-review-actions">
   <button type="button" id="quickStartReviewBtn" class="kid-start-review">▶ SHOW MY CARDS</button>
 </div>
-<div id="pointsReminder" aria-live="polite" class="points-reminder kid-short-reminder">Press Show My Cards. Then press Start Recording and say each shorash and its meaning. Pictures are allowed.</div>
+<div id="pointsReminder" aria-live="polite" class="points-reminder kid-short-reminder">Press Show My Cards, then say each shorash and its meaning.</div>
           </div>
 
           <details class="review-options card-panel">
@@ -1527,14 +1529,24 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           <div id="reviewArea" class="hidden">
             <div class="review-meta">
               <span id="reviewCounter" class="pill"></span>
+              <span id="reviewCycleLeft" class="pill cycle-pill hidden"></span>
               <span id="reviewProgressToday" class="pill subtle"></span>
               <span id="reviewPasuk" class="muted"></span>
             </div>
+            <div id="reviewBatchDone" class="hidden" role="status" aria-live="polite">
+              <div id="reviewBatchHead"></div>
+              <div id="reviewBatchSub"></div>
+              <div id="reviewBatchNote"></div>
+              <div class="batch-actions">
+                <button type="button" id="reviewBatchMoreBtn" class="primary">Keep going</button>
+                <button type="button" id="reviewBatchStopBtn" class="ghost">Stop for now</button>
+              </div>
+            </div>
             <div id="tooFastMessage" class="too-fast hidden">Give yourself a moment to say the word and meaning.</div>
             <div id="activeReviewRecording" class="record-action-row">
-              <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording — 2 Points</button>
+              <button id="shorashimRecordBtn" class="primary" type="button">🎙️ Start Recording</button>
               <button id="shorashimPauseBtn" class="ghost hidden" type="button">⏸ Pause</button>
-              <span id="shorashimRecordStatus" class="mini-note kid-record-note">🎙️ Record your Shorashim. Rabbi Cohen will check it.</span>
+              <span id="shorashimRecordStatus" class="mini-note kid-record-note">🎙️ Record your Shorashim. Your teacher will listen.</span>
               <div id="reviewSentNote" class="review-sent-note hidden" role="status" aria-live="polite"></div>
             </div>
             <div class="review-card-wrap">
@@ -1547,6 +1559,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
                 <div id="reviewEnglish" class="review-english hidden"></div>
                 <div id="reviewBackExamples" class="review-examples back hidden"></div>
               </button>
+              <button id="reviewSpeakBtn" type="button" class="speak-btn speak-btn-big hidden" data-speak="" aria-label="Hear the English meaning">🔊</button>
             </div>
             <div class="review-nav">
               <button id="chooseReviewCardsBtn" class="ghost">☰ Choose Different Cards</button>
@@ -1559,9 +1572,22 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           </div>
         </section>
 
+        <section id="practiceScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn ghost">← Home</button>
+            <div><h2>Practice Activities</h2></div>
+          </div>
+          <div class="hero-grid two game-menu-grid">
+            <button class="feature-card" data-practice="trace"><span class="feature-icon">✍️</span><strong>Tracing</strong><span>Trace the word</span></button>
+            <button class="feature-card" data-practice="mc"><span class="feature-icon">🅰️</span><strong>Multiple Choice</strong><span>Pick the meaning</span></button>
+            <button class="feature-card" data-practice="match"><span class="feature-icon">🔗</span><strong>Matching</strong><span>Match Hebrew to English</span></button>
+          </div>
+          <div id="practiceStage" class="card-panel game-stage hidden"></div>
+        </section>
+
         <section id="gamesScreen" class="screen">
           <div class="section-head">
-            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
+            <button class="backBtn ghost">← Home</button>
             <div><h2>Games</h2></div>
           </div>
           <div id="gamesLockedPanel" class="card-panel center-panel hidden">
@@ -1647,8 +1673,14 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
   <script src="chumash-vocab.js?v=20261126-chumash-1"></script>
   <script src="units.js?v=20261108-units-2"></script>
-  <script src="app.js?v=20261126-chumash2"></script>
-  <script src="review-categories.js?v=20261106-units-1"></script>
+  <script src="review-cycle-core.js?v=20261127-cycles2"></script>
+  <script src="builtin-pictures.js?v=20261127-builtin1"></script>
+  <script src="mastery-core.js?v=20261127-mastery1"></script>
+  <script src="app.js?v=20261127-builtin1-simplify2"></script>
+  <script src="practice-activities.js?v=20261127-mastery2"></script>
+  <script src="review-categories.js?v=20261127-cycles2"></script>
+  <script src="review-cycles.js?v=20261127-cycles3"></script>
+  <script src="review-points.js?v=20261127-points1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
   <script src="../multiplayer/identity.js?v=functions-sdk-20261102-1"></script>
   <script src="../b3-race.js?v=race-sync-20261109"></script>
@@ -1863,7 +1895,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 })();
 </script>
 
-<script src="shorashim-skin.js?v=20261013-skin"></script>
+<script src="shorashim-skin.js?v=20261127-tracker2"></script>
 <style id="shorashim-single-card-v1">
   /* One big centered card. The front is decorated; the back only shows the meaning when the card turns. */
   #learnWorkspace .flip-stage{
@@ -2000,7 +2032,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 
 <!-- Homework mode (#649): only active when opened from a homework checklist (?hw=...). -->
 <script src="../assignment-center/homework-mode.js?v=20261108-hw649" data-manual-done></script>
-<script defer src="../class-pointer-prototype/activity-share.js?v=20261125-wb3"></script>
+<script defer src="../class-pointer-prototype/activity-share.js?v=20261127-sel1"></script>
 </body>
 </html>
 

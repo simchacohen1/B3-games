@@ -187,16 +187,18 @@
     }
     // Move or resize one of my own marks without sending it again (a picture stays where it is in the pile).
     if(op.type==='board-move'){
-      const old=board.strokes.find(item=>item.by===by&&item.id===op.id);if(!old)return false;
+      // A student on their own (not a group's) board may also move and resize what the teacher put there (op.any): it is their copy.
+      const old=board.strokes.find(item=>item.id===op.id&&(item.by===by||(by==='student'&&op.any===true&&item.by==='teacher')));if(!old)return false;
       const s=cleanStroke({...old,id:typeof op.newId==='string'?op.newId:old.id,points:op.points});
-      if(!s||s.id[0]!==by[0]||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
+      if(!s||s.id[0]!==(old.by===by?by[0]:'s')||(old.by!==by&&s.id===old.id)||s.points.length!==old.points.length||(s.id!==old.id&&board.strokes.some(item=>item.id===s.id)))return false;
       s.by=by;board.strokes[board.strokes.indexOf(old)]=s;return true;
     }
     if(op.type==='board-remove'){
       if(!Array.isArray(op.ids))return false;
       const ids=new Set(op.ids.slice(0,MAX_STROKES).filter(id=>typeof id==='string')),before=board.strokes.length;
-      // Only the teacher may also remove a student's mark (op.any); a student can never remove the teacher's.
-      const anyOwner=by==='teacher'&&op.any===true;
+      // The teacher may also remove a student's mark (op.any). A student may remove the teacher's marks only from their own board (a group
+      // board never passes it on: groupOp keeps just the student's own lines).
+      const anyOwner=op.any===true;
       board.strokes=board.strokes.filter(s=>!((anyOwner||s.by===by)&&ids.has(s.id)));return board.strokes.length!==before;
     }
     // Teacher only: put a mark on the board that is owned by the student (the teacher moved, resized or recolored the
@@ -269,16 +271,18 @@
   }
   // The shared drawing toolbar hands over the whole list of one side's marks; turn the difference into board changes.
   // A picture that was only moved keeps its picture: send its new place, not the whole picture again.
-  function syncBoardItems(board,by,list,act,own){
+  function syncBoardItems(board,by,list,act,own,anyOwner){
     // `own` (a group board): only my own lines are mine to add, remove or move; my group's other lines are left alone.
-    const mine=board.strokes.filter(item=>item.by===by&&(!own||own(item))),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
+    // `anyOwner` (a student's own board): the teacher's marks are theirs to change too.
+    const isMine=item=>(item.by===by&&(!own||own(item)))||(anyOwner===true&&item.by==='teacher');
+    const mine=board.strokes.filter(isMine),keep=new Set(list.map(item=>item.id)),had=new Set(mine.map(item=>item.id));
     const gone=mine.filter(item=>!keep.has(item.id)),moved=new Set();
     for(const item of list){
       const from=!had.has(item.id)&&item.image?gone.find(old=>old.image===item.image&&!moved.has(old.id)):null;
-      if(from){moved.add(from.id);moved.add(item.id);act({type:'board-move',id:from.id,newId:item.id,points:item.points})}
+      if(from){moved.add(from.id);moved.add(item.id);act({type:'board-move',id:from.id,newId:item.id,points:item.points,...(from.by!==by?{any:true}:{})})}
     }
     const removed=gone.filter(item=>!moved.has(item.id)).map(item=>item.id);
-    if(removed.length)act({type:'board-remove',ids:removed});
+    if(removed.length)act({type:'board-remove',ids:removed,...(removed.some(id=>board.strokes.find(item=>item.id===id)?.by!==by)?{any:true}:{})});
     for(const item of list)if(!had.has(item.id)&&!moved.has(item.id)){const {by:_by,...stroke}=item;act({type:'board-add',stroke})}
     syncOrder(board,list,act,item=>item.by===by&&(!own||own(item)));
   }
@@ -817,11 +821,39 @@
       pasteFromClipboard:()=>clip.paste(),
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
-      getItems:()=>board.strokes.filter(item=>item.by==='student'&&ownItem(item)),
-      setItems(list){syncBoardItems(board,'student',list,act,group?ownItem:null)},
+      getItems:()=>board.strokes.filter(item=>(item.by==='student'&&ownItem(item))||(!group&&item.by==='teacher')),
+      setItems(list){syncBoardItems(board,'student',list,act,group?ownItem:null,!group)},
       // Hebrew word tiles can be picked up with any drawing tool.
-      grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
+      // The teacher's sent word can be picked up with Select (and dragged) as well.
+      solid:true,
+      grab:{hit:p=>boardOpen()&&((!!drawer?.tiles&&activity?.kind==='tiles'&&drawer.tiles.hit(p))||wordHit(p)),
+        down:p=>{if(!boardOpen())return false;if(drawer?.tiles&&activity?.kind==='tiles'&&drawer.tiles.hit(p))return drawer.tiles.down(p);return wordDown(p)},
+        move:(p,f)=>{if(wordGrab)wordMove(p,f);else drawer?.tiles?.move(p,f)},up:p=>{if(wordGrab){if(p)wordMove(p,true);wordGrab=null}else drawer?.tiles?.up(p)},cancel:()=>{wordGrab=null;drawer?.tiles?.cancel()}},
       live(draft){if(!boardOpen())return;const op=pagedOp(board,{type:'board-draft',stroke:draft||null});applyTo(board,op,'student');B.sendTeacher(op);redraw()}};
+    // The word the teacher sent: where it is on the board, so a press on it can pick it up (Select tool only).
+    let wordGrab=null,wordAt=0;
+    function wordBox(){
+      const t=board.text,w=canvas.clientWidth,h=canvas.clientHeight;
+      if(activity?.kind!=='word'||!t||!t.value||!w||!h)return null;
+      const ctx=canvas.getContext('2d');let size=Math.max(10,h*t.size);
+      ctx.save();ctx.font='700 '+size+'px Arial, sans-serif';
+      while(size>12&&ctx.measureText(t.value).width>w*.90){size*=.9;ctx.font='700 '+size+'px Arial, sans-serif'}
+      const width=Math.min(w*.95,ctx.measureText(t.value).width);ctx.restore();
+      return{cx:t.x*w,cy:t.y*h,hw:width/2+8,hh:size*.6,w,h};
+    }
+    function wordHit(p){
+      if(window.FTTAnnotate?.state?.().tool!=='select')return false;
+      const b=wordBox();return !!b&&Math.abs(p.x*b.w-b.cx)<=b.hw&&Math.abs(p.y*b.h-b.cy)<=b.hh;
+    }
+    function wordDown(p){
+      if(!wordHit(p))return false;
+      wordGrab={dx:p.x-board.text.x,dy:p.y-board.text.y};return true;
+    }
+    function wordMove(p,final){
+      if(!wordGrab||!board.text)return;
+      if(!final&&Date.now()-wordAt<70)return;wordAt=Date.now();
+      act({type:'board-text',text:{...board.text,x:round(Math.min(1,Math.max(0,p.x-wordGrab.dx))),y:round(Math.min(1,Math.max(0,p.y-wordGrab.dy)))}});
+    }
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
       const FA=window.FTTAnnotate;if(!FA)return;
@@ -1990,7 +2022,9 @@
       available:()=>!!Groups&&on&&!suspended&&!view.hidden&&mode==='boards',
       active:()=>groupsOn(),
       open:()=>openGroupsDialog(),
-      save:()=>saveGroupBoards()
+      save:()=>saveGroupBoards(),
+      // The groups and who is in each (names only), so the whiteboard's student zones can be given to a whole group.
+      list:()=>groupsOn()?gstate.groups.map(g=>({id:g.id,name:g.name,names:Groups.membersOf(gstate,g.id).map(key=>gstate.assign[key].n).filter(Boolean)})):[]
     },
     // A PNG picture of the student board that is open large.
     exportPng(){const board=focusBoard();return board&&mode==='boards'?boardPng(board):Promise.reject(Error('Open one student whiteboard first.'))},

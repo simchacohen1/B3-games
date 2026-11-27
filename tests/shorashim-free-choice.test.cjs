@@ -28,7 +28,7 @@ test('word list does not label or disable future available words',()=>{
   const items=[{id:'first',front:'א',english:'first'},{id:'later',front:'ב',english:'later'}], nodes={};
   const document={getElementById(id){return nodes[id]||=({innerHTML:'',textContent:'',children:[],appendChild(el){this.children.push(el)}})},createElement(){return {}}};
   const s={cards:{}};
-  const ctx=vm.createContext({currentTrack:'shorashim',student:()=>s,learningCatalog:()=>items,keyFor:(t,id)=>t+':'+id,document,selectedItemKey:null,escapeHTML:x=>x,reviewFilterLabel:()=>'Perek',loadEditorItem:()=>{}});
+  const ctx=vm.createContext({speakButtonHTML:()=>'',currentTrack:'shorashim',student:()=>s,learningCatalog:()=>items,keyFor:(t,id)=>t+':'+id,document,selectedItemKey:null,escapeHTML:x=>x,reviewFilterLabel:()=>'Perek',loadEditorItem:()=>{}});
   vm.runInContext(fn('renderWordList'),ctx);
   ctx.renderWordList();
   assert.equal(nodes.wordList.children.length,2);
@@ -43,7 +43,7 @@ const unitCtx=(items,extra={})=>{
   const s={cards:{}};
   const ctx=vm.createContext({window:{B3ShorashimUnits:Units},currentTrack:'shorashim',learningPerek:null,db:{settings:{}},
     visibleCatalog:()=>items.filter(x=>!x.hidden),student:()=>s,keyFor:(t,id)=>t+':'+id,...extra});
-  ['unitKeyOf','unitLabels','studentUnits','currentLearningUnit','learningCatalog','nextLearningUncreated'].forEach(n=>vm.runInContext(fn(n),ctx));
+  ['chumashCatalog','chumashExtra','unitKeyOf','unitLabels','studentUnits','currentLearningUnit','learningCatalog','nextLearningUncreated'].forEach(n=>vm.runInContext(fn(n),ctx));
   return {ctx,s};
 };
 
@@ -81,7 +81,7 @@ test('words without a perek are grouped by their list/category and teacher label
 test('choosing a unit updates the menu without leaving Shorashim',()=>{
   const screens=[],items=[{id:'x',perek:18},{id:'y',perek:19},{id:'z',perek:20}];
   const ctx=vm.createContext({window:{B3ShorashimUnits:Units},db:{settings:{}},visibleCatalog:()=>items,currentTrack:'prefix',learningPerek:'perek:18',selectedItemKey:'prefix:p',followAllowsScreen:()=>true,goScreen:x=>screens.push(x)}); // no Follow Teacher restriction active
-  ['unitLabels','bookletAllowed','studentUnits','chooseLearningPerek'].forEach(n=>vm.runInContext(fn(n),ctx));
+  ['chumashCatalog','chumashExtra','unitLabels','bookletAllowed','studentUnits','chooseLearningPerek'].forEach(n=>vm.runInContext(fn(n),ctx));
   ctx.chooseLearningPerek('perek:19');
   assert.equal(ctx.currentTrack,'shorashim');
   assert.equal(ctx.learningPerek,'perek:19');
@@ -95,7 +95,7 @@ test('choosing a unit updates the menu without leaving Shorashim',()=>{
   ctx.db.settings.showBooklet=false;
   ctx.chooseLearningPerek('booklet'); // the teacher turned the booklet off
   assert.deepEqual(screens,['learnScreen','learnScreen']);
-  assert.match(html,/data-go="shorashimPerekScreen" data-track="shorashim"/);
+  assert.match(html,/data-learn-direct="1" data-track="shorashim"/);
   assert.match(html,/id="perekUnitChoices"/);
   assert.match(html,/changeLearningPerekBtn/);
 });
