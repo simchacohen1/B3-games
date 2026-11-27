@@ -11,4 +11,4 @@ for(const name of ['redeem','cancelRequest'])test(name+' times out and frees the
   assert.doesNotMatch(body,/await load\(\)/,'refresh must not hold the busy flag');
   assert.match(body,/state\.busy=false;\s*load\(\)/);
 });
-test('student.html loads the fixed script',()=>assert.match(fs.readFileSync(__dirname+'/../student-rewards/student.html','utf8'),/student\.js\?g=1&v=d{8}-[a-z-]+/));
+test('student.html loads the fixed script',()=>assert.match(fs.readFileSync(__dirname+'/../student-rewards/student.html','utf8'),/student\.js\?g=1&v=\d{8}-[a-z-]+/));
