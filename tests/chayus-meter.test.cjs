@@ -438,3 +438,14 @@ test('room sound alone is still not counted as a voice', () => {
   for (let t = 1200; t <= 30000; t += 200) m.sample(0.004 + 0.0015 * Math.sin(t / 300), t);
   assert.equal(m.snapshot().countedSeconds, 0);
 });
+
+test('teachers are routed to the Chayus Meter teacher dashboard everywhere', () => {
+  const fs = require('node:fs'); const path = require('node:path'); const root = path.join(__dirname, '..'); const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+  assert.match(read('index.html'), /"chayus-meter":"chayus-meter\/teacher\.html"/, 'index.html teacher map');
+  assert.match(read('teacher-preview-tool.html'), /"chayus-meter":\["Chayus Meter","chayus-meter\/teacher\.html"\]/, 'owner preview map');
+  assert.match(read('shared/home-tool-registry.js'), /id:"chayus-meter"[^}]*teacherHref:"chayus-meter\/teacher\.html"/, 'Teacher Home tile');
+  const student = read('chayus-meter/index.html');
+  assert.match(student, /id="teacherReport"[^>]*href="teacher\.html"[^>]*hidden/, 'Teacher report link starts hidden');
+  assert.match(student, /teacher-link\.js/, 'link script loaded');
+  assert.match(read('chayus-meter/teacher-link.js'), /access\.role === 'admin' \|\| access\.role === 'teacher'/, 'shown only to teacher or admin');
+});
