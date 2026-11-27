@@ -115,7 +115,7 @@
   }
 
   /* ================= Tracing ================= */
-  const W = 900, H = 320, SCALE = 0.5, BRUSH = 30;
+  const W = 900, H = 360, SCALE = 0.5, BRUSH = 30;
   function traceLetters(front) {
     const first = String(front || '').split('/')[0];
     return Array.from(first.normalize('NFC').replace(NIKUD, '')).filter(ch => /[א-ת]/.test(ch));
@@ -145,11 +145,11 @@
   function setupTrace(w, letters, onNext) {
     const base = $('trBase'), ink = $('trInk'), bctx = base.getContext('2d'), ictx = ink.getContext('2d');
     // Fit the word to the canvas.
-    let size = 230; bctx.font = `${size}px ${TRACE_FONT}`;
+    let size = 300; bctx.font = `${size}px ${TRACE_FONT}`;
     const measure = () => letters.map(l => bctx.measureText(l).width);
     let widths = measure(), total = widths.reduce((a, b) => a + b, 0) + (letters.length - 1) * size * 0.04;
     if (total > W - 60) { size = Math.floor(size * (W - 60) / total); bctx.font = `${size}px ${TRACE_FONT}`; widths = measure(); total = widths.reduce((a, b) => a + b, 0) + (letters.length - 1) * size * 0.04; }
-    const gap = size * 0.04, baseline = Math.round(H * 0.72);
+    const gap = size * 0.04, baseline = Math.round(H * 0.74);
     // Hebrew reads right to left: the first letter sits at the right.
     let x = (W + total) / 2;
     const pos = letters.map((l, i) => { x -= widths[i]; const p = { l, x, w: widths[i] }; x -= gap; return p; });

@@ -6,7 +6,7 @@
   'use strict';
   const M = window.ShorashimMastery;
   const ROW_LIMIT = 400;
-  let classes = [], classesLoaded = false, dirty = true, showAll = false;
+  let classes = [], classesLoaded = false, dirty = true, showAll = false, fallbackStudents = null;
   const f = { boy: '', cls: '', list: '', stage: '', mode: 'any', q: '', flagged: false };
 
   const style = document.createElement('style');
@@ -44,15 +44,25 @@
     const out = [], seen = new Set();
     const add = (key, track, item) => { if (!item || seen.has(key)) return; seen.add(key); out.push({ key, track, front: item.front || item.hebrew || '', english: item.english || '', list: listLabel(item, track) }); };
     ['shorashim', 'prefix', 'suffix'].forEach(track => ((state.catalog && state.catalog[track]) || []).forEach(it => { if (it && !it.hidden) add(track + ':' + it.id, track, it); }));
-    Object.values(state.students || {}).forEach(s => {
+    Object.values(studentMap()).forEach(s => {
       const keys = new Set([...Object.keys((s && s.cards) || {}), ...Object.keys((s && s.practice) || {})]);
       keys.forEach(k => { if (!seen.has(k)) { const it = itemFor(k); if (it) add(k, k.split(':')[0], it); } });
     });
     return out;
   }
 
+  // Stricter database rules refuse the whole class student list, but a teacher may still read each
+  // of their own class's students one by one. Use the class roster in that case.
+  function studentMap() { return state.students && Object.keys(state.students).length ? state.students : (fallbackStudents || {}); }
+  async function loadRosterStudents() {
+    if (fallbackStudents || (state.students && Object.keys(state.students).length) || !classes.length) return;
+    const ids = [...new Set(classes.flatMap(c => c.studentIds || []))];
+    const got = {};
+    await Promise.all(ids.map(async id => { try { const v = (await db.ref(`${SPACE}/students/${id}`).once('value')).val(); if (v) got[id] = v; } catch (e) { /* not readable: skip */ } }));
+    fallbackStudents = got;
+  }
   function boysInScope() {
-    let list = Object.entries(state.students || {}).filter(([, s]) => s && typeof s === 'object').map(([id, s]) => ({ id, name: s.name || id, rec: s }));
+    let list = Object.entries(studentMap()).filter(([, s]) => s && typeof s === 'object').map(([id, s]) => ({ id, name: s.name || id, rec: s }));
     if (f.cls) { const c = classes.find(x => x.id === f.cls); const ids = new Set((c && c.studentIds) || []); list = list.filter(b => ids.has(b.id)); }
     if (f.boy) list = list.filter(b => b.id === f.boy);
     return list.sort((a, b) => a.name.localeCompare(b.name));
@@ -75,7 +85,7 @@
     const host = $('masteryBody'); if (!host) return;
     const items = allItems(), groups = M.groupWords(items);
     const lists = [...new Set(items.map(i => i.list))].sort((a, b) => a.localeCompare(b));
-    const allBoys = Object.entries(state.students || {}).filter(([, s]) => s && typeof s === 'object').map(([id, s]) => ({ id, name: s.name || id })).sort((a, b) => a.name.localeCompare(b.name));
+    const allBoys = Object.entries(studentMap()).filter(([, s]) => s && typeof s === 'object').map(([id, s]) => ({ id, name: s.name || id })).sort((a, b) => a.name.localeCompare(b.name));
     const boys = boysInScope();
 
     let scoped = groups;
@@ -138,7 +148,7 @@
   window.renderShorashimMastery = function () { if (visible()) render(); else dirty = true; };
   document.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-tab="mastery"]');
-    if (b) { loadClasses(); setTimeout(() => render(), 0); }
+    if (b) { setTimeout(async () => { render(); await loadClasses(); fallbackStudents = null; try { await loadRosterStudents(); } catch (e) { /* keep what we have */ } render(); }, 0); }
   });
   window.__shorashimMasteryFilters = f; // test hook
 })();

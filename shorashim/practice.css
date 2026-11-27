@@ -16,7 +16,7 @@
 .pa-tile.he{font-size:34px;direction:rtl}
 @keyframes paShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 .pa-trace-label{text-align:center;font-size:34px;font-weight:800;direction:rtl;margin:4px 0}
-.pa-trace-wrap{position:relative;width:100%;max-width:900px;margin:8px auto;aspect-ratio:900/320;border:2px solid #e2e8f0;border-radius:20px;background:#fffdf5;overflow:hidden}
+.pa-trace-wrap{position:relative;width:100%;max-width:900px;margin:8px auto;aspect-ratio:900/360;border:2px solid #e2e8f0;border-radius:20px;background:#fffdf5;overflow:hidden}
 .pa-trace-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
 #trInk{touch-action:none;cursor:crosshair}
 .pa-trace-foot{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:8px}
