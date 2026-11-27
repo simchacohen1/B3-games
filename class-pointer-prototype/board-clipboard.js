@@ -124,6 +124,8 @@
   //       boxW (a width the teacher chose by dragging the side of the box), and where the block goes:
   //       center:{x,y} for new words, or left|right and top|bottom for words that are already placed.
   function flowText(text,width100,opts={}){
+    // Words in several styles (opts.spans) are laid out by their own routine; words in one style never are.
+    if(Array.isArray(opts.spans)&&opts.spans.length&&typeof opts.runWidth==='function'){const rich=flowRich(text,opts);if(rich)return rich}
     const aspect=opts.aspect||16/9,scale=opts.scale||1,size=opts.size||.016,margin=opts.margin==null?.04:opts.margin;
     const boxW=opts.boxW?clamp(opts.boxW,.05,1):0,maxWidth=boxW||clamp(opts.maxWidth||1-2*margin,.05,1);
     const lineHeight=size*1.25*aspect*scale,measure=line=>width100(line)/100*size,lines=[];
@@ -159,6 +161,135 @@
       return out;
     });
     return{strokes,cut,lines:lines.length,frame:{left,top,width,height:total,rtl}};
+  }
+  // ---------- Words in several styles ----------
+  // spans: [{start,end,c?,s?,b?,f?}] over the characters of the text (color, size as a multiple of the box's size, bold, font).
+  // opts.runWidth(font,bold) gives a function that measures a line at a 100px font. Each line comes out as its own text mark
+  // with "runs" (the line cut into pieces of one style), and is as tall as its tallest piece. Returns null when no span
+  // really changes anything, so the caller lays the words out the ordinary way.
+  const styleKey=style=>(style.c||'')+'|'+(style.s||'')+'|'+(style.b===undefined?'':style.b?1:0)+'|'+(style.f||'');
+  function charStyles(length,spans){
+    const styles=Array.from({length},()=>({}));
+    for(const span of spans){
+      if(!span||!Number.isFinite(span.start)||!Number.isFinite(span.end))continue;
+      for(let i=Math.max(0,span.start);i<Math.min(length,span.end);i++){
+        const style=styles[i];
+        if(typeof span.c==='string')style.c=span.c;
+        if(Number.isFinite(span.s)&&span.s>0)style.s=span.s;
+        if(span.b===true||span.b===false)style.b=span.b;
+        if(typeof span.f==='string')style.f=span.f;
+      }
+    }
+    return styles;
+  }
+  function flowRich(rawText,opts){
+    const text=String(rawText==null?'':rawText),styles=charStyles(text.length,opts.spans);
+    if(!styles.some(style=>style.c||style.s||style.b!==undefined||style.f))return null;
+    const aspect=opts.aspect||16/9,scale=opts.scale||1,size=opts.size||.016,margin=opts.margin==null?.04:opts.margin;
+    const boxW=opts.boxW?clamp(opts.boxW,.05,1):0,maxWidth=boxW||clamp(opts.maxWidth||1-2*margin,.05,1);
+    const baseHeight=size*1.25*aspect*scale,blockFont=opts.font||'sans',blockBold=opts.bold===true;
+    // Width of the characters from a to b: each stretch of one style measured in its own font and size.
+    const cache=new Map();
+    function widthOf(a,b){
+      const key=a+':'+b;if(cache.has(key))return cache.get(key);
+      let total=0,i=a;
+      while(i<b){
+        let j=i+1;const k=styleKey(styles[i]);while(j<b&&styleKey(styles[j])===k)j++;
+        const st=styles[i],measure=opts.runWidth(st.f||blockFont,st.b===undefined?blockBold:st.b);
+        total+=measure(text.slice(i,j))/100*size*(st.s||1);i=j;
+      }
+      cache.set(key,total);return total;
+    }
+    const trimEnd=(a,b)=>{let end=b;while(end>a&&/\s/.test(text[end-1]))end--;return end};
+    const maxChars=LIMITS.itemChars,found=[];
+    // The same wrapping rules as wrapLines, on positions in the text instead of on pieces of it.
+    let paragraphStart=0;
+    for(const paragraph of text.split('\n')){
+      const paragraphEnd=paragraphStart+paragraph.length;let first=true;
+      const push=(a,b)=>{
+        let start=a;if(!first)while(start<b&&/\s/.test(text[start]))start++;
+        const end=trimEnd(start,b);
+        if(end>start&&text.slice(start,end).trim()){found.push({a:start,b:end,soft:!first});first=false}
+      };
+      if(paragraph.trim()){
+        let lineA=paragraphStart,lineB=paragraphStart,at=paragraphStart;
+        for(const part of paragraph.split(/(\s+)/)){
+          if(!part)continue;
+          const partStart=at,partEnd=at+part.length;at=partEnd;
+          if(partEnd-lineA<=maxChars&&widthOf(lineA,trimEnd(lineA,partEnd))<=maxWidth){lineB=partEnd;continue}
+          if(text.slice(lineA,lineB).trim())push(lineA,lineB);
+          lineA=lineB=partEnd;
+          if(!part.trim())continue;
+          // One word wider than the board: break it between letters.
+          lineA=lineB=partStart;let cursor=partStart;
+          for(const letter of Array.from(part)){
+            const end=cursor+letter.length;
+            if(lineB>lineA&&(end-lineA>maxChars||widthOf(lineA,trimEnd(lineA,end))>maxWidth)){push(lineA,lineB);lineA=cursor}
+            lineB=end;cursor=end;
+          }
+        }
+        if(text.slice(lineA,lineB).trim())push(lineA,lineB);
+      }
+      paragraphStart=paragraphEnd+1;
+    }
+    // Pieces of one style, and how tall each line is.
+    const lines=found.map(line=>{
+      const runs=[];let i=line.a;
+      while(i<line.b){
+        let j=i+1;const k=styleKey(styles[i]);while(j<line.b&&styleKey(styles[j])===k)j++;
+        const st=styles[i],run={t:text.slice(i,j)};
+        if(st.c)run.c=st.c;if(st.s&&Math.abs(st.s-1)>.001)run.s=Math.round(st.s*100)/100;if(st.b!==undefined)run.b=st.b;if(st.f)run.f=st.f;
+        runs.push(run);i=j;
+      }
+      const mult=Math.max(...runs.map(run=>run.s||1));
+      return{...line,text:text.slice(line.a,line.b),runs,height:baseHeight*mult,width:Math.min(maxWidth,widthOf(line.a,line.b))};
+    });
+    let used=0,keep=0;
+    for(const line of lines){if(keep&&used+line.height>1+1e-9)break;used+=line.height;keep++}
+    const cut=keep<lines.length;lines.length=keep;
+    const total=lines.reduce((sum,line)=>sum+line.height,0),full=Math.max(0,...lines.map(line=>line.width));
+    const width=boxW?Math.max(full,boxW):full,rtl=isRtl(text),align=['left','center','right'].includes(opts.align)?opts.align:'';
+    let left,top;
+    if(opts.center){left=clamp(opts.center.x-width/2,margin,1-margin-width);top=opts.top!=null?clamp(opts.top,0,1-total):clamp(opts.center.y-total/2,margin,1-margin-total)}
+    else{
+      left=clamp(opts.left!=null?opts.left:opts.right!=null?opts.right-width:(1-width)/2,0,1-width);
+      top=clamp(opts.top!=null?opts.top:opts.bottom!=null?opts.bottom-total:(1-total)/2,0,1-total);
+    }
+    let y=top;
+    const strokes=lines.map(line=>{
+      const reach=Math.max(.02,line.width),lineTop=y;y+=line.height;
+      let start=rtl?left+width:left;
+      if(align){const free=Math.max(0,width-reach);start=rtl?left+width-(align==='right'?0:align==='center'?free/2:free):left+(align==='left'?0:align==='center'?free/2:free)}
+      const out={tool:'text',color:opts.color||'#ffcc00',size:round(size),text:line.text,runs:line.runs,
+        points:[{x:round(clamp(start,0,1)),y:round(clamp(lineTop,0,1))},{x:round(clamp(rtl?start-reach:start+reach,0,1)),y:round(clamp(lineTop+Math.max(.02,line.height),0,1))}]};
+      if(opts.block)out.block=opts.block;
+      if(line.soft)out.soft=true;
+      if(opts.bold)out.bold=true;
+      if(align)out.align=align;
+      if(opts.font&&opts.font!=='sans')out.font=opts.font;
+      if(boxW)out.boxW=round(width);
+      return out;
+    });
+    return{strokes,cut,lines:lines.length,frame:{left,top,width,height:total,rtl}};
+  }
+  // The words of a block with their styles, as the text and spans flowText takes: from the runs of the block's lines.
+  // Lines join the way blockText joins them, so the positions match that text.
+  function blockSpans(lines){
+    const text=blockText(lines),spans=[];let at=0;
+    (lines||[]).forEach((line,index)=>{
+      if(index)at+=1;
+      const own=String(line.text||'');
+      if(Array.isArray(line.runs)&&line.runs.length){
+        let i=at;
+        for(const run of line.runs){
+          const end=i+String(run.t).length;
+          if(run.c||run.s||run.b===true||run.b===false||run.f)spans.push({start:i,end,...(run.c?{c:run.c}:{}),...(run.s?{s:run.s}:{}),...(run.b===true||run.b===false?{b:run.b}:{}),...(run.f?{f:run.f}:{})});
+          i=end;
+        }
+      }
+      at+=own.length;
+    });
+    return{text,spans};
   }
   // The words of a block as the writer wrote them: wrapped lines join with a space, chosen line breaks stay.
   function blockText(lines){return (lines||[]).map((line,index)=>(index?(line.soft?' ':'\n'):'')+String(line.text||'')).join('')}
@@ -206,7 +337,7 @@
     const n=Math.floor(Number(raw.current)),current=raw.version===2&&Number.isFinite(n)&&n>=0&&n<pages.length?n:0;
     return{pictures:pages[current].pictures,strokes:pages[current].strokes,pages,current};
   }
-  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,flowText,blockText,fitSize,placeImage,cleanImageData,cleanLessonBoard};
+  const api={IMAGE_TYPE,DATA_IMAGE,LIMITS,LESSON,isRtl,cleanText,htmlText,pick,wrapLines,layoutText,textStrokes,flowText,blockText,blockSpans,fitSize,placeImage,cleanImageData,cleanLessonBoard};
   if(typeof module!=='undefined'&&module.exports){module.exports=api;return}
   if(root.ClassPointerClipboard)return;
 

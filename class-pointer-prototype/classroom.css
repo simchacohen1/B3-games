@@ -117,6 +117,11 @@ body.teacher-view #stage:fullscreen #exitFullScreenLesson,body.teacher-view #sta
 #pdfNav .pdf-bold-btn[aria-pressed="true"]{background:#fff;color:#1d4ed8;border-color:#fff}
 /* Left / Center / Right for the text box, and the layer buttons (Bring to front ... Send to back) for a picked picture, shape or words. */
 #pdfNav .pdf-align-btn{margin-left:2px;min-width:52px}
+#pdfNav .pdf-textcolor{display:inline-flex;align-items:center;gap:4px;margin-left:6px}
+#pdfNav .pdf-textcolor[hidden]{display:none}
+#pdfNav .pdf-swatch{box-sizing:border-box;width:24px;height:24px;min-width:0;padding:0;border-radius:50%;border:2px solid #fff;cursor:pointer;box-shadow:0 0 0 1px #0006}
+#pdfNav .pdf-colorpick{box-sizing:border-box;width:34px;height:30px;padding:0;border:2px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer}
+.board-text-inline[data-placeholder]:empty::before{content:attr(data-placeholder);opacity:.45}
 #pdfNav .pdf-align-btn[aria-pressed="true"],#pdfNav .pdf-layer-btn:focus-visible{background:#fff;color:#1d4ed8;border-color:#fff}
 #pdfNav .pdf-arrange{display:inline-flex;align-items:center;gap:4px;color:#dbeafe;font-size:14px;font-weight:700;white-space:nowrap}
 #pdfNav .pdf-arrange[hidden]{display:none}
