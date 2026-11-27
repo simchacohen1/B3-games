@@ -297,7 +297,7 @@
   // its own, in wbPages and in saved files) and `zonesLocked` turns them all off for students. Student: `myZones` is what the
   // teacher told this page ({locked, zones:[{x,y,w,h,mine,label}]}); a student writes only inside the boxes that are theirs.
   const Z=window.ClassPointerZones||null;
-  let zones=[],zonesLocked=false,myZones=null,zoneLayer=null,zoneSig='',zoneListeners=new Set();
+  let zones=[],zonesLocked=false,myZones=null,zoneLayer=null,zoneSig='',zoneListeners=new Set(),zoneNotice=null,zoneFocusKey='',zoneFocusPending=false;
   // A read-only video of the teacher board lets activity pages watch without
   // navigating away or participating in the document editing protocol.
   let boardPresentation=null,boardPresentationTimer=null,boardBackground=null;
@@ -537,6 +537,7 @@
     scroller.scrollTop=view.top*H;scroller.scrollLeft=view.left*W;
     // scroll events caused by this move must not be sent back out (quietUntil)
     afterMove();
+    focusMyZone();
   }
   function setZoom(next,reset){
     if(notReady())return;next=P.clamp(next,P.MIN_ZOOM,P.MAX_ZOOM);
@@ -680,7 +681,7 @@
   const selecting=()=>$(isTeacher?'teacherTool':'studentTool')?.value==='select'&&B.writingAllowed('select');
   function selectedStroke(){
     const stroke=selectedId?strokes.find(item=>item.id===selectedId):null;
-    if(!stroke||(!isTeacher&&(stroke.owner!==B.owner()||!C.isHighlightShape(stroke.tool)))){selectedId=null;return null}return stroke;
+    if(!stroke||(!isTeacher&&!(stroke.owner===B.owner()&&C.isHighlightShape(stroke.tool))&&!zoneSelectable(stroke))){selectedId=null;return null}return stroke;
   }
   // The dashed box and the handles around the picked mark. Drawn in the ink layer, never sent to the class.
   function drawSelection(list){
@@ -764,7 +765,7 @@
     if(!selecting()||notReady())return false;
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
     if(picked&&at){
-      if(picked.tool==='text'){if(textHandles(blockFrame(textBlock(picked))).some(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12))return true}
+      if(picked.tool==='text'){if(isTeacher&&textHandles(blockFrame(textBlock(picked))).some(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12))return true}
       else if(G?.handleAt(picked,at.px,at.py,at.w,at.h,12))return true;
     }
     const point=normalized(event);
@@ -788,13 +789,15 @@
   // Starts picking, dragging or resizing. False when nothing was under the pointer (then the click is the mouse's).
   function startSelect(event,p){
     const G=geometry(),picked=selectedStroke(),at=clampedPoint(event);
-    if(picked?.tool==='text'&&at){
+    if(picked?.tool==='text'&&at&&isTeacher){
       const group=textBlock(picked),frame=blockFrame(group),grip=textHandles(frame).find(item=>Math.hypot(item.x*at.w-at.px,item.y*at.h-at.py)<=12);
       if(grip){edit={kind:'text',handle:grip.id,stroke:picked,group,frame,preview:new Map(),swap:null,start:at,moved:false,pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
     }
-    const handle=G&&picked&&at?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
+    const handle=G&&picked&&at&&(isTeacher||picked.tool!=='text')?G.handleAt(picked,at.px,at.py,at.w,at.h,12):null;
     if(handle){edit={kind:'resize',handle:handle.id,stroke:picked,group:[picked],preview:new Map(),start:at,moved:false,zone:studentZoneOf(picked),pid:event.pointerId};content.setPointerCapture(edit.pid);return true}
-    const hit=isTeacher?teacherMarkAt(event,p,true,true):[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&zoneAllowsStudent(mark)&&markHits(mark,p,true));
+    // A student with a box of their own can pick anything inside it (the teacher's words and pictures too); every other mark stays locked.
+    const zoneHit=!isTeacher&&Z&&Z.studentActive(myZones)?teacherMarkAt(event,p,true,true):null;
+    const hit=isTeacher?teacherMarkAt(event,p,true,true):zoneHit&&zoneSelectable(zoneHit)?zoneHit:[...strokes].reverse().find(mark=>mark.owner===B.owner()&&C.isHighlightShape(mark.tool)&&zoneAllowsStudent(mark)&&markHits(mark,p,true));
     // Words that were already picked: a click that does not drag opens them for typing (see endSelect).
     const again=!!hit&&hit.tool==='text'&&!!picked&&textBlock(picked).some(item=>item.id===hit.id);
     selectedId=hit?hit.id:null;
@@ -2025,7 +2028,7 @@
     const sig=JSON.stringify([teaching,list,locked,isTeacher]);
     if(sig===zoneSig&&(!list.length||zoneLayer?.isConnected))return;
     zoneSig=sig;
-    if(!list.length){zoneLayer?.remove();zoneLayer=null;return}
+    if(!list.length){zoneLayer?.remove();zoneLayer=null;syncZoneNotice(false);return}
     if(!zoneLayer){zoneLayer=zoneNode('div');zoneLayer.className='board-zones';zoneLayer.dataset.stageUi='true';zoneLayer.setAttribute('aria-hidden','true')}
     if(zoneLayer.parentNode!==content)content.appendChild(zoneLayer);
     zoneLayer.classList.toggle('board-zones-locked',locked);zoneLayer.replaceChildren();
@@ -2039,15 +2042,44 @@
       dim.setAttribute('d','M0 0H1V1H0Z'+open.map(z=>'M'+z.x+' '+z.y+'h'+z.w+'v'+z.h+'h'+(-z.w)+'Z').join(''));
       dim.setAttribute('fill-rule','evenodd');dim.setAttribute('class','board-zone-dim');s.append(dim);
     }
+    // A student's own box gets a white halo under a thick bright line, so it cannot be missed.
+    if(!teaching)for(const z of list)if(z.mine)s.append(rect(z,'board-zone-halo'));
     for(const z of list)s.append(rect(z,teaching?'board-zone-box'+(z.owners.length?' given':''):'board-zone-box'+(z.mine?' mine':' other')));
     zoneLayer.append(s);
     for(const z of list){
       const label=zoneNode('div');
       label.className='board-zone-label'+(teaching?'':z.mine?' mine':' other');
       label.style.left=(z.x*100)+'%';label.style.top=(z.y*100)+'%';label.style.maxWidth=(z.w*100)+'%';
-      label.textContent=teaching?'Zone '+z.number+' · '+(z.label||'nobody yet'):(z.mine?'Your box'+(locked?' (locked)':''):(z.label||''));
+      label.textContent=teaching?'Zone '+z.number+' · '+(z.label||'nobody yet'):(z.mine?'Your space'+(locked?' (locked)':''):(z.label||''));
       if(teaching||z.mine||z.label)zoneLayer.append(label);
     }
+    syncZoneNotice(!teaching&&!list.some(z=>z.mine));
+  }
+  // A student who has no box yet: a note that stays at the top of the board (zero height, so it takes no room).
+
+  function syncZoneNotice(show){
+    if(!show){zoneNotice?.remove();zoneNotice=null;return}
+    if(zoneNotice?.isConnected)return;
+    zoneNotice=zoneNode('div');zoneNotice.className='board-zone-notice-wrap';zoneNotice.dataset.stageUi='true';
+    const text=zoneNode('div');text.className='board-zone-notice';text.setAttribute('role','status');
+    text.textContent="Your teacher hasn't given you a space yet.";zoneNotice.append(text);
+    scroller.insertBefore(zoneNotice,scroller.firstChild);
+  }
+  // A student: bring their own box into view (the board may be bigger than the screen). Once per change of box, as soon as the
+  // board is on show. The teacher's view (which the student follows) is not touched.
+
+  function focusMyZone(){
+    if(isTeacher||!zoneFocusPending||scroller.hidden||!W||!H)return;
+    const z=myZones&&!myZones.locked?myZones.zones.find(item=>item.mine):null;
+    if(!z){zoneFocusPending=false;return}
+    zoneFocusPending=false;
+    const cw=scroller.clientWidth,ch=scroller.clientHeight;
+    const x0=z.x*W,x1=(z.x+z.w)*W,y0=z.y*H,y1=(z.y+z.h)*H;
+    if(x0>=scroller.scrollLeft&&x1<=scroller.scrollLeft+cw&&y0>=scroller.scrollTop&&y1<=scroller.scrollTop+ch)return;
+    quietUntil=Date.now()+150;
+    if(W>cw)scroller.scrollLeft=Math.max(0,Math.min(W-cw,(x0+x1)/2-cw/2));
+    if(H>ch)scroller.scrollTop=Math.max(0,Math.min(H-ch,(y0+y1)/2-ch/2));
+    afterMove();
   }
   // Teacher: the zones changed (or the page did). Redraw, tell every student, and tell the zone panel.
   function syncZones(){
@@ -2076,7 +2108,10 @@
     const next=Z.cleanForStudent(message);
     myZones=next.zones.length?next:null;
     if(!myZones&&draft)cancelDraft();
+    const mineKey=JSON.stringify((myZones?.zones||[]).filter(z=>z.mine).map(z=>[z.id,z.x,z.y,z.w,z.h]));
+    if(mineKey!==zoneFocusKey){zoneFocusKey=mineKey;zoneFocusPending=mineKey!=='[]'}
     renderZones();
+    requestAnimationFrame(focusMyZone);
   }
   // Student: may a press start at p? false: no (and say why); a zone: stay inside it; null: the board is free.
   function zoneStart(p){
@@ -2086,6 +2121,8 @@
     return zone;
   }
   const zoneAllowsStudent=stroke=>isTeacher||!Z||Z.studentAllows(myZones,stroke);
+  // Student: may this mark (anyone's) be picked, moved and resized? Only while zones are on and unlocked, and only wholly inside their own box.
+  function zoneSelectable(stroke){return !isTeacher&&!!Z&&Z.studentActive(myZones)&&!myZones.locked&&Z.studentAllows(myZones,stroke)}
   // The student's own box that holds this mark (or null: no zones, or the teacher).
   const studentZoneOf=mark=>isTeacher||!Z||!Z.studentActive(myZones)?null:Z.studentZoneAt(myZones,mark.points[0]);
 

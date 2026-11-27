@@ -250,13 +250,12 @@ test('Student whiteboards: the teacher can delete a student\'s mark, and Clear l
   assert.ok(!f.sent.some(entry=>entry.message.any===true),'no student mark was removed');
 });
 
-test('Student whiteboards: a student can never change or remove the teacher\'s marks',async()=>{
+test('Student whiteboards: a student cannot put marks as the teacher, or move the teacher marks without asking for it', async () => {
   const f=await boardFixture();
   f.tile.click();
   const surface=f.toolbar.stack.find(s=>s.id==='student-board');
   surface.setItems([stroke('t1')]);
   // From the student's connection: remove (even asking for any), put and move are refused.
-  f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-remove',ids:['t1'],any:true});
   f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-remove',ids:['t1']});
   f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-put',stroke:stroke('s5'),owner:'teacher'});
   f.window.ClassPointerBoards.fromStudent(f.member,{type:'board-move',id:'t1',points:[{x:.5,y:.5},{x:.6,y:.6}]});

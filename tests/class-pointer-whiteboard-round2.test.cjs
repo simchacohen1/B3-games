@@ -470,3 +470,25 @@ test('once the same work is saved, an older device copy of it is removed too',as
   assert.equal((await later.auto.flush()).ok,true);
   assert.equal(Object.keys(later.store).filter(key=>key.startsWith('ftt-board-draft:')).length,0);
 });
+
+test('a student on their own board can move, resize and remove what the teacher put there (their copy); a group board cannot',()=>{
+  const b=board({...item('t1'),by:'teacher'},{...item('s1'),by:'student'});
+  const sent=[];const act=op=>{sent.push(op);B.applyOp(b,op,'student')};
+  // Without the flag a student still cannot touch the teacher's mark.
+  assert.equal(B.applyOp(b,{type:'board-move',id:'t1',newId:'s9',points:[{x:.2,y:.2},{x:.4,y:.4}]},'student'),false);
+  assert.equal(B.applyOp(b,{type:'board-remove',ids:['t1']},'student'),false);
+  // The toolbar (student's own, not a group's) hands over the teacher's mark with a new place: the old one goes, a student's one comes.
+  const moved=item('s2',{points:[{x:.5,y:.5},{x:.7,y:.7}]});
+  B.syncBoardItems(b,'student',[item('s1'),moved],act,null,true);
+  assert.equal(order(b),'s1,s2');
+  assert.equal(b.strokes.find(s=>s.id==='s2').by,'student');
+  assert.ok(sent.some(op=>op.type==='board-remove'&&op.any===true));
+  // A resized picture of the teacher's keeps its picture (board-move) and is then the student's.
+  const pic=board({id:'t5',tool:'rect',color:'#1f2937',size:.006,points:[{x:.1,y:.1},{x:.3,y:.3}],image:'data:image/png;base64,AAAA',by:'teacher'});
+  assert.equal(B.applyOp(pic,{type:'board-move',id:'t5',newId:'s5',points:[{x:.1,y:.1},{x:.5,y:.5}],any:true},'student'),true);
+  assert.equal(pic.strokes[0].id,'s5');assert.equal(pic.strokes[0].by,'student');
+  // A group board: the member's page never asks for it, and the relay keeps only the member's own lines.
+  const g=board({...item('t1'),by:'teacher'});
+  assert.equal(B.groupOp({pages:[g],at:0},{type:'board-move',id:'t1',newId:'s9',points:[{x:.2,y:.2},{x:.4,y:.4}],any:true},'m1'),null);
+  assert.equal(B.groupOp({pages:[g],at:0},{type:'board-remove',ids:['t1'],any:true},'m1'),null);
+});

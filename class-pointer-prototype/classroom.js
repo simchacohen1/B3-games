@@ -95,9 +95,17 @@ function replaceStudentMarks(member,changes){
   // A move of several marks is one step for the student's Undo.
   highlightStore.group(member.id,()=>{
     for(const change of changes.slice(0,60)){
-      if(!change||typeof change.id!=='string'||!editable(change.id)||!change.stroke||!C.cleanStroke(change.stroke))continue;
+      if(!change||typeof change.id!=='string'||!change.stroke||!C.cleanStroke(change.stroke))continue;
       const converted=member.presence?studentMessageToDocument({type:'highlight',stroke:change.stroke}).stroke:change.stroke;
-      if(zonesOn()&&!(zoneAllows(member,highlightStore.strokes.find(mark=>mark.id===change.id))&&zoneAllows(member,converted)))continue;
+      const mark=highlightStore.strokes.find(item=>item.id===change.id);
+      // Inside a box of their own (zones on, not locked) a student may also move and resize the teacher's marks and pictures.
+      // Both where the mark is and where it goes must be wholly inside one of their boxes; everything else stays locked.
+      if(mark&&mark.owner!==member.id){
+        if(zonesOn()&&!zoneState.locked&&zoneAllows(member,mark)&&zoneAllows(member,converted)&&highlightStore.replace(mark.owner,change.id,converted))changed=true;
+        continue;
+      }
+      if(!editable(change.id))continue;
+      if(zonesOn()&&!(zoneAllows(member,mark)&&zoneAllows(member,converted)))continue;
       if(highlightStore.replace(member.id,change.id,converted))changed=true;
     }
   });
@@ -862,6 +870,12 @@ function editOwnHighlightShape(id,stroke){
   send(teacherConnection,stroke?{type:'edit-highlights',action:'replace',changes:[{id,stroke}]}:{type:'edit-highlights',action:'erase',ids:[id]});
   return true;
 }
+// Several of my own marks at once (a block of words moved together).
+function editOwnHighlightShapes(list){
+  if(!Array.isArray(list)||!list.length||!window.ClassPointerPdf?.active()||!live()||!writingAllowed('select')||!teacherConnection?.open)return false;
+  send(teacherConnection,{type:'edit-highlights',action:'replace',changes:list.slice(0,60).map(([id,stroke])=>{const {image,...rest}=stroke||{};return{id,stroke:rest}})});
+  return true;
+}
 // Small, fixed doorway used by PDF mode (pdf-mode.js). Nothing else reaches into this file.
 window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   // What the lesson shows now: 'screen', 'pdf', 'webpage', 'whiteboard' or null (used by classroom-annotate.js).
@@ -884,7 +898,7 @@ window.ClassPointerBridge={isTeacher,send,fail,setNavigation,
   reorderMarks(ids,how){if(!isTeacher||!Array.isArray(ids)||!ids.length)return false;const changed=highlightStore.group('teacher',()=>highlightStore.reorder('teacher',ids,how));if(changed)publishHighlights();return changed},
   replaceMark(id,stroke){if(!isTeacher)return editOwnHighlightShape(id,stroke);if(!highlightStore.group('teacher',()=>highlightStore.replace(markOwner(id),id,stroke)))return false;publishHighlights();return true},
   // The same for several marks at once (the lines of one pasted text): [[id,stroke],...]. Sent to the class once.
-  replaceMarks(list){if(!isTeacher||!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
+  replaceMarks(list){if(!isTeacher)return editOwnHighlightShapes(list);if(!Array.isArray(list))return false;let changed=false;highlightStore.group('teacher',()=>{for(const [id,stroke] of list)changed=highlightStore.replace(markOwner(id),id,stroke)||changed});if(changed)publishHighlights();return changed},
   owner:()=>isTeacher?'teacher':'student:'+peer?.id,ownColor:()=>isTeacher?'#ffcc00':state.members.find(m=>m.id==='student:'+peer?.id)?.color||'#ffcc00',
   setPdf(on,kind='pdf'){state.pdf=on;state.documentKind=on?kind:null;state.points={};if(!on){highlightStore.reset();publishHighlights()}highlighter?.render();publish()},
   resetMarks(){state.points={};highlightStore.reset();publishHighlights();publish()},

@@ -130,8 +130,8 @@ test('words are opened for editing only with Text or a second click in Select; o
 
 test('the changed scripts get new cache versions',()=>{
  assert.match(html,new RegExp('"classroom-core\\.js\\?v=20261125-wb1"'),'classroom-core');
- assert.match(html,/"classroom\.js\?v=20261126-zn3"/,'classroom');
- assert.match(html,/"pdf-mode\.js\?v=20261126-zn1"/,'pdf-mode');
+ assert.match(html,/"classroom\.js\?v=20261127-zv1"/,'classroom');
+ assert.match(html,/"pdf-mode\.js\?v=20261127-zv1"/,'pdf-mode');
 });
 
 test('pasted words can be recolored and resized: a size click in Select goes to the picked mark',()=>{
@@ -161,7 +161,7 @@ test('the lines of one pasted text are picked, moved, recolored and resized toge
  assert.match(pdf,/upper\.color===lower\.color&&upper\.size===lower\.size&&Math\.abs\(lower\.points\[0\]\.y-upper\.points\[0\]\.y-lineStep\(upper\.size\)\)<\.004/);
  assert.match(pdf,/group:textBlock\(hit\)/);
  assert.match(pdf,/changeMarks\(textBlock\(stroke\)\.map\(item=>\[item\.id,\{\.\.\.item,color:color\.toLowerCase\(\)\}\]\)\)/);
- assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\|\|!Array\.isArray\(list\)\)return false;let changed=false;highlightStore\.group\('teacher',\(\)=>\{for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed\}\);if\(changed\)publishHighlights\(\);return changed\}/);
+ assert.match(classroom,/replaceMarks\(list\)\{if\(!isTeacher\)return editOwnHighlightShapes\(list\);if\(!Array\.isArray\(list\)\)return false;let changed=false;highlightStore\.group\('teacher',\(\)=>\{for\(const \[id,stroke\] of list\)changed=highlightStore\.replace\(markOwner\(id\),id,stroke\)\|\|changed\}\);if\(changed\)publishHighlights\(\);return changed\}/);
 });
 
 test('after a paste the teacher is pointed at Select, which is always on screen',()=>{
@@ -1061,7 +1061,7 @@ test('the teacher keeps a student\'s changes to that student\'s marks only',()=>
 test('the teacher page checks permissions and ownership on student Select messages',()=>{
  const room=read('class-pointer-prototype/classroom.js');
  assert.match(room,/else if\(live\(\)&&writingAllowed\('select',member\)\)\{\s*if\(message\.action==='replace'&&replaceStudentMarks\(member,message\.changes\)\)publishHighlights\(\);\s*else if\(message\.action==='erase'&&eraseStudentMarks\(member,message\.ids\)\)publishHighlights\(\);/);
- assert.match(room,/const converted=member\.presence\?studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke:change\.stroke;\s*(?:if\(zonesOn\(\)[^\n]*continue;\s*)?if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
+ assert.match(room,/const converted=member\.presence\?studentMessageToDocument\(\{type:'highlight',stroke:change\.stroke\}\)\.stroke:change\.stroke;[\s\S]*if\(highlightStore\.replace\(member\.id,change\.id,converted\)\)changed=true;/,'the owner is the sender\'s, never named by the message');
  assert.doesNotMatch(room,/replace\(change\.owner|replace\(message\.owner/);
 });
 
@@ -1200,7 +1200,7 @@ function teacherMarkApi({isTeacher=true}={}){
  const method=name=>{const line=lines.find(text=>text.startsWith('  '+name+'('));assert.ok(line,name+' is in classroom.js');return line.replace(/,\s*$/,'')};
  const store=new C.HighlightStore(),published=[];
  const code=grabFunction(room,'function markOwner(id)')+';({'+['eraseMark','eraseMarks','swapMarks','replaceMark','replaceMarks'].map(method).join(',')+'})';
- const api=vm.runInNewContext(code,{isTeacher,editOwnHighlightShape:()=>false,highlightStore:store,publishHighlights:()=>published.push(1),Array,Number});
+ const api=vm.runInNewContext(code,{isTeacher,editOwnHighlightShape:()=>false,editOwnHighlightShapes:()=>false,highlightStore:store,publishHighlights:()=>published.push(1),Array,Number});
  return{api,store,published};
 }
 
@@ -1305,4 +1305,37 @@ test('the lesson store preserves highlight shapes through edits and undo',()=>{
  assert.equal(store.strokes.at(-1).color,'#ffcc00');
  store.edit(student,'undo');
  assert.deepEqual(store.strokes.map(s=>s.tool),['highlight-rectangle']);
+});
+
+test('zones: inside their own box a student moves the teacher\'s marks; outside it, or with the zones locked, nothing changes', () => {
+ const Z = require('../class-pointer-prototype/board-zones-core.js');
+ const room = read('class-pointer-prototype/classroom.js');
+ const store = new C.HighlightStore();
+ const zoneState = { zones: [{ id: 'z1', x: .05, y: .1, w: .4, h: .5, owners: [{ k: 'avi', n: 'Avi' }] }], locked: false };
+ const member = { id: 'student:a', studentId: 'avi', name: 'Avi', presence: false };
+ const code = grabFunction(room, 'function replaceStudentMarks(member,changes)') + ';' + grabFunction(room, 'function canEditStudentMark(member,mark)') + ';({replaceStudentMarks})';
+ const sandbox = { highlightStore: store, C, Array, zoneState, Z, zonesOn: () => true, writingAllowed: () => true, toolAllowed: () => true,
+  zoneAllows: (m, stroke) => !Z.active(zoneState.zones) || Z.allows(zoneState.zones, zoneState.locked, Z.keyOf(m), stroke) };
+ sandbox.zonesOn = () => Z.active(zoneState.zones);
+ const api = require('node:vm').runInNewContext(code, sandbox);
+ const rect = (x1, y1, x2, y2) => ({ tool: 'rectangle', color: '#1d4ed8', size: .016, points: [{ x: x1, y: y1 }, { x: x2, y: y2 }] });
+ store.add('teacher', rect(.1, .2, .2, .3)); store.add('teacher', rect(.6, .2, .7, .3));
+ const [inside, outside] = store.strokes.map(s => s.id);
+ // Inside the box, moved inside the box: the teacher's mark moves and is still the teacher's.
+ assert.equal(api.replaceStudentMarks(member, [{ id: inside, stroke: rect(.2, .3, .3, .4) }]), true);
+ assert.deepEqual(store.strokes[0].points[0], { x: .2, y: .3 }); assert.equal(store.strokes[0].owner, 'teacher');
+ // Dragged out of the box: refused.
+ assert.equal(api.replaceStudentMarks(member, [{ id: inside, stroke: rect(.6, .3, .7, .4) }]), false);
+ assert.deepEqual(store.strokes[0].points[0], { x: .2, y: .3 });
+ // A mark outside the box stays locked.
+ assert.equal(api.replaceStudentMarks(member, [{ id: outside, stroke: rect(.1, .3, .2, .4) }]), false);
+ assert.deepEqual(store.strokes[1].points[0], { x: .6, y: .2 });
+ // Locked zones, or no zone of theirs: nothing.
+ zoneState.locked = true;
+ assert.equal(api.replaceStudentMarks(member, [{ id: inside, stroke: rect(.1, .3, .2, .4) }]), false);
+ zoneState.locked = false;
+ assert.equal(api.replaceStudentMarks({ ...member, studentId: 'benny', name: 'Benny' }, [{ id: inside, stroke: rect(.1, .3, .2, .4) }]), false);
+ // With no zones at all the old rule stands: the teacher's marks are not theirs.
+ zoneState.zones = [];
+ assert.equal(api.replaceStudentMarks(member, [{ id: inside, stroke: rect(.1, .3, .2, .4) }]), false);
 });

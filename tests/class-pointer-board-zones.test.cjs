@@ -160,7 +160,7 @@ test('the teacher’s page checks every mark a student sends against that studen
   assert.match(src, /const zoneAllows=\(member,stroke\)=>!zonesOn\(\)\|\|Z\.allows\(zoneState\.zones,zoneState\.locked,Z\.keyOf\(member\),stroke\)/);
   // new marks, changed marks, taken-away marks, undo and clear
   assert.match(src, /if\(!zoneAllows\(member,message\.stroke\)\)\{send\(member\.connection,\{type:'lesson-zone-denied'\}\);return\}/);
-  assert.match(src, /zoneAllows\(member,highlightStore\.strokes\.find\(mark=>mark\.id===change\.id\)\)&&zoneAllows\(member,converted\)/);
+  assert.match(src, /zoneAllows\(member,mark\)&&zoneAllows\(member,converted\)/);
   assert.match(src, /canEditStudentMark\(member,mark\)&&zoneAllows\(member,mark\)/);
   assert.match(src, /zonesOn\(\)&&zoneState\.locked\)\{send\(member\.connection,\{type:'lesson-zone-denied'\}\)/);
   // who the student is comes from the connection, never from the message
@@ -208,4 +208,15 @@ test('the zones window only ever shows names as text and works only on the teach
   assert.doesNotMatch(src, /innerHTML|insertAdjacentHTML|outerHTML/);
   assert.match(src, /if\(!B\|\|!B\.isTeacher\|\|!Z\)return/);
   for (const word of ['Draw a zone', 'Lock all zones', 'Unlock all zones', 'Remove all zones', 'One box for each student', 'Make boxes']) assert.ok(src.includes(word), word);
+});
+
+test('a student sees their own space clearly: bright outline, "Your space", dimmed rest, a note when they have none', () => {
+  const pdf = read('pdf-mode.js'), css = read('student-boards.css');
+  assert.match(pdf, /'Your space'/);
+  assert.match(pdf, /Your teacher hasn't given you a space yet\./);
+  assert.match(pdf, /board-zone-halo/);
+  assert.match(pdf, /function focusMyZone/);
+  assert.match(css, /\.board-zone-box\.mine\{stroke:#00c853;stroke-width:5/);
+  assert.match(css, /\.board-zone-dim\{fill-opacity:\.42\}/);
+  assert.match(css, /\.board-zone-notice/);
 });
