@@ -227,6 +227,22 @@
       });
     } catch (e) {}
   }
+  // The owner's class dropdowns inside tools list only B3 ET and B3 WT (admin pages keep every class).
+  // The option the page has selected is never removed, so a link to another class still shows it.
+  function limitOwnerDropdowns(scope) {
+    try {
+      if (/(?:^|\/)(?:admin|owner-admin)\.html$/.test(root.location.pathname) || !isOwner()) return;
+      Object.keys(SELECT_IDS).forEach(function (id) {
+        var sel = scope.getElementById(id);
+        if (!sel || sel.tagName !== 'SELECT') return;
+        var classOpts = Array.prototype.filter.call(sel.options, function (o) { return SAFE.test(o.value) && o.value !== ALL; });
+        if (!classOpts.some(function (o) { return o.value === 'et' || o.value === 'wt'; })) return;
+        classOpts.forEach(function (o) {
+          if (o.value !== 'et' && o.value !== 'wt' && o !== sel.options[sel.selectedIndex]) o.remove();
+        });
+      });
+    } catch (e) {}
+  }
   function watchPage() {
     var doc = root.document;
     if (!doc || !doc.addEventListener || root.__b3ClassWatch) return;
@@ -241,10 +257,12 @@
     var queued = false;
     function schedule() {
       if (queued) return; queued = true;
-      (root.requestAnimationFrame || root.setTimeout)(function () { queued = false; relabelOptions(doc); });
+      (root.requestAnimationFrame || root.setTimeout)(function () { queued = false; relabelOptions(doc); limitOwnerDropdowns(doc); });
     }
     function start() {
-      relabelOptions(doc);
+      relabelOptions(doc); limitOwnerDropdowns(doc);
+      // Owner sign-in settles after the page loads: look again for a few seconds.
+      var n = 0, t = root.setInterval(function () { limitOwnerDropdowns(doc); if (++n > 12) root.clearInterval(t); }, 1000);
       if (root.MutationObserver) new root.MutationObserver(schedule).observe(doc.body, { childList: true, subtree: true });
     }
     if (doc.body) start(); else doc.addEventListener('DOMContentLoaded', start, { once: true });

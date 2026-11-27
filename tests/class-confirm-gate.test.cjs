@@ -76,3 +76,8 @@ test('the owner\'s class pickers list only B3 ET and B3 WT; teachers see all the
   assert.deepEqual(gate.pickable(ids),ids);
   delete global.B3SiteSettings;
 });
+test('owner dropdowns inside tools are limited to B3 ET and B3 WT; admin pages are not',()=>{
+  const src=fs.readFileSync(path.join(__dirname,'..','class-confirm-gate.js'),'utf8');
+  assert.match(src,/limitOwnerDropdowns/);
+  assert.match(src,/admin\|owner-admin/);
+});
