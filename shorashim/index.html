@@ -1171,6 +1171,8 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
 <link rel="stylesheet" href="shorashim-hubs.css?v=20261126-inner2">
+<link rel="stylesheet" href="practice.css?v=20261127-mastery2">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap">
 <style id="shorashim-perek-menu-styles">
   .perek-choice-grid{margin:26px auto 0}
   .perek-choice{min-height:215px;align-items:center;justify-content:center;text-align:center;gap:12px;border:2px solid #c7d2fe}
@@ -1483,6 +1485,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
               <span class="hub-sub">No recording</span>
               <span class="hub-pts none">No points</span>
             </button>
+            <button type="button" class="hub-card hub-practice-acts" id="practiceHomeCard" data-go="practiceScreen">
+              <span class="hub-art" aria-hidden="true"><span class="hub-emoji">✍️</span></span>
+              <strong>Practice Activities</strong>
+              <span class="hub-sub">Tracing, multiple choice, matching</span>
+            </button>
             <button type="button" class="hub-card hub-games" id="gamesHomeCard" data-go="gamesScreen">
               <span class="hub-art" aria-hidden="true"><span class="hub-emoji">🎮</span></span>
               <strong>Games</strong>
@@ -1594,6 +1601,19 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
           </div>
         </section>
 
+        <section id="practiceScreen" class="screen">
+          <div class="section-head">
+            <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
+            <div><h2>Practice Activities</h2></div>
+          </div>
+          <div class="hero-grid two game-menu-grid">
+            <button class="feature-card" data-practice="trace"><span class="feature-icon">✍️</span><strong>Tracing</strong><span>Trace the word</span></button>
+            <button class="feature-card" data-practice="mc"><span class="feature-icon">🅰️</span><strong>Multiple Choice</strong><span>Pick the meaning</span></button>
+            <button class="feature-card" data-practice="match"><span class="feature-icon">🔗</span><strong>Matching</strong><span>Match Hebrew to English</span></button>
+          </div>
+          <div id="practiceStage" class="card-panel game-stage hidden"></div>
+        </section>
+
         <section id="gamesScreen" class="screen">
           <div class="section-head">
             <button class="backBtn backStep ghost" data-back="reviewHubScreen">← Back</button><button class="backBtn ghost">← Home</button>
@@ -1684,7 +1704,9 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="units.js?v=20261108-units-2"></script>
   <script src="review-cycle-core.js?v=20261127-cycles2"></script>
   <script src="builtin-pictures.js?v=20261127-builtin1"></script>
-  <script src="app.js?v=20261127-builtin1-cycles2"></script>
+  <script src="mastery-core.js?v=20261127-mastery1"></script>
+  <script src="app.js?v=20261127-builtin1-cycles2-mastery1"></script>
+  <script src="practice-activities.js?v=20261127-mastery2"></script>
   <script src="review-categories.js?v=20261127-cycles2"></script>
   <script src="review-cycles.js?v=20261127-cycles2"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>
