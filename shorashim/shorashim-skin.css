@@ -333,11 +333,8 @@ body.sk-has-reset #learnWorkspace #resetCardBtn{display:none !important}
 #newBadge{background:#ffe9a8 !important;color:#7a4b00 !important;border:2px solid #f0c24f}
 
 /* ---------- Small screens: keep the header simple ---------- */
-@media (max-width:900px){
-  .sk-progress .sk-bar,.sk-progress .sk-pct{display:none}
-}
 @media (max-width:650px){
-  .sk-progress{display:none}
+  .sk-progress{gap:6px;padding:4px 8px}.sk-progress .sk-trophy{display:none}.sk-progress .sk-count{min-width:54px}
   .topbar h1 .sk-words span{font-size:.7em}
   #learnWorkspace .toolbox[data-ux-tool="pictures"].ux-tool-active{
     grid-template-columns:minmax(0,1fr) !important;

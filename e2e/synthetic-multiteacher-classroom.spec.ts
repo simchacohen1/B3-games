@@ -412,13 +412,17 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await page.goto(`${origin}/shorashim/index.html`);
   await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
   await expect(page.locator('#appShell')).toBeVisible();
+  // New Shorashim now opens the learning cards directly; "Switch list" shows the lists.
   await page.getByRole('button',{name:/^New Shorashim/}).click();
+  await expect(page.locator('#editorContent')).toBeVisible();
+  await page.locator('#changeLearningPerekBtn').click();
   await expect(page.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('1 of 1 learned');
   await page.locator('[data-learning-perek="perek:18"]').click();
   await expect(page.locator('#editorContent')).toBeVisible();
   await page.reload();
   await expect(page.locator('#signedInStudentName')).toHaveText('Ari Example');
   await page.getByRole('button',{name:/^New Shorashim/}).click();
+  await page.locator('#changeLearningPerekBtn').click();
   await expect(page.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('1 of 1 learned');
   expect(await readFixture(`posukPractice/shorashimLearning/students/${ariId}`)).toBeNull();
   const chazaraTeacherContext=await browser.newContext(),chazaraTeacherPage=await chazaraTeacherContext.newPage();
@@ -444,6 +448,7 @@ test('new teacher claims one assigned class, enrolls three students, and a stude
   await chazaraTeacherPage.goto(`${origin}/shorashim/index.html?class=${CLASS_ID}`);
   await expect(chazaraTeacherPage.locator('#signedInStudentName')).toHaveText('Teacher Preview');
   await chazaraTeacherPage.getByRole('button',{name:/^New Shorashim/}).click();
+  await chazaraTeacherPage.locator('#changeLearningPerekBtn').click();
   await expect(chazaraTeacherPage.locator('[data-learning-perek="perek:18"] .perek-progress')).toContainText('0 of 1 learned');
   await chazaraTeacherContext.close();
   const claims=await page.evaluate(async()=> (await window.firebase.auth().currentUser.getIdTokenResult()).claims);

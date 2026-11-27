@@ -95,7 +95,7 @@ test('choosing a unit updates the menu without leaving Shorashim',()=>{
   ctx.db.settings.showBooklet=false;
   ctx.chooseLearningPerek('booklet'); // the teacher turned the booklet off
   assert.deepEqual(screens,['learnScreen','learnScreen']);
-  assert.match(html,/data-go="shorashimPerekScreen" data-track="shorashim"/);
+  assert.match(html,/data-learn-direct="1" data-track="shorashim"/);
   assert.match(html,/id="perekUnitChoices"/);
   assert.match(html,/changeLearningPerekBtn/);
 });
