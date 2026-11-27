@@ -10,9 +10,9 @@ const block = html.slice(html.indexOf('// ---- Editing the overview (owner only)
 test('each teacher row starts with a checkbox, tool cells are buttons, and the bulk bar and Undo bar exist', () => {
   assert.match(html, /<th scope="row"><label><input type="checkbox" data-pick=/);
   assert.match(html, /<button type="button" class="tool-cell" data-teacher=/);
-  for (const id of ['toolAccessSelectAll', 'toolAccessClearSel', 'toolAccessTool', 'toolAccessGive', 'toolAccessRemove', 'toolAccessUndoBar', 'toolAccessUndo'])
+  for (const id of ['toolAccessSelectAll', 'toolAccessClearSel', 'toolAccessTools', 'toolAccessToolsAll', 'toolAccessToolList', 'toolAccessGive', 'toolAccessRemove', 'toolAccessUndoBar', 'toolAccessUndo'])
     assert.ok(html.includes('id="' + id + '"'), id);
-  assert.match(html, /Select all shown/);
+  assert.match(html, /Select all teachers/);
   assert.match(html, /Give to selected/);
   assert.match(html, /Remove from selected/);
 });
@@ -25,7 +25,7 @@ test('a change applies to ALL of the teacher\'s active classes and warns about c
 });
 
 test('every change is confirmed first with the number of teachers and classes, and is written in one update', () => {
-  assert.match(block, /This changes "\+p\.items\.length\+" class/);
+  assert.match(block, /This makes "\+p\.items\.length\+" change/);
   assert.match(block, /if\(!confirm\(message\)\)return;/);
   assert.match(block, /await db\.ref\(\)\.update\(updates\)/);
   assert.match(block, /updates\["b3Games\/workspaces\/"\+WS\+"\/classes\/"\+i\.classId\+"\/toolGrants\/"\+i\.tool\]=i\.next/);
@@ -47,4 +47,11 @@ test('the CSV export and the earlier overview features are unchanged by the edit
   assert.match(html, /const toolAccessHeaders=\["Name","School","Classes",\.\.\.PLATFORM_TOOLS\.map\(\(\[,name\]\)=>name\)\];/);
   assert.match(html, /downloadFile\("tool-access-overview\.csv",FTTOwnerExport\.toCsv\(\[toolAccessHeaders,\.\.\.rows\]\)\)/);
   assert.match(html, /\.access-overview-table thead th:first-child,\.access-overview-table tbody th\{position:sticky;left:0;/);
+});
+
+test('several tools can be ticked (or all at once) and are confirmed with the tool and teacher counts', () => {
+  assert.match(html, /Select all tools/);
+  assert.match(block, /const pickedTools=\(\)=>/);
+  assert.match(block, /apply\(\[\.\.\.toolAccessSelected\],pickedTools\(\),true\)/);
+  assert.match(block, /tools\.length\+" tools"/);
 });

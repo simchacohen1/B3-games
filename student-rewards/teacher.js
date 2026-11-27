@@ -641,6 +641,7 @@ function studentsPage(){
   ${gaps.length?`<div class="points-alert"><b>⚠ ${gaps.length} balance${gaps.length===1?"":"s"} contain older points without a saved reason.</b><span>Those show as “History gap” in the boy’s history.</span></div>`:""}
   <div class="students-bar"><input id="studentSearch" type="search" placeholder="Find a boy…" aria-label="Find a boy"><strong>${total} ★ across ${r.length} student${r.length===1?"":"s"}</strong></div>
   <div class="points-student-grid">${r.map(s=>{const bal=Number(s.rewardBalance)||0,last=latest[s.id],w=waiting[s.id]||0;return `<button class="points-student-card" data-student-card data-name="${esc(String(s.name||"").toLowerCase())}" data-open-student="${esc(s.id)}"><span class="points-student-top"><em style="background:${esc(safeColor(s))}">${esc(s.initials||initials(s.name))}</em><span><b>${esc(s.name)}</b><small>${all&&pointsStudentClassLabel(s.id)?`${esc(pointsStudentClassLabel(s.id))} · `:""}${last?`Latest: ${esc(last.reason)}`:"No saved activity yet"}</small></span></span><strong class="${bal<0?"neg":""}">${bal} ★</strong>${w?`<span class="chip-wait">${w} prize${w===1?"":"s"} waiting</span>`:""}</button>`}).join("")||`<div class="empty"><h3>No students in this class</h3><p>Add students under Settings → Classes.</p></div>`}</div>
+  ${classSpendingOverviewHTML(r)}
   ${reportsSection()}</section>`;
 }
 function reportsSection(){
@@ -656,6 +657,42 @@ function studentPrizesHTML(s){
     return `<div class="stu-line"><span><b>${esc(item.rewardName||"Class reward")}${Array.isArray(item.modeNames)&&item.modeNames.length?" — "+esc(item.modeNames.join(", ")):""}</b><small>${amount} ★ to ${esc(item.className||pointClassName(item.classId))} · ${item.createdAt?esc(new Date(timeMs(item.createdAt)).toLocaleDateString()):""}</small></span>${done?prizePill("refunded"):""}${!done&&!state.teacherMode?`<button type="button" class="points-undo refund" data-refund-contribution="${esc(s.id)}|${esc(key)}">↩ Refund</button>`:""}</div>`};
   return `<section class="points-section"><div class="points-section-head"><div><h2>Prizes and class contributions</h2><p>What ${esc(s.name)} spent points on. Waiting = bought, not handed over yet.</p></div></div><div class="stu-lines">${buys.map(buyRow).join("")}${gives.map(giveRow).join("")}${buys.length||gives.length?"":`<div class="empty"><p>No prizes bought and nothing given to a class goal yet.</p></div>`}</div></section>`;
 }
+// ---------- Prize spending chart (one boy) and class overview (one row per boy) ----------
+// Everything a boy ever spent in the Prize Store: purchases and class-prize contributions, with what was returned.
+// Read-only: built from the records already loaded, nothing is written here.
+function spendingEntries(sid){
+  const out=[],R=state.root||{};
+  for(const [key,item0] of Object.entries(R.redemptionsByStudent?.[sid]||{})){
+    const item=item0||{},st=String(item.status||"pending"),points=Math.max(0,Number(item.cost)||0),returned=["declined","canceled","refunded"].includes(st);
+    out.push({kind:"Bought",key,when:timeMs(item.requestedAt),name:R.rewards?.[item.rewardId]?.name||item.rewardName||"Prize",points,returned,refunded:returned?points:0,state:returned?"Refunded":st==="collected"?"Given":"Waiting"});
+  }
+  for(const [key,item0] of Object.entries(R.classRewardContributionsByStudent?.[sid]||{})){
+    const item=item0||{},points=Math.abs(Number(item.amount)||0),returned=Boolean(item.refundedAt),won=Boolean(item.winner&&typeof item.winner==="object");
+    out.push({kind:"Class prize",key,when:timeMs(item.createdAt),name:(item.rewardName||"Class prize")+(Array.isArray(item.modeNames)&&item.modeNames.length?" — "+item.modeNames.join(", "):""),points,returned,refunded:returned?Math.abs(Number(item.refundedAmount??points)||0):0,state:returned?"Refunded":won?"Won":"On the bar"});
+  }
+  return out.sort((a,b)=>a.when-b.when);
+}
+function spendingTotals(sid){
+  const rows=spendingEntries(sid),spent=rows.reduce((a,r)=>a+r.points,0),refunded=rows.reduce((a,r)=>a+r.refunded,0);
+  return {rows,spent,refunded,net:spent-refunded,buys:rows.filter(r=>r.kind==="Bought").length,gifts:rows.filter(r=>r.kind==="Class prize").length};
+}
+function spendingWhen(t){return t?new Date(t).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"Unknown date"}
+function studentSpendingHTML(s){
+  const t=spendingTotals(s.id),bal=Number(s.rewardBalance)||0;
+  const perItem=new Map();
+  for(const r of t.rows){const k=r.kind+"|"+r.name,e=perItem.get(k)||{kind:r.kind,name:r.name,times:0,spent:0,refunded:0};e.times++;e.spent+=r.points;e.refunded+=r.refunded;perItem.set(k,e)}
+  const items=[...perItem.values()].sort((a,b)=>b.spent-a.spent),top=Math.max(1,...items.map(i=>i.spent));
+  const tile=(label,value,cls="")=>`<div class="spend-tile ${cls}"><small>${esc(label)}</small><b>${value} ★</b></div>`;
+  return `<section class="points-section spend-chart"><div class="points-section-head"><div><h2>Prize Store spending</h2><p>Every purchase and class-prize contribution ${esc(s.name)} ever made. Refunds are shown, nothing is deleted.</p></div></div>
+  <div class="spend-tiles">${tile("Total spent",t.spent)}${tile("Total refunded",t.refunded,"good")}${tile("Net spent",t.net)}${tile("Current balance",bal,bal<0?"bad":"")}</div>
+  ${t.rows.length?`<h3 class="spend-sub">Totals per item</h3><div class="spend-bars">${items.map(i=>`<div class="spend-bar-row"><span class="spend-bar-name"><b>${esc(i.name)}</b><small>${esc(i.kind)} · ${i.times} time${i.times===1?"":"s"}</small></span><span class="spend-bar-track"><i style="width:${Math.max(2,Math.round(i.spent/top*100))}%"></i>${i.refunded?`<i class="back" style="width:${Math.round(i.refunded/top*100)}%"></i>`:""}</span><span class="spend-bar-num"><b>${i.spent} ★</b>${i.refunded?`<small>${i.refunded} ★ refunded</small>`:""}</span></div>`).join("")}</div>
+  <h3 class="spend-sub">Every purchase and contribution</h3><div class="points-table"><table class="spend-table"><thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Points</th><th>Status</th><th>Refunded</th></tr></thead><tbody>${t.rows.slice().reverse().map(r=>`<tr><td>${esc(spendingWhen(r.when))}</td><td>${esc(r.kind)}</td><td>${esc(r.name)}</td><td><b>${r.points} ★</b></td><td><span class="prize-pill ${r.returned?"refunded":r.state==="Given"||r.state==="Won"?"given":"waiting"}">${esc(r.state)}</span></td><td>${r.refunded?`+${r.refunded} ★`:"—"}</td></tr>`).join("")}</tbody><tfoot><tr><td colspan="3">Totals</td><td><b>${t.spent} ★</b></td><td></td><td><b>${t.refunded?"+"+t.refunded+" ★":"—"}</b></td></tr></tfoot></table></div>`:`<p class="muted">No purchases or contributions yet.</p>`}</section>`;
+}
+function classSpendingOverviewHTML(roster){
+  const rows=roster.map(s=>({s,t:spendingTotals(s.id)})),sum=f=>rows.reduce((a,x)=>a+f(x),0);
+  return `<section class="points-section spend-overview" id="spendOverview"><div class="points-section-head"><div><h2>Prize Store spending overview</h2><p>One row per boy: what he bought, gave to class prizes, and got back. Tap a boy for his full chart.</p></div></div>
+  <div class="points-table"><table class="spend-table"><thead><tr><th>Boy</th><th>Bought</th><th>Class prize gifts</th><th>Total spent</th><th>Total refunded</th><th>Net spent</th><th>Balance now</th></tr></thead><tbody>${rows.map(({s,t})=>`<tr data-open-student="${esc(s.id)}" class="spend-click"><td><b>${esc(s.name)}</b></td><td>${t.buys}</td><td>${t.gifts}</td><td>${t.spent} ★</td><td>${t.refunded?`+${t.refunded} ★`:"—"}</td><td>${t.net} ★</td><td><b>${Number(s.rewardBalance)||0} ★</b></td></tr>`).join("")}</tbody><tfoot><tr><td>All ${rows.length} boys</td><td>${sum(x=>x.t.buys)}</td><td>${sum(x=>x.t.gifts)}</td><td>${sum(x=>x.t.spent)} ★</td><td>+${sum(x=>x.t.refunded)} ★</td><td>${sum(x=>x.t.net)} ★</td><td>${sum(x=>Number(x.s.rewardBalance)||0)} ★</td></tr></tfoot></table></div></section>`;
+}
 function studentDetail(s){
   state.pointClassId="all";state.pointStudent=s.id;
   const ledger=allPointLedger(true).filter(row=>row.sid===s.id&&row.counts);
@@ -664,6 +701,7 @@ function studentDetail(s){
   return `<section class="workspace student-detail"><button type="button" class="back-link" id="backToStudents">← All students</button>
   <div class="studenthero"><em class="huge" style="background:${esc(safeColor(s))}">${esc(s.initials)}</em><div><h2>${esc(s.name)}</h2><p>${esc(pointsStudentClassLabel(s.id)||"")}</p></div><button class="balance" id="adjustPoints"><span>CURRENT POINT BALANCE</span><b class="${bal<0?"neg":""}">${bal} ★</b><small>Click to adjust points</small></button></div>
   <section class="points-section"><div class="points-section-head"><div><h2>Where the points came from</h2><p>All-time, by reason. Tap a reason to filter the history below.</p></div></div><div class="points-reason-grid">${groups.map(x=>`<button class="points-reason-card ${state.pointType===x.id?"selected":""} ${x.amount<0?"negative":x.amount>0?"positive":"zero"}" data-points-source="${esc(x.id)}"><span class="points-reason-icon">${x.icon}</span><span class="points-reason-copy"><b>${esc(x.label)}</b>${x.hint?`<small>${esc(x.hint)}</small>`:""}<i>${x.count} ${x.count===1?"entry":"entries"}</i></span><strong>${x.amount>0?"+":""}${x.amount} ★</strong></button>`).join("")||`<div class="points-reason-empty">No saved point activity yet.</div>`}</div></section>
+  ${studentSpendingHTML(s)}
   ${studentPrizesHTML(s)}
   ${studentPointsPanel(s)}
   <section class="panel" style="margin-top:18px"><div class="panelhead"><div><h2>Progress by category</h2><p>${scoreFor(s)}% overall in ${esc(cls()?.name||"class")}</p></div></div><div class="categories">${Object.entries(g).map(([name,x])=>{const pct=x.p?Math.round(x.e/x.p*100):0;return `<article><span>${esc(name)}</span><b>${pct}%</b><u><i style="width:${Math.min(110,pct)}%;background:${esc(safeColor(s))}"></i></u><small>${x.e} of ${x.p} progress points</small></article>`}).join("")||`<article><span>Progress</span><b>—</b><small>No saved ratings yet</small></article>`}</div></section>

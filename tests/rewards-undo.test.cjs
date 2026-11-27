@@ -242,7 +242,7 @@ test('the staging copy of the teacher rewards function uses the same core as the
   assert.doesNotMatch(wrapper, /sols\.tools|funtorahtools\.com/);
   assert.match(fs.readFileSync(path.join(__dirname, '../backend/functions-staging/index.js'), 'utf8'), /exports\.studentRewardsTeacher = require\('\.\/rewards-teacher'\)\.studentRewardsTeacher;/);
   const html = fs.readFileSync(path.join(__dirname, '../student-rewards/teacher.html'), 'utf8');
-  assert.match(html, /brightpath\.css\?v=20261127-fourtabs/); assert.match(html, /teacher\.js\?v=20261127-fourtabs/);
+  assert.match(html, /brightpath\.css\?v=20261127-spending/); assert.match(html, /teacher\.js\?v=20261127-spending/);
 });
 
 test('an undo claim left behind by a crash can be taken again after 2 minutes, but not while it is fresh', async () => {
