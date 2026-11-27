@@ -557,9 +557,9 @@
       var ids=rows.map(function(row){return row.id;});
       // The panels act on the class in the link, else the teacher's site-wide class.
       authorized=true;
+      teacherAnnotate(true);
       selected = ids.includes(requested) ? requested : siteClass();
       adoptLinkClass();
-      teacherAnnotate(true);
       setupUi();
       syncClassPicker();
       syncHomeButton(access);
