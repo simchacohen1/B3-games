@@ -48,7 +48,7 @@ test('Send whiteboard to students hands the current whiteboard picture to the "s
   assert.equal(await h.api.sendCurrent(),true);
   assert.equal(h.sent.length,1);
   assert.equal(h.sent[0].blob,h.picture);
-  assert.match(h.sent[0].note,/own copy to draw on/);
+  assert.match(h.sent[0].note,/selected, moved and resized/);
   assert.match(h.sent[0].note,/stays on their own board/);
 });
 
@@ -89,7 +89,7 @@ test('student-boards sends only after the teacher confirms, through the existing
   assert.match(body,/if\(!B\.started\(\)\)\{B\.fail\(/);
   assert.match(body,/\/\^image\\\/\(png\|jpeg\|webp\)\$\/\.test\(blob\.type/,'only a picture');
   assert.match(body,/sendEveryone\('boards'\)/,'opens the student whiteboards first');
-  assert.match(body,/showPaste\(\{kind:'image',file:blob,subject:options\.subject\|\|'',note:/,'asks first');
+  assert.match(body,/showPaste\(\{kind:'image',file:blob,subject:options\.subject\|\|'',pieces:options\.pieces\|\|null,note:/,'asks first');
   assert.doesNotMatch(body,/sendActivity\(|sendImageFile\(|commitPaste\(/,'sends nothing by itself');
   // The preview's own button is what sends, and it keeps the size and type checks and the erase confirmation.
   assert.match(boardsSource,/const confirmPaste=button\('✓ Send to all boards'[^\n]*commitPaste\(\)/);
@@ -99,9 +99,9 @@ test('student-boards sends only after the teacher confirms, through the existing
 
 test('the toolbar Send menu offers This whiteboard (and a PDF); More no longer carries Send; the classroom loads the new scripts',()=>{
   assert.match(annotate,/\{icon:'📝',label:'This whiteboard',disabled:!window\.FTTSavedWork\?\.sendCurrent,onClick:\(\)=>window\.FTTSavedWork\?\.sendCurrent\?\.\(\)\}/);
-  assert.match(html,/student-boards[.]js[?]v=20261127-sel1/);
+  assert.match(html,/student-boards[.]js[?]v=20261127-pc1/);
   assert.match(html,/classroom-annotate[.]js[?]v=20261126-zn1/);
-  assert.match(html,/saved-work[.]js[?]v=20261125-wb3/);
+  assert.match(html,/saved-work[.]js[?]v=20261127-pc1/);
 });
 
 test('no rules, storage or function files are touched by this feature',()=>{

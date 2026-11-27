@@ -467,8 +467,16 @@
       else pictures=[await pdf.exportPng()];
     }catch(_){pictures=null}
     if(!pictures||!pictures.length||!pictures[0]){const ui=openDialog('Send to students');ui.body.append(h('p','ftt-saved-note','Open the whiteboard on the lesson first, then press Send whiteboard to students.'));return false}
-    if(all)return boards.sendPagesToAll(pictures,'These are the '+pictures.length+' pages of the whiteboard as they are now. Every student gets their own copy of every page to draw on. What they draw stays on their own board.',{subject:current?.subject||''});
-    return boards.sendPictureToAll(pictures[0],'This is the whiteboard as it is now. Every student gets their own copy to draw on. What they draw stays on their own board.',{subject:current?.subject||''});
+    // The words, pictures, shapes and lines also go along as separate pieces, so a student can select, move and resize them.
+    let pieces=null;
+    try{
+      if(typeof pdf.exportPieces==='function'&&typeof boards.sendPieces==='function'){
+        const list=await pdf.exportPieces(all?0:info&&info.count>1?Number(opts.page)||info.current+1:0);
+        if(list&&list.length&&list.some(piece=>piece.strokes.length||piece.hasBackground))pieces=list;
+      }
+    }catch(_){pieces=null}
+    if(all)return boards.sendPagesToAll(pictures,'These are the '+pictures.length+' pages of the whiteboard as they are now. Every student gets their own copy of every page: the words, pictures and shapes can be selected, moved and resized. What they do stays on their own board.',{subject:current?.subject||'',pieces});
+    return boards.sendPictureToAll(pictures[0],'This is the whiteboard as it is now. Every student gets their own copy: the words, pictures and shapes can be selected, moved and resized. What they do stays on their own board.',{subject:current?.subject||'',pieces});
   }
   // A whiteboard saved earlier. Its small picture was saved with it.
   async function sendFile(file,ui){

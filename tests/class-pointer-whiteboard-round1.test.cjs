@@ -177,5 +177,5 @@ test('sending a whiteboard to the class: the preview is the one yes, so no secon
   // The warning is shown in the preview, before the green button.
   assert.match(boards,/if\(hasStudentWork\(\)\)\{const warn=el\('p',null,'.{1,3} Some students have marks on their boards\. Sending replaces their boards with this one\.'\)/);
   // A declined question is never silent.
-  assert.equal((boards.match(/Nothing was sent\. Students still have their marks\./g)||[]).length,2);
+  assert.equal((boards.match(/Nothing was sent\. Students still have their marks\./g)||[]).length,3);
 });

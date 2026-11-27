@@ -52,8 +52,9 @@
     if(!s||typeof s.id!=='string'||!/^[a-z0-9-]{2,40}$/i.test(s.id)||!COLORS.includes(s.color)||!Array.isArray(s.points)||!s.points.length||s.points.length>MAX_POINTS||!s.points.every(validPoint))return null;
     const tool=s.tool==null||s.tool==='pen'?null:s.tool;
     if(tool!==null&&!ITEM_TOOLS.includes(tool))return null;
-    if(!(tool?ITEM_SIZES:SIZE_VALUES).includes(s.size))return null;
-    const out={id:s.id,color:s.color,size:s.size,points:s.points.map(p=>({x:round(p.x),y:round(p.y)}))};
+    // Words may be any size a teacher's words can be (an editable copy of the teacher's board keeps them); lines keep the fixed sizes.
+    if(tool==='text'?!(Number.isFinite(s.size)&&s.size>=.01&&s.size<=.08):!(tool?ITEM_SIZES:SIZE_VALUES).includes(s.size))return null;
+    const out={id:s.id,color:s.color,size:tool==='text'?round(s.size):s.size,points:s.points.map(p=>({x:round(p.x),y:round(p.y)}))};
     // On a group board the teacher's page marks each line with the code of the student who drew it ("m3").
     if(typeof s.who==='string'&&/^m[0-9]{1,5}$/.test(s.who))out.who=s.who;
     if(tool){
@@ -121,9 +122,10 @@
     return{value:raw.value,size:round(raw.size),color:raw.color.toLowerCase(),x:round(raw.x),y:round(raw.y)};
   }
   function paintActivity(ctx,w,h,board){
-    if(board.bg){const bg=pictureOf(board.bg);if(bg)ctx.drawImage(bg,0,0,w,h)}
+    const bx=board.box||{x:0,y:0,w:1,h:1};
+    if(board.bg){const bg=pictureOf(board.bg);if(bg)ctx.drawImage(bg,bx.x*w,bx.y*h,bx.w*w,bx.h*h)}
     if(activity?.kind==='image'){
-      if(activityImage?.complete&&activityImage.naturalWidth)ctx.drawImage(activityImage,0,0,w,h);
+      if(activityImage?.complete&&activityImage.naturalWidth)ctx.drawImage(activityImage,bx.x*w,bx.y*h,bx.w*w,bx.h*h);
     }else if(activity?.kind==='tiles'){
       Tiles.paint(ctx,w,h,activity,board.tiles);
     }else if(activity?.kind==='word'){
@@ -152,19 +154,33 @@
   // Teacher: pictures that were sent as pages [{id,bg}] (+ send info), so every board starts with them.
   let classPages=null;
   function cleanBg(raw){return typeof raw==='string'&&raw.length<=PAGE_BG_MAX&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(raw)?raw:''}
-  function newPage(id,bg){return{id:id||FIRST_PAGE,strokes:[],drafts:{student:null,teacher:null},text:defaultWord(),tiles:activity?.kind==='tiles'?Tiles.defaultState(activity):null,bg:bg||''}}
+  // Where the sent picture sits on a board, as a share of the board (x, y, width, height). Null is "fills the board".
+  function cleanBox(raw){
+    if(!raw||![raw.x,raw.y,raw.w,raw.h].every(Number.isFinite))return null;
+    const w=raw.w,h=raw.h;
+    if(w<.05||h<.05||w>4||h>4||raw.x<-w*.9||raw.x>1-w*.1||raw.y<-h*.9||raw.y>1-h*.1)return null;
+    return{x:round(raw.x),y:round(raw.y),w:round(w),h:round(h)};
+  }
+  function newPage(id,bg){return{id:id||FIRST_PAGE,strokes:[],drafts:{student:null,teacher:null},text:defaultWord(),tiles:activity?.kind==='tiles'?Tiles.defaultState(activity):null,bg:bg||'',box:null}}
   function makeSet(pages){
     const set={pages:pages&&pages.length?pages:[newPage()],viewId:'',curId:''};
     set.viewId=set.curId=set.pages[0].id;
     Object.defineProperty(set,'at',{get(){const i=set.pages.findIndex(p=>p.id===set.viewId);return i<0?0:i}});
-    for(const key of ['strokes','drafts','text','tiles','bg'])Object.defineProperty(set,key,{get(){return set.pages[set.at][key]},set(value){set.pages[set.at][key]=value}});
+    for(const key of ['strokes','drafts','text','tiles','bg','box'])Object.defineProperty(set,key,{get(){return set.pages[set.at][key]},set(value){set.pages[set.at][key]=value}});
     return set;
   }
   const pageId=set=>set.pages[set.at].id;
   // A change to the page being shown names that page, so it still lands on the right page if the other side is elsewhere.
   const pagedOp=(set,op)=>Pages&&!/^board-page/.test(op.type)?{...op,pg:pageId(set)}:op;
   const clearDrafts=set=>{if(set)for(const page of set.pages)page.drafts={student:null,teacher:null}};
-  function emptyBoard(){return makeSet(classPages?classPages.map(p=>newPage(p.id,p.bg)):null)}
+  function emptyBoard(){
+    return makeSet(classPages?classPages.map(p=>{
+      const page=newPage(p.id,p.bg);
+      // Pieces sent as editable items: each board gets its own copy of them, owned by the teacher.
+      if(Array.isArray(p.strokes))page.strokes=p.strokes.map(s=>({...s,points:s.points.map(q=>({...q})),by:'teacher'}));
+      return page;
+    }):null);
+  }
   // Student line ids start with "s", teacher line ids with "t". Each side may remove or clear only its own lines;
   // only the teacher may clear a whole board.
   function applyOp(board,op,by){
@@ -179,6 +195,12 @@
       const next=Tiles.move(activity,board.tiles,op.tile);
       if(!next)return false;
       board.tiles=next;return true;
+    }
+    // The picture the teacher sent (the page background or the class picture) is the student's own copy to move and resize.
+    if(op.type==='board-box'){
+      if(by!=='student')return false;
+      const b=cleanBox(op.box);if(!b)return false;
+      board.box=b;return true;
     }
     if(op.type==='board-add'){
       const s=cleanStroke(op.stroke);
@@ -318,8 +340,8 @@
     const members=(Array.isArray(raw.members)?raw.members:[]).slice(0,12).map(text).filter(Boolean);
     return{id:raw.id,name:text(raw.name)||'Group',me:raw.me,members};
   }
-  function pageFromMessage(id,bg,list,rawText,rawTiles){
-    const page=newPage(id,bg);
+  function pageFromMessage(id,bg,list,rawText,rawTiles,rawBox){
+    const page=newPage(id,bg);page.box=cleanBox(rawBox);
     if(activity?.kind==='word')page.text=cleanWord(rawText)||defaultWord();
     if(activity?.kind==='tiles')page.tiles=Tiles.cleanState(activity,rawTiles);
     if(Array.isArray(list))for(const raw of list.slice(0,MAX_STROKES)){const s=cleanStroke(raw);if(s&&!(s.image&&pictureCount(page)>=MAX_IMAGES)){s.by=raw.by==='teacher'?'teacher':'student';page.strokes.push(s)}}
@@ -331,7 +353,7 @@
       const pages=[],seen=new Set();
       for(const raw of extra.pages.slice(0,Pages.MAX_PAGES)){
         if(!raw||!Pages.validId(raw.id)||seen.has(raw.id))continue;
-        seen.add(raw.id);pages.push(pageFromMessage(raw.id,cleanBg(raw.bg),raw.strokes,raw.text,raw.tiles));
+        seen.add(raw.id);pages.push(pageFromMessage(raw.id,cleanBg(raw.bg),raw.strokes,raw.text,raw.tiles,raw.box));
       }
       if(pages.length){
         const set=makeSet(pages);
@@ -339,7 +361,7 @@
         return set;
       }
     }
-    return makeSet([pageFromMessage(FIRST_PAGE,'',list,rawText,rawTiles)]);
+    return makeSet([pageFromMessage(FIRST_PAGE,'',list,rawText,rawTiles,extra?.box)]);
   }
 
   // ---------- Page strip (shared by the student and the teacher looking at a student's board) ----------
@@ -373,7 +395,7 @@
       more.textContent=(open?'\u25BE':'\u25B4')+' Pages';
       if(!open)return;
       let waiting=false;
-      const mark=s.pages.map(p=>{const last=p.strokes[p.strokes.length-1];if(p.bg&&!pictureOf(p.bg))waiting=true;return p.id+':'+p.strokes.length+':'+(last?last.id+':'+last.points.length:'')+':'+(p.bg?1:0)});
+      const mark=s.pages.map(p=>{const last=p.strokes[p.strokes.length-1];if(p.bg&&!pictureOf(p.bg))waiting=true;return p.id+':'+p.strokes.length+':'+(last?last.id+':'+last.points.length:'')+':'+(p.bg?1:0)+(p.box?':'+p.box.x+','+p.box.y+','+p.box.w+','+p.box.h:'')});
       const now=[s.viewId,s.curId,...mark].join('|');
       if(now===sig&&!waiting)return;
       sig=waiting?'':now;
@@ -561,6 +583,9 @@
       event.preventDefault();pid=event.pointerId;canvas.setPointerCapture(pid);
       const p=pos(event);
       if(tileDrag&&activity?.kind==='tiles'&&tileDrag.down(p))return;
+      // With the drawing toolbar on Select or Pointer this board is not a pen: an empty press does nothing.
+      const fa=o.by==='student'?window.FTTAnnotate?.state?.():null;
+      if(fa&&fa.mode==='open'&&fa.surface==='board'&&(fa.tool==='select'||fa.tool==='pointer')){pid=null;try{canvas.releasePointerCapture(event.pointerId)}catch(_){}return}
       if(o.tools.tool==='move'){
         const picture=pictureAt(p);
         grab=picture?{id:picture.id,dx:p.x-picture.points[0].x,dy:p.y-picture.points[0].y}:null;
@@ -821,8 +846,17 @@
       pasteFromClipboard:()=>clip.paste(),
       label:'Drawing on your whiteboard. Your teacher sees it.',
       rect:()=>{if(!boardOpen()||view.hidden||surface.hidden)return null;const r=canvas.getBoundingClientRect();return r.width&&r.height?r:null},
-      getItems:()=>board.strokes.filter(item=>(item.by==='student'&&ownItem(item))||(!group&&item.by==='teacher')),
-      setItems(list){syncBoardItems(board,'student',list,act,group?ownItem:null,!group)},
+      getItems:()=>{const own=board.strokes.filter(item=>(item.by==='student'&&ownItem(item))||(!group&&item.by==='teacher')),pic=sentPicture();return pic?[pic,...own]:own},
+      setItems(list){
+        // The toolbar gives a moved or resized item a new id, so the sent picture is found by its picture too.
+        const own=sentPicture(),pic=own?list.find(item=>item.id===own.id)||list.find(item=>item.image===own.image&&!board.strokes.some(s=>s.id===item.id)):null;
+        if(pic)sentId=pic.id;
+        if(pic&&!group&&pic.points.length===2){
+          const [a,b]=pic.points,box=cleanBox({x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(b.x-a.x),h:Math.abs(b.y-a.y)}),now=board.box||{x:0,y:0,w:1,h:1};
+          if(box&&(Math.abs(box.x-now.x)>.0005||Math.abs(box.y-now.y)>.0005||Math.abs(box.w-now.w)>.0005||Math.abs(box.h-now.h)>.0005))act({type:'board-box',box});
+        }
+        syncBoardItems(board,'student',list.filter(item=>item!==pic),act,group?ownItem:null,!group);
+      },
       // Hebrew word tiles can be picked up with any drawing tool.
       // The teacher's sent word can be picked up with Select (and dragged) as well.
       solid:true,
@@ -830,6 +864,15 @@
         down:p=>{if(!boardOpen())return false;if(drawer?.tiles&&activity?.kind==='tiles'&&drawer.tiles.hit(p))return drawer.tiles.down(p);return wordDown(p)},
         move:(p,f)=>{if(wordGrab)wordMove(p,f);else drawer?.tiles?.move(p,f)},up:p=>{if(wordGrab){if(p)wordMove(p,true);wordGrab=null}else drawer?.tiles?.up(p)},cancel:()=>{wordGrab=null;drawer?.tiles?.cancel()}},
       live(draft){if(!boardOpen())return;const op=pagedOp(board,{type:'board-draft',stroke:draft||null});applyTo(board,op,'student');B.sendTeacher(op);redraw()}};
+    // The picture the teacher sent (a page background, or the class picture) is shown to the toolbar as one more item at the
+    // bottom of the pile, so Select can pick it, move it and resize it. It is only this student's own copy that changes.
+    let sentId='sbg';
+    function sentPicture(){
+      const data=board.bg||(activity?.kind==='image'?activity.data:'');
+      if(!data||group)return null;
+      const b=board.box||{x:0,y:0,w:1,h:1};
+      return{id:sentId,tool:'rect',color:'#1f2937',size:.006,points:[{x:b.x,y:b.y},{x:b.x+b.w,y:b.y+b.h}],image:data,by:'teacher'};
+    }
     // The word the teacher sent: where it is on the board, so a press on it can pick it up (Select tool only).
     let wordGrab=null,wordAt=0;
     function wordBox(){
@@ -1256,6 +1299,13 @@
       tick.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:700';
       tick.append(box,el('span',null,'⭐ Mark as important (every student\'s copy arrives starred)'));
       previewBody.append(tick);
+      // A whiteboard goes as pieces students can select, move and resize, unless the teacher wants it static.
+      if(value.pieces){
+        const lock=el('label',null),lockBox=el('input');lockBox.type='checkbox';lockBox.id='boardsLocked';
+        lock.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:700';
+        lock.append(lockBox,el('span',null,'🔒 Send as a locked picture (students can only draw on top of it)'));
+        previewBody.append(lock);
+      }
       // Anything a student has drawn (even a stray tap) is replaced by the new board. Say so here, before the green button.
       if(hasStudentWork()){const warn=el('p',null,'⚠ Some students have marks on their boards. Sending replaces their boards with this one.');warn.style.cssText='margin:10px 0;padding:8px 10px;border-radius:10px;background:#fff4d6;color:#7a4b00;font-weight:700';previewBody.append(warn)}
     }
@@ -1266,8 +1316,9 @@
   }
   async function commitPaste(){
     const item=pendingPaste;if(!item)return;
-    const important=!!previewBody.querySelector('#boardsImportant')?.checked;
+    const important=!!previewBody.querySelector('#boardsImportant')?.checked,locked=!!previewBody.querySelector('#boardsLocked')?.checked;
     closePreview();
+    if(item.pieces&&!locked&&await sendPieces(item.pieces,{confirmed:true,subject:item.subject}))return;
     // The preview already told the teacher that students' marks are replaced, and the green button was the yes: no second question.
     if(item.kind==='image')await sendImageFile(item.file,{subject:item.subject,important,confirmed:true});
     else if(item.kind==='pages')await sendPagesFiles(item.files,{subject:item.subject,important,confirmed:true});
@@ -1621,7 +1672,7 @@
     const paused=isBlocked(m);if(paused||mode!=='screens')closeScreen(m);
     const message={type:'board-mode',on:true,mode,blocked:paused};
     if(mode==='boards'){message.activity=activity;if(!paused){
-      const b=boardFor(m);clearDrafts(b);message.strokes=b.strokes;message.text=b.text;message.tiles=b.tiles;
+      const b=boardFor(m);clearDrafts(b);message.strokes=b.strokes;message.text=b.text;message.tiles=b.tiles;if(b.box)message.box=b.box;
       const gid=groupIdOf(m);
       if(gid){
         const code=Groups.codeOf(gstate,personKeyOf(m));
@@ -1629,7 +1680,7 @@
       }
       // More than one page, a page that is not the first one, or pictures sent as pages: the whole list goes along.
       if(Pages&&(b.pages.length>1||b.pages[0].id!==FIRST_PAGE||b.pages[0].bg)){
-        message.pages=b.pages.map(p=>({id:p.id,strokes:p.strokes,text:p.text,tiles:p.tiles,...(p.bg?{bg:p.bg}:{})}));message.at=b.curId;
+        message.pages=b.pages.map(p=>({id:p.id,strokes:p.strokes,text:p.text,tiles:p.tiles,...(p.bg?{bg:p.bg}:{}),...(p.box?{box:p.box}:{})}));message.at=b.curId;
         if(classPages?.send&&b.pages.every(p=>p.bg))message.send=classPages.send;
       }
     }}
@@ -1829,6 +1880,86 @@
       return await sendPages(pages,{id:newSendId(),subject:extra.subject,important:extra.important===true,confirmed:extra.confirmed===true});
     }catch(e){B.fail(e.message||'Could not prepare the pages.');return false}
     finally{sendImage.disabled=false;updateActivityLabel()}
+  }
+  // ---------- The teacher's whiteboard as editable pieces ----------
+  // Each mark of the whiteboard (words, pictures, shapes, lines) becomes a board mark of the teacher's on every student's board, so
+  // the student can select, move and resize it. Anything that cannot travel as a piece (too big, too many) is painted into the page
+  // background instead, so nothing is lost.
+  const MARK_TOOLS={pen:'pen',pencil:'pen',crayon:'pen',highlight:'highlight',underline:'line',box:'rect',line:'line','pen-arrow':'arrow',arrow:'arrow',rectangle:'rect',rect:'rect',ellipse:'ellipse',triangle:'triangle',text:'text',picture:'rect'};
+  let markSeq=0;
+  const nearestOf=(list,value)=>list.reduce((a,b)=>Math.abs(b-value)<Math.abs(a-value)?b:a);
+  function nearestColor(hex){
+    const m=/^#?([0-9a-f]{6})$/i.exec(String(hex||''));if(!m)return COLORS[0];
+    const n=parseInt(m[1],16),r=n>>16,g=(n>>8)&255,b=n&255;let best=COLORS[0],bd=1e9;
+    for(const c of COLORS){const k=parseInt(c.slice(1),16),d=(r-(k>>16))**2+(g-((k>>8)&255))**2+(b-(k&255))**2;if(d<bd){bd=d;best=c}}
+    return best;
+  }
+  const clamp01=v=>Math.min(1,Math.max(0,v));
+  let measureCtx=null;
+  // The words of a teacher's text box, broken into lines the way they sit in the box, and the box's top-left corner as one point.
+  function wordsLayout(raw){
+    const [a,b]=raw.points,size=Math.min(.08,Math.max(.01,Number(raw.size)||.04));
+    measureCtx=measureCtx||document.createElement('canvas').getContext('2d');
+    measureCtx.font='600 '+(size*1000)+'px Arial, "Segoe UI", sans-serif';
+    const left=Math.min(a.x,b?b.x:a.x),right=Math.max(a.x,b?b.x:a.x),top=Math.min(a.y,b?b.y:a.y),boxW=Math.max(.05,right-left)*1000;
+    const lines=[];
+    for(const para of String(raw.text||'').split('\n')){
+      let line='';
+      for(const word of para.split(/\s+/).filter(Boolean)){
+        const next=line?line+' '+word:word;
+        if(line&&measureCtx.measureText(next).width>boxW){lines.push(line);line=word}else line=next;
+      }
+      lines.push(line);
+    }
+    const widest=Math.max(0,...lines.map(line=>measureCtx.measureText(line).width))/1000,align=raw.align==='center'||raw.align==='right'?raw.align:'left';
+    const x=align==='right'?right-widest:align==='center'?left+((right-left)-widest)/2:left;
+    return{lines,size,align,x:clamp01(x),y:clamp01(top)};
+  }
+  function markToBoardMark(raw){
+    const tool=MARK_TOOLS[raw?.tool||'pen'];
+    if(!raw||!tool||!Array.isArray(raw.points)||!raw.points.length||!raw.points.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)))return null;
+    const id='t'+Date.now().toString(36)+'-'+(++markSeq).toString(36),color=nearestColor(raw.color);
+    if(tool==='text'){
+      const w=wordsLayout(raw);
+      if(!w.lines.length||w.lines.length>8)return null;
+      const text=w.lines.join('\n');
+      return cleanStroke({id,tool:'text',color,size:w.size,points:[{x:w.x,y:w.y}],text,...(w.align!=='left'?{align:w.align}:{})});
+    }
+    if(raw.tool==='picture'){
+      if(typeof raw.image!=='string'||raw.points.length!==2||!raw.points.every(validPoint))return null;
+      const [a,b]=raw.points;
+      return cleanStroke({id,tool:'rect',color:COLORS[0],size:.006,points:[{x:Math.min(a.x,b.x),y:Math.min(a.y,b.y)},{x:Math.max(a.x,b.x),y:Math.max(a.y,b.y)}],image:raw.image});
+    }
+    let points=raw.points.slice(0,MAX_POINTS).map(p=>({x:clamp01(p.x),y:clamp01(p.y)}));
+    if(tool!=='pen'&&tool!=='highlight')points=[points[0],points[points.length-1]];
+    const size=nearestOf(tool==='pen'?SIZE_VALUES:ITEM_SIZES,Number(raw.size)||.006);
+    return cleanStroke({id,tool:tool==='pen'?null:tool,color,size,points,...(raw.fill===true?{fill:true}:{})});
+  }
+  async function sendPieces(pieces,info={}){
+    if(!Pages||!on||mode!=='boards'||!Array.isArray(pieces)||!pieces.length)return false;
+    const clean=[];
+    for(const piece of pieces.slice(0,Pages.MAX_PAGES)){
+      const strokes=[],left=[];let images=0;
+      for(const raw of piece.strokes||[]){
+        const s=strokes.length<MAX_STROKES-1?markToBoardMark(raw):null;
+        if(s&&(!s.image||images<MAX_IMAGES)){if(s.image)images++;strokes.push(s)}else left.push(raw);
+      }
+      let bg='';
+      if(left.length||piece.hasBackground){
+        try{bg=cleanBg(await piece.render(left,PAGE_BG_MAX-1000))}catch(_){bg=''}
+        if(!bg){B.status('A page is too detailed to send as pieces. Try "Send as a locked picture".');return false}
+      }
+      clean.push({id:Pages.newId(),strokes,bg});
+    }
+    if(clean.length===1)clean[0].id=FIRST_PAGE;
+    if(hasStudentWork()&&info.confirmed!==true&&!confirm('This will erase the students\' current marks and pages and start the new board. Continue?')){B.status('Nothing was sent. Students still have their marks.');return false}
+    boards.clear();chooseActivity(null,dirtyAll);
+    classPages=clean;
+    for(const m of admitted())sendMode(m);
+    dirtyAll();updateActivityLabel();
+    const here=admitted(),skipped=here.filter(m=>excluded(m,'boards')||isBlocked(m)),got=here.length-skipped.length;
+    B.status('Sent the whiteboard to '+got+' of '+here.length+' student'+(here.length===1?'':'s')+' as pieces they can select, move and resize.'+(skipped.length?' Not sent to '+skipped.slice(0,5).map(m=>m.name).join(', ')+' (their whiteboard is paused or off).':''));
+    return true;
   }
   function sendActivity(next,opts={}){
     if(!on||mode!=='boards')return;
@@ -2036,7 +2167,7 @@
       if(!blob||!/^image\/(png|jpeg|webp)$/.test(blob.type||'')){B.fail('There is no whiteboard picture to send.');return false}
       if(!on||mode!=='boards'||suspended||view.hidden)await sendEveryone('boards');
       if(!on||mode!=='boards')return false;
-      showPaste({kind:'image',file:blob,subject:options.subject||'',note:note||'Every student gets their own copy to draw on. What they draw stays on their own board.'});
+      showPaste({kind:'image',file:blob,subject:options.subject||'',pieces:options.pieces||null,note:note||'Every student gets their own copy to draw on. What they draw stays on their own board.'});
       return true;
     },
     // Teacher: offer one picture per whiteboard page to every student whiteboard, as pages. Opens the same
@@ -2048,10 +2179,10 @@
       if(!files.length||!files.every(blob=>blob&&/^image\/(png|jpeg|webp)$/.test(blob.type||''))){B.fail('There is no whiteboard picture to send.');return false}
       if(!on||mode!=='boards'||suspended||view.hidden)await sendEveryone('boards');
       if(!on||mode!=='boards')return false;
-      showPaste({kind:'pages',files,subject:options.subject||'',note:note||'Every student gets their own copy of these pages to draw on. What they draw stays on their own board.'});
+      showPaste({kind:'pages',files,subject:options.subject||'',pieces:options.pieces||null,note:note||'Every student gets their own copy of these pages to draw on. What they draw stays on their own board.'});
       return true;
     },
-    sendPages,
+    sendPages,sendPieces,
     navigateWorkspace(destination){
       if(destination==='teach'){hideWorkspace();return true}
       if(destination!=='screens'&&destination!=='whiteboards')return false;

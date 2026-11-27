@@ -137,9 +137,9 @@ test('the pages: teacher button, student list, one-click save with a Hebrew-date
 
 test('student activity pages load the worksheet-aware saved-work code; the small pop-up sends a worksheet to My files and deleting removes its pages',()=>{
   const share=read('class-pointer-prototype/activity-share.js');
-  assert.match(share,/saved-work-core\.js\?v=20261124-pages1/);assert.match(share,/saved-work\.js\?v=20261125-wb3/);
+  assert.match(share,/saved-work-core\.js\?v=20261124-pages1/);assert.match(share,/saved-work\.js\?v=20261127-pc1/);
   const pages=['chazara/index.html','chavrusa/index.html','gematria/index.html','halacha/index.html','shorashim/index.html'];
-  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261127-sel1/,page);
+  for(const page of pages)assert.match(read(page),/activity-share\.js\?v=20261127-pc1/,page);
   const saved=read('class-pointer-prototype/saved-work.js');
   assert.match(saved,/file\.worksheet\n?\s*\?\[button\('Continue in My files'/);
   assert.match(saved,/if\(file\.worksheet\)\{[\s\S]*?startsWith\(file\.id\+'-p'\)[\s\S]*?\.delete\(\)/,'page pictures are removed with the worksheet');
