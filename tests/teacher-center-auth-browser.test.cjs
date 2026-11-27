@@ -57,7 +57,7 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    results[role]=await page.evaluate(()=>({
     elapsedMs:performance.now(),
     classes:[...document.querySelectorAll('#classes .class-card h2')].map(x=>x.textContent.trim()),
-    etStudentTools:(()=>{const card=[...document.querySelectorAll('#classes .class-card')].find(x=>x.querySelector('h2')?.textContent.trim()==='ET');return card?[...card.querySelectorAll('.student-tool-controls input[data-tool]')].map(x=>x.dataset.tool).sort():[]})(),
+    etStudentTools:(()=>{const card=[...document.querySelectorAll('#classes .class-card')].find(x=>x.querySelector('h2')?.textContent.trim()==='B3 ET');return card?[...card.querySelectorAll('.student-tool-controls input[data-tool]')].map(x=>x.dataset.tool).sort():[]})(),
     appVisible:!document.getElementById('app').classList.contains('hidden'),
     signInVisible:!document.getElementById('gate').classList.contains('hidden'),
     reads:window.__syntheticReads.slice()
