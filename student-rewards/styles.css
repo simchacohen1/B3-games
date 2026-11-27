@@ -124,3 +124,52 @@
 .reward-store-section .rewardgrid,.reward-store-section .class-goal-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
 .class-goal-card .class-goal-top strong{white-space:nowrap}
 .class-contribute input{flex:0 0 6.5rem;width:6.5rem;padding:0 10px}
+
+/* ===== Prize Store redesign (look only) — 2026-11-27 ===== */
+.studentmain.store-mode>.studentwelcome,.studentmain.store-mode>.active-class-goals{display:none}
+.studentmain.store-mode{padding-top:22px}
+.prize-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 26px;border-radius:26px;color:#fff;background:radial-gradient(circle at 12% 30%,#8f78ff 0,transparent 22%),radial-gradient(circle at 70% 110%,#5a3bd0 0,transparent 40%),linear-gradient(135deg,#7a5cf0,#4f34c4)}
+.prize-hero-title{display:flex;align-items:center;gap:14px}
+.prize-hero-icon{display:grid;place-items:center;filter:drop-shadow(0 4px 6px #2a1a7a66)}
+.prize-hero h2{margin:0;font-size:clamp(2rem,6vw,3.2rem);font-weight:900;color:#fff;text-shadow:0 3px 0 #2f1d8f}
+.prize-points-pill{display:flex;align-items:center;gap:8px;background:#fff;color:#2c1c7a;border-radius:999px;padding:10px 22px;font-size:clamp(1.1rem,3.5vw,1.6rem);font-weight:800;box-shadow:0 4px 0 #cfc6f5}
+.prize-points-pill b{font-size:1.25em;font-weight:900}
+.prize-banner{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:14px;padding:12px 18px;border-radius:22px;background:#ece9f9}
+.prize-open-pill{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:999px;font-size:1.25rem;font-weight:900;color:#fff;background:#1f9d36;box-shadow:0 3px 0 #167a29}
+.prize-banner.closed .prize-open-pill{background:#c4464f;box-shadow:0 3px 0 #9a3139}
+.prize-banner-text{font-size:1.2rem;font-weight:800;color:#3a2a9a}
+.prize-banner.closed .prize-banner-text{color:#6b4a4e}
+.reward-store-section.personal-store{background:none;border:0;padding:0;margin-top:16px}
+.reward-store-section.class-store{border-radius:24px;margin-top:22px}
+.reward-store-section .rewardgrid.studentrewards{margin-top:0;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.prize-card,.class-store .class-goal-card{display:flex;flex-direction:column;align-items:stretch;text-align:center;background:#fff;border:2px solid #e3def8;border-radius:24px;padding:12px 12px 14px;box-shadow:0 5px 0 #ddd6f6}
+.prize-pic,.class-store .class-goal-icon{width:100%;height:150px;border-radius:18px;display:grid;place-items:center;font-size:84px;line-height:1;background:#d9ecff}
+.prize-pic span{filter:drop-shadow(0 4px 4px #0000001f)}
+.personal-store .prize-card:nth-child(5n+1) .prize-pic,.class-store .class-goal-card:nth-child(5n+1) .class-goal-icon{background:#d9ecff}
+.personal-store .prize-card:nth-child(5n+2) .prize-pic,.class-store .class-goal-card:nth-child(5n+2) .class-goal-icon{background:#e6dcfb}
+.personal-store .prize-card:nth-child(5n+3) .prize-pic,.class-store .class-goal-card:nth-child(5n+3) .class-goal-icon{background:#ffd9ea}
+.personal-store .prize-card:nth-child(5n+4) .prize-pic,.class-store .class-goal-card:nth-child(5n+4) .class-goal-icon{background:#d4f5d8}
+.personal-store .prize-card:nth-child(5n) .prize-pic,.class-store .class-goal-card:nth-child(5n) .class-goal-icon{background:#ffe9c7}
+.prize-card h3{margin:12px 6px 10px;font-size:1.3rem;line-height:1.15;font-weight:900;min-height:2.4em;display:grid;place-items:center}
+.prize-price,.class-store .class-goal-top>strong{align-self:center;display:inline-block;background:#fff0c2;color:#5a3a00;border-radius:14px;padding:8px 16px;font-size:1.15rem;font-weight:900}
+.prize-card .reward-status{margin:8px 0 0;font-size:.95rem}
+.prize-card .reward-status:empty{display:none}
+.prize-note{display:block;margin-top:4px;color:#6b7180;font-size:.8rem}
+.prize-card .buy-btn{margin-top:auto;background:#22a63b;box-shadow:0 4px 0 #168429;font-size:1.5rem;min-height:58px;border-radius:16px}
+.prize-card .prize-price{margin-bottom:12px}
+.prize-card .buy-btn:disabled{background:#c9ced8!important;color:#fff!important;box-shadow:0 4px 0 #aab0bd!important;opacity:1;font-size:1.15rem}
+.prize-card.reward-closed{background:#fff}
+.prize-card.reward-closed .prize-pic{filter:grayscale(.45);opacity:.75}
+.class-store .class-goal-top{flex-direction:column;align-items:stretch;gap:8px;text-align:center}
+.class-store .class-goal-top>div:nth-child(2){flex:none}
+.class-store .class-goal-top h3{font-size:1.3rem;font-weight:900;margin:6px 0}
+.class-store .class-goal-top small{font-size:.7rem}
+.class-store .class-goal-card.gimkit-voting-card .class-goal-top{flex-direction:row;align-items:center;text-align:left}
+.class-store .class-goal-card.gimkit-voting-card .class-goal-icon{width:70px;height:70px;font-size:40px}
+.class-store .class-goal-numbers{justify-content:center}
+.class-store .class-contribute .bigbtn{background:#22a63b;box-shadow:0 4px 0 #168429;font-weight:900}
+.class-store .class-contribute .bigbtn:disabled{background:#c9ced8;box-shadow:0 4px 0 #aab0bd;opacity:1;color:#fff}
+.studentmain.store-mode>.panel{border:2px solid #e3def8;border-radius:24px;background:#fff}
+.studentmain.store-mode>.panel h2{font-weight:900}
+.studentmain.store-mode .purchasehistory article{border-radius:14px;background:#faf9ff;border-color:#e3def8}
+@media(max-width:600px){.reward-store-section .rewardgrid.studentrewards{grid-template-columns:repeat(2,1fr);gap:10px}.prize-pic,.class-store .class-goal-icon{height:110px;font-size:62px}.prize-card h3{font-size:1.05rem}.prize-price,.class-store .class-goal-top>strong{font-size:1rem;padding:6px 10px;white-space:nowrap}.prize-card .reward-status{font-size:.85rem}.prize-hero{padding:16px}.prize-banner{padding:10px}.prize-card .buy-btn{font-size:1.25rem}}
