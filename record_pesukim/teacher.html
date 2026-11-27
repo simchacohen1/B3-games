@@ -196,6 +196,14 @@
   .wr-check{ font-weight:900; }
   .wr-n{ margin-left:4px; font-size:.78rem; opacity:.8; }
   .wr-empty{ color:#7a6a3d; font-size:.88rem; }
+  .wr-head{ flex-wrap:wrap; justify-content:flex-start; }
+  .wr-head .wr-total{ margin-left:auto; }
+  .wr-switch{ display:inline-flex; gap:4px; }
+  .wr-switch button{ font:inherit; font-size:.82rem; font-weight:800; padding:4px 11px; border-radius:999px; border:2px solid #d4c79a; background:#fff; color:#5a4310; cursor:pointer; }
+  .wr-switch button[aria-pressed=true]{ background:#5a4310; border-color:#5a4310; color:#fff; }
+  .wr-chip.sel{ outline:3px solid #1f3d73; outline-offset:1px; }
+  .wr-pick{ margin-top:8px; font-size:.88rem; font-weight:700; color:#1f3d73; }
+  .wr-pick button{ font:inherit; font-weight:800; margin-left:6px; padding:2px 10px; border-radius:999px; border:2px solid #1f3d73; background:#fff; color:#1f3d73; cursor:pointer; }
   .tab-btn{
     font-family:'Quicksand', sans-serif; font-weight:700; font-size:0.85rem;
     border: 2px solid var(--ink-soft); background:#fff; color: var(--ink-soft);
@@ -398,6 +406,12 @@
   .tab-count{ display:inline-block; min-width:18px; padding:0 6px; margin-left:4px; border-radius:999px;
     background: var(--rimon); color:#fff; font-size:0.7rem; line-height:18px; text-align:center; }
   .tab-count:empty{ display:none; }
+  /* Phone: the work (strip, marking) comes first; the student list sits below it and stays short. */
+  @media(max-width:700px){
+    .main-panel{ order:1; flex-basis:100%; padding:12px; }
+    .students-panel{ order:2; flex-basis:100%; max-height:300px; }
+    .wt-actions button{ flex:1 1 130px; }
+  }
 
   .ov-cards{ display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap:10px; margin-bottom:18px; }
   .ov-card{ background:#fff; border-radius:12px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,.07); border-top:4px solid #d8c9a0; }
@@ -563,8 +577,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
   <div id="dashboard" style="display:none;">
     <header>
       <h1>📖 Posuk Practice — Teacher</h1>
-      <p>Grade recordings, see progress and recordings for your class</p>
-      <label style="display:inline-flex;gap:8px;align-items:center;margin-top:6px;font-weight:700;">Sefer:
+      <label style="display:inline-flex;gap:8px;align-items:center;margin-top:2px;font-weight:700;">Sefer:
         <select id="teacherSeferSelect" style="padding:6px 10px;border-radius:8px;border:2px solid var(--ink-soft);font-family:'Quicksand',sans-serif;"></select>
       </label>
     </header>
@@ -585,11 +598,11 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
       </div>
 
       <div class="main-panel">
-        <div id="whoRecordedStrip" class="who-recorded" aria-label="Who recorded today"></div>
+        <div id="whoRecordedStrip" class="who-recorded" aria-label="Who recorded"></div>
         <div class="tab-bar">
-          <button class="tab-btn" id="gradeTabBtn">🎙️ To Grade<span class="tab-count" id="gradeTabCount"></span></button>
+          <button class="tab-btn" id="gradeTabBtn">🎙️ Marking<span class="tab-count" id="gradeTabCount"></span></button>
           <button class="tab-btn active" id="overviewTabBtn">🏠 Overview<span class="tab-count" id="overviewDisputeCount"></span></button>
-          <button class="tab-btn" id="studentTabBtn">👤 Student</button>
+          <button class="tab-btn" id="studentTabBtn" hidden>👤 Student</button>
           <button class="tab-btn" id="rosterTabBtn">📋 Roster</button>
           <button class="tab-btn" id="summaryTabBtn">📊 By Posuk</button>
           <button class="tab-btn" id="reportsTabBtn">🧾 Reports</button>
@@ -612,7 +625,7 @@ body.reports-focused #mainContent>div:has(#reportGenerateBtn){justify-content:fl
 <script src="../shared/submission-open-core.js?v=20261124"></script>
 <script src="../firebase-config.js"></script><script src="../class-confirm-gate.js"></script>
 <script src="../site-settings.js?v=20261020-demo-student"></script>
-<script src="grading-queue.js"></script><script src="who-recorded.js?v=20261125"></script><script src="posuk-word-marks-core.js?v=20261122"></script>
+<script src="grading-queue.js"></script><script src="../rashi-letters/history-core.js?v=20261126-onepage"></script><script src="who-recorded.js?v=20261127-onepage"></script><script src="posuk-word-marks-core.js?v=20261122"></script>
 
 <script>
 /* Paste the SAME firebaseConfig used in student.html and your other B3 Games files */
@@ -1178,6 +1191,8 @@ let currentTeacherTab = 'overview';
 function markTab(tab){
   currentTeacherTab = tab;
   Object.entries(TAB_BUTTONS).forEach(([t, btnId]) => document.getElementById(btnId).classList.toggle('active', t === tab));
+  // The Student tab only matters once a boy is picked (from the left list); until then it is just clutter.
+  document.getElementById('studentTabBtn').hidden = !(tab === 'student' || activeStudentId);
 }
 
 (function setupTeacherSeferSelect(){
@@ -1441,18 +1456,35 @@ let studentDisputeCounts = {}; // id -> number of pending disputes (filled once 
 // student from the sidebar, Class Roster, Reports, and Class Stats. Activity
 // info (lastActive) is merged in on top where it exists; a student who's
 // approved but has never logged in still shows up, just with no activity yet.
-/* "Who recorded today": one chip per student of this class, live. Tap a chip to see that boy's recordings. */
+/* "Who recorded": one chip per student of this class, live, with a Today / Yesterday / This week switch (Posuk recordings only).
+   Tap a chip to show only that boy: the Marking tab (waiting + earlier) and the class tables then show just him. Tap him again to show everyone. */
 let whoRecorded = null;
+function applyPickFilter(){
+  let st = document.getElementById('pickFilterStyle');
+  if(!st){ st = document.createElement('style'); st.id = 'pickFilterStyle'; document.head.appendChild(st); }
+  const sid = gradeView.sid;
+  st.textContent = sid && /^[A-Za-z0-9_-]+$/.test(sid) ? '#mainContent tr[data-student]:not([data-student="' + sid + '"]){display:none}' : '';
+}
+function pickStudent(sid){
+  gradeView.sid = sid && gradeView.sid === sid ? '' : sid;   // the same boy again = show everyone
+  gradeView.backTo = '';
+  applyPickFilter();
+  if(whoRecorded) whoRecorded.redraw();
+  if(currentTeacherTab === 'grade') gradeRerender();
+  else if(gradeView.sid) setTab('grade');
+}
 function mountWhoRecorded(){
   if(whoRecorded){ whoRecorded.sync(); return; }
   const el = document.getElementById('whoRecordedStrip');
-  if(!el || !window.B3WhoRecorded) return;
+  if(!el || !window.B3WhoRecorded || !window.RashiHistoryCore) return;
   whoRecorded = B3WhoRecorded.mount({
     db, el, path: B3PosukGradingQueue.submissionsPath,
     students: () => studentsMap,
     // A sent recording counts, unless the teacher or the boy deleted it.
-    isRecording: (s, from) => !!(s.id && s.status !== 'deleted' && (Number(s.submittedAt) || 0) >= from),
-    onPick: sid => { Object.assign(gradeView, { range:'all', sid, status:'all', openKey:'', backTo:'' }); setTab('grade'); }
+    isRecording: s => !!(s.id && s.status !== 'deleted'),
+    selected: () => gradeView.sid,
+    range: (period, now) => RashiHistoryCore.range(period, now),
+    onPick: pickStudent
   });
 }
 async function loadStudents(){
@@ -4780,6 +4812,31 @@ function renderClassPosukDetail(posukKey, bodyEl){
   .gm-speed button{ font:800 .85rem system-ui,sans-serif; min-width:46px; padding:7px 10px; border:2px solid #d9cba6; border-radius:10px; background:#fff; color:var(--ink); cursor:pointer; }
   .gm-speed button.on{ background:var(--navy); border-color:var(--navy); color:#fff; }
   .gm-scrub{ display:block; width:100%; height:44px; margin:6px 0 0; cursor:pointer; accent-color:var(--navy); }
+  .gp-section{ margin:0 0 22px; }
+  .gp-section>h2{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; font-size:1.25rem; margin:0 0 4px; }
+  .gp-section>h2 .gp-n{ font-size:.9rem; font-family:'Quicksand',sans-serif; font-weight:800; background:var(--rimon); color:#fff; border-radius:999px; padding:1px 10px; }
+  .gp-section>h2 .gp-n:empty{ display:none; }
+  .gp-section>h2 .gm-start{ margin-left:auto; font-size:.95rem; }
+  .gp-sub{ color:var(--ink-soft); font-size:.88rem; margin:0 0 10px; }
+  .wt-card{ background:#fff; border:2px solid #e6dcc4; border-radius:14px; padding:12px 14px; margin:0 0 10px; }
+  .wt-card.is-open{ border-color:var(--gold); }
+  .wt-card.wt-done{ border-color:#9fd2a8; background:#f4fbf5; }
+  .wt-top{ display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; }
+  .wt-who{ font-weight:800; font-size:1.05rem; }
+  .wt-ref{ flex:1 1 200px; font-weight:700; }
+  .wt-when{ color:var(--ink-soft); font-size:.85rem; }
+  .wt-actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+  .wt-actions button{ font:800 1.05rem 'Quicksand',sans-serif; border-radius:999px; padding:12px 26px; cursor:pointer; min-height:48px; }
+  .wt-play{ background:var(--navy); color:#fff; border:2px solid var(--navy); }
+  .wt-grade{ background:var(--gold); color:var(--ink); border:2px solid #97781a; }
+  .wt-card.wt-done .wt-grade{ background:#d3f2d8; border-color:#4caf6a; color:#14532d; }
+  .wt-card .gm-open{ padding:10px 0 0; }
+  .gp-section.earlier{ background:#fff; border:2px solid #e6dcc4; border-radius:14px; padding:14px 16px; }
+  .er-bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 12px; }
+  .er-bar button{ font:inherit; font-size:.85rem; font-weight:800; padding:6px 13px; border-radius:999px; border:2px solid #d9cba6; background:#fff; color:var(--ink); cursor:pointer; }
+  .er-bar button[aria-pressed=true]{ background:var(--navy); border-color:var(--navy); color:#fff; }
+  .er-bar input{ font:inherit; padding:6px 11px; border-radius:10px; border:2px solid #d9cba6; min-width:150px; margin-left:auto; }
+  .gp-opts{ margin:0 0 12px; }
   .graded-row{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:8px 0; border-bottom:1px solid #eee; font-size:.9rem; }
 </style>
 <script>
@@ -4862,7 +4919,7 @@ function submissionPosukKeys(s){
 /* ---------- Marking list: one place for all of my classes ----------
    Filters at the top (Today / This week / All, one boy, needs grading / graded). The list is grouped by day.
    Click a row to open that recording right there, ready to grade or delete. Only one is open at a time. */
-const gradeView = { range:'all', sid:'', status:'pending', openKey:'', backTo:'' };
+const gradeView = { range:'all', sid:'', text:'', openKey:'', backTo:'' };   // sid = the boy picked in the "Who recorded" strip
 let gradeData = { items:[], roster:{}, scope:[], openConfigs:{} };
 function gradeNameOf(sid){ const r = gradeData.roster[sid]; return (r && r.name) || studentsMap[sid] || sid; }
 function gradeClassLabel(sid){
@@ -4875,17 +4932,6 @@ function gradeDayKey(ts){
   const d = new Date(Number(ts) || 0);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
-function gradeDayLabel(key){
-  const today = gradeDayKey(Date.now()), yesterday = gradeDayKey(Date.now() - 86400000);
-  const [y, m, d] = key.split('-').map(Number);
-  const text = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'short' });
-  return key === today ? 'Today · ' + text : key === yesterday ? 'Yesterday · ' + text : text;
-}
-function gradeRangeStart(range){
-  const d = new Date(); d.setHours(0, 0, 0, 0);
-  if(range === 'week') d.setDate(d.getDate() - d.getDay());   // this week starts on Sunday
-  return range === 'all' ? 0 : d.getTime();
-}
 function gradeChipText(s){
   if(B3PosukGradingQueue.isPending(s)) return '⏳ Needs grading';
   const score = gradeScoreOf(s);
@@ -4896,34 +4942,39 @@ function gradeShownByOpenFilter(s){
   const classId = (gradeData.roster[s.sid] || {}).classId, config = gradeData.openConfigs[classId];
   return !config || B3SubmissionOpenCore.isPosukOpen(config, s.sid, submissionPosukKeys(s));
 }
-function gradeFiltered(){
-  const from = gradeRangeStart(gradeView.range);
-  return gradeData.items.filter(s =>
-    (!gradeView.sid || s.sid === gradeView.sid) &&
-    (Number(s.submittedAt) || 0) >= from &&
-    (gradeView.status === 'all' || (gradeView.status === 'pending') === B3PosukGradingQueue.isPending(s)) &&
-    gradeShownByOpenFilter(s));
+/* Waiting to mark: every recording still waiting, for the boy picked in the strip (if any). */
+function gradeWaiting(){
+  return gradeData.items.filter(s => B3PosukGradingQueue.isPending(s) && (!gradeView.sid || s.sid === gradeView.sid) && gradeShownByOpenFilter(s));
+}
+/* Earlier: the recordings already marked, filtered by the boy, the period buttons and the posuk search. */
+function gradeEarlier(){
+  const GH = window.RashiHistoryCore;
+  const rows = gradeData.items.filter(s => !B3PosukGradingQueue.isPending(s))
+    .map(s => ({ s, sid:s.sid, name:gradeNameOf(s.sid), label:gradeRefLabel(s), when:Number(s.submittedAt) || 0 }));
+  return GH.filter(rows, { sid:gradeView.sid, range:GH.range(gradeView.range, Date.now()), text:gradeView.text }).map(r => r.s);
 }
 function gradeNavHtml(){
-  const seg = (name, opts, cur) => '<span class="gm-seg" role="group" aria-label="' + name + '">' +
-    opts.map(([v, l]) => `<button type="button" data-${name}="${v}" class="${v === cur ? 'on' : ''}" aria-pressed="${v === cur}">${l}</button>`).join('') + '</span>';
-  const waiting = {};
-  gradeData.items.forEach(s => { if(B3PosukGradingQueue.isPending(s)) waiting[s.sid] = (waiting[s.sid] || 0) + 1; });
-  const boys = Object.keys(gradeData.roster).sort((a, b) => gradeNameOf(a).localeCompare(gradeNameOf(b)));
   const owner = teacherAccess.role === 'admin';
   const classNames = gradeData.scope.map(id => id.length <= 3 ? id.toUpperCase() : id).join(' + ');
-  return '<div class="gm-bar">' +
-    '<label class="gm-field">When ' + seg('range', [['today', 'Today'], ['week', 'This week'], ['all', 'All']], gradeView.range) + '</label>' +
-    '<label class="gm-field">Boy <select data-boy="1"><option value="">All boys</option>' +
-      boys.map(id => `<option value="${escapeHtml(id)}"${id === gradeView.sid ? ' selected' : ''}>${escapeHtml(gradeNameOf(id))}${waiting[id] ? ' (' + waiting[id] + ' waiting)' : ''}</option>`).join('') + '</select></label>' +
-    '<label class="gm-field">Status ' + seg('status', [['pending', 'Needs grading'], ['graded', 'Graded'], ['all', 'Both']], gradeView.status) + '</label>' +
-    (() => { const n = gradeWaitingInOrder().length; return `<button type="button" class="btn gold gm-start" data-start="1"${n ? '' : ' disabled'}>▶ Start marking${n ? ' (' + n + ' waiting)' : ''}</button>`; })() +
-    '</div>' +
-    '<div class="gm-scope">Showing: <b>' + escapeHtml(classNames || 'no classes') + '</b>' +
+  return '<div class="gm-scope">Showing: <b>' + escapeHtml(classNames || 'no classes') + '</b>' +
       (owner ? ' · <label><input type="checkbox" data-allclasses="1"' + (markingAllClassesPref() ? ' checked' : '') + '> Owner: all classes</label>' : '') +
       ' · <label><input type="checkbox" data-openonly="1"' + (openOnlyPref() ? ' checked' : '') + '> Only posuk I have opened for sending</label>' +
       ' · <button type="button" class="gm-link" data-refresh="1">↻ Refresh</button></div>' +
     (gradeView.backTo ? '<div class="gm-scope"><button type="button" class="gm-link" data-back="1">← Back to ' + escapeHtml(gradeNameOf(gradeView.backTo)) + '’s progress</button></div>' : '');
+}
+function gradeWhenText(ms){
+  const GH = window.RashiHistoryCore;
+  return GH.headingFor(ms, Date.now()) + ', ' + new Date(ms).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+}
+/* One clean card per waiting recording: who, which posuk, when, and two big buttons. Play opens it and starts the sound;
+   Grade opens the same card (the 0-10 buttons, the word marks and Delete live there). */
+function gradeWaitingCardHtml(s){
+  const cls = gradeClassLabel(s.sid), ms = Number(s.submittedAt) || 0;
+  return `<div class="gm-item wt-card" data-item="${escapeHtml(gradeKey(s))}"><div class="wt-top"><span class="wt-who">${escapeHtml(gradeNameOf(s.sid))}</span>` +
+    (cls && gradeData.scope.length > 1 ? `<span class="gm-cls">${escapeHtml(cls)}</span>` : '') +
+    `<span class="wt-ref">${escapeHtml(gradeRefLabel(s))}</span><span class="wt-when">${escapeHtml(gradeWhenText(ms))}${s.durationMs ? ' · ' + escapeHtml(formatDuration(Number(s.durationMs) / 1000)) : ''}</span></div>` +
+    '<div class="wt-actions"><button type="button" class="wt-play" data-playopen="1">▶ Play</button><button type="button" class="wt-grade" data-row="1" aria-expanded="false">✎ Grade</button></div>' +
+    '<div class="gm-open" hidden></div></div>';
 }
 function gradeRowHtml(s, showBoy){
   const pending = B3PosukGradingQueue.isPending(s), cls = gradeClassLabel(s.sid);
@@ -4935,20 +4986,27 @@ function gradeRowHtml(s, showBoy){
     `<span class="gm-chip${pending ? ' wait' : ''}">${escapeHtml(gradeChipText(s))}</span></button><div class="gm-open" hidden></div></div>`;
 }
 function renderGradeList(){
-  const listEl = document.getElementById('gradeList');
-  if(!listEl) return;
-  const rows = gradeFiltered();
+  const waitEl = document.getElementById('gradeWaiting'), earlEl = document.getElementById('gradeEarlier');
+  if(!waitEl || !earlEl) return;
+  const queue = gradeWaitingInOrder(), boyName = gradeView.sid ? gradeNameOf(gradeView.sid) : '';
+  const n = document.getElementById('gradeWaitingN'); if(n) n.textContent = queue.length ? String(queue.length) : '';
+  const start = document.getElementById('gradeStartBtn');
+  if(start){ start.disabled = !queue.length; start.textContent = '▶ Start marking' + (queue.length ? ' (' + queue.length + ')' : ''); }
+  document.querySelectorAll('.er-bar [data-range]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === gradeView.range)));
+  waitEl.innerHTML = queue.length ? queue.map(gradeWaitingCardHtml).join('') :
+    '<div class="empty-msg">' + (boyName ? 'Nothing waiting from ' + escapeHtml(boyName) + '. 🎉' : 'Nothing waiting to mark. 🎉') + '</div>';
+  const rows = gradeEarlier();
   if(!rows.length){
-    listEl.innerHTML = '<div class="empty-msg">' + (gradeView.status === 'pending' ? 'Nothing waiting for these filters. 🎉' : 'No recordings for these filters.') + '</div>';
+    const any = gradeData.items.some(s => !B3PosukGradingQueue.isPending(s));
+    earlEl.innerHTML = '<div class="empty-msg">' + (any ? 'Nothing matches.' : 'No marked recordings yet.') + '</div>';
     return;
   }
-  const days = gradeDaysOf(rows);
-  const today = gradeDayKey(Date.now()), keepOpen = rows.length <= 12;
-  listEl.innerHTML = [...days.entries()].map(([k, items]) => {
-    const waiting = items.filter(s => B3PosukGradingQueue.isPending(s)).length;
-    const open = keepOpen || k === today || items.some(s => gradeKey(s) === gradeView.openKey);
-    return `<details class="gm-day"${open ? ' open' : ''}><summary><b>${escapeHtml(gradeDayLabel(k))}</b><span>${items.length} recording${items.length === 1 ? '' : 's'}${waiting ? ' · ' + waiting + ' waiting' : ''}</span></summary>` +
-      items.map(s => gradeRowHtml(s, !gradeView.sid)).join('') + '</details>';
+  const groups = window.RashiHistoryCore.groupByDay(rows.map(s => ({ s, when:Number(s.submittedAt) || 0, name:gradeNameOf(s.sid) })), Date.now());
+  const keepOpen = rows.length <= 12;
+  earlEl.innerHTML = groups.map(g => {
+    const open = keepOpen || g.heading === 'Today' || g.rows.some(r => gradeKey(r.s) === gradeView.openKey);
+    return `<details class="gm-day"${open ? ' open' : ''}><summary><b>${escapeHtml(g.heading)}</b><span>${g.rows.length} recording${g.rows.length === 1 ? '' : 's'}</span></summary>` +
+      g.rows.map(r => gradeRowHtml(r.s, !gradeView.sid)).join('') + '</details>';
   }).join('');
 }
 /* ---------- Start marking: work through the waiting recordings one after another ----------
@@ -4968,7 +5026,7 @@ function gradeDaysOf(rows){
   return days;
 }
 function gradeWaitingInOrder(){
-  return [...gradeDaysOf(gradeFiltered().filter(s => B3PosukGradingQueue.isPending(s))).values()].flat();
+  return [...gradeDaysOf(gradeWaiting()).values()].flat();
 }
 function markingKeysHint(){ return 'Space = play / pause · 0–9 = grade (1 then 0 = 10) · G = 10 · or tap a number'; }
 async function startMarking(){
@@ -5127,6 +5185,21 @@ async function openGradeItem(key, scrollTo){
   if(scrollTo) itemEl.scrollIntoView({ behavior:'smooth', block:'start' });
   return true;
 }
+/* Redraw the lists after a filter changed (the boy, the period, the search). An open card is saved and closed first. */
+async function gradeRerender(){
+  await closeGradeOpen(); gradeView.openKey = '';
+  const nav = document.getElementById('gradeNav'); if(nav) nav.innerHTML = gradeNavHtml();
+  renderGradeList();
+}
+/* The Play button on a waiting card: open the card and start the sound (or pause it, when the card is already open). */
+async function playGradeItem(key){
+  const itemEl = [...document.querySelectorAll('.gm-item')].find(e => e.dataset.item === key);
+  if(!itemEl) return;
+  const wasOpen = itemEl.classList.contains('is-open');
+  if(!wasOpen) await openGradeItem(key, false);
+  const card = itemEl.querySelector('.grade-card');
+  if(card && card._player){ if(wasOpen) card._player.toggle(); else card._player.autoplay(); }
+}
 async function loadGradeTab(){
   await flushGradeSaves();   // never lose a tap when the list is refreshed
   if(gradeMarking){ await Promise.allSettled([...gradeMarking.saves]); gradeMarking = null; gradeOnDeleted = null; document.body.classList.remove('gm-marking'); }
@@ -5152,31 +5225,38 @@ async function loadGradeTab(){
   }catch(err){ console.error(err); mainEl.innerHTML = '<div class="empty-msg">Could not load recordings to grade.</div>'; return; }
   const waitingTotal = gradeData.items.filter(s => B3PosukGradingQueue.isPending(s)).length;
   document.getElementById('gradeTabCount').textContent = waitingTotal ? String(waitingTotal) : '';
-  mainEl.innerHTML = '<h2>🎙️ Recordings to mark</h2><div id="gradeNav"></div><div id="gradeList"></div><div id="gradeMarking" hidden></div>';
+  mainEl.innerHTML = '<div id="gradeNav" class="gp-opts"></div><div id="gradeList">' +
+    '<section class="gp-section" id="gradePanelWaiting"><h2>⏳ Waiting to mark <span class="gp-n" id="gradeWaitingN"></span><button type="button" class="btn gold gm-start" id="gradeStartBtn" data-start="1">▶ Start marking</button></h2>' +
+      '<p class="gp-sub">Tap Play to listen, then Grade to give it 0–10. Start marking goes through them one after another.</p><div id="gradeWaiting"></div></section>' +
+    '<section class="gp-section earlier" id="gradePanelEarlier"><h2>🗂 Earlier</h2><p class="gp-sub">Recordings you already marked, newest first. Tap one to listen or change the grade.</p>' +
+      '<div class="er-bar" role="group" aria-label="Show">' + [['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'This week'], ['month', 'This month'], ['all', 'All']].map(([k, l]) => `<button type="button" data-range="${k}" aria-pressed="false">${l}</button>`).join('') +
+      '<input type="search" id="gradeSearch" placeholder="Search posuk…" aria-label="Search posuk"></div><div id="gradeEarlier"></div></section>' +
+    '</div><div id="gradeMarking" hidden></div>';
   const navEl = document.getElementById('gradeNav');
-  const rerender = async () => { await closeGradeOpen(); gradeView.openKey = ''; navEl.innerHTML = gradeNavHtml(); renderGradeList(); };
   navEl.innerHTML = gradeNavHtml();
+  const searchEl = document.getElementById('gradeSearch'); searchEl.value = gradeView.text;
+  searchEl.oninput = () => { gradeView.text = searchEl.value; gradeRerender(); };
   navEl.onclick = e => {
-    const r = e.target.closest('[data-range]'), st = e.target.closest('[data-status]');
-    if(r){ gradeView.range = r.dataset.range; rerender(); }
-    else if(st){ gradeView.status = st.dataset.status; rerender(); }
-    else if(e.target.closest('[data-refresh]')) loadGradeTab();
-    else if(e.target.closest('[data-start]')) startMarking();
+    if(e.target.closest('[data-refresh]')) loadGradeTab();
     else if(e.target.closest('[data-back]')){ const sid = gradeView.backTo; gradeView.backTo = ''; openStudentAt(sid, null, 'readtranslate'); }
   };
   navEl.onchange = e => {
-    if(e.target.matches('[data-boy]')){ gradeView.sid = e.target.value; gradeView.backTo = ''; rerender(); }
-    else if(e.target.matches('[data-openonly]')){ setOpenOnlyPref(e.target.checked); loadGradeTab(); }
-    else if(e.target.matches('[data-allclasses]')){ setMarkingAllClassesPref(e.target.checked); gradeView.sid = ''; loadGradeTab(); }
+    if(e.target.matches('[data-openonly]')){ setOpenOnlyPref(e.target.checked); loadGradeTab(); }
+    else if(e.target.matches('[data-allclasses]')){ setMarkingAllClassesPref(e.target.checked); gradeView.sid = ''; applyPickFilter(); loadGradeTab(); }
   };
   document.getElementById('gradeMarking').onclick = e => {
     if(e.target.closest('[data-mskip]')){ if(gradeMarking && gradeMarking.card){ gradeMarking.card = null; gradeMarking.lastText = ''; markingAdvance(true); } }
     else if(e.target.closest('[data-mback]')) exitMarking();
   };
   document.getElementById('gradeList').onclick = e => {
-    const row = e.target.closest('[data-row]');
-    if(row) openGradeItem(row.closest('.gm-item').dataset.item, false);
+    const range = e.target.closest('[data-range]'), play = e.target.closest('[data-playopen]'), row = e.target.closest('[data-row]');
+    if(range){ gradeView.range = range.dataset.range; gradeRerender(); }
+    else if(e.target.closest('[data-start]')) startMarking();
+    else if(play) playGradeItem(play.closest('.gm-item').dataset.item);
+    else if(row) openGradeItem(row.closest('.gm-item').dataset.item, false);
   };
+  applyPickFilter();
+  if(whoRecorded) whoRecorded.redraw();
   renderGradeList();
   if(gradeView.openKey) await openGradeItem(gradeView.openKey, true);
 }
@@ -5190,7 +5270,7 @@ async function openRecordingFromProgress(sid, posukKey){
     (parsed.perek && parsed.posuk && Number(s.perek) === parsed.perek && Number(s.startPosuk) <= parsed.posuk && parsed.posuk <= Number(s.endPosuk || s.startPosuk));
   const found = subs.filter(s => s && s.id && s.status !== 'deleted' && covers(s)).sort((a, b) => (Number(b.submittedAt) || 0) - (Number(a.submittedAt) || 0))[0];
   if(!found) return false;
-  Object.assign(gradeView, { range:'all', sid, status:'all', openKey:sid + '|' + found.id, backTo:sid });
+  Object.assign(gradeView, { range:'all', sid, text:'', openKey:sid + '|' + found.id, backTo:sid });
   setTab('grade');
   return true;
 }
@@ -5331,6 +5411,12 @@ function wireGradeCard(card, s){
         s.status = sending === POSUK_GOLD_POINTS ? 'gold' : (sending === 0 ? 'retry' : 'scored'); s.score = sending; s.gradedAt = s.gradedAt || Date.now();
         const chip = card.closest('.gm-item') && card.closest('.gm-item').querySelector('.gm-chip');
         if(chip){ chip.textContent = gradeChipText(s); chip.classList.remove('wait'); }
+        const waitCard = card.closest('.wt-card');
+        if(waitCard){   // it stays here for now so the grade can still be changed; it moves to Earlier the next time the list is drawn
+          waitCard.classList.add('wt-done');
+          const gb = waitCard.querySelector('.wt-grade'); if(gb) gb.textContent = '✔ Marked ' + sending + '/10';
+          const nw = document.getElementById('gradeWaitingN'); if(nw) nw.textContent = gradeWaiting().length ? String(gradeWaiting().length) : '';
+        }
         const count = document.getElementById('gradeTabCount');
         if(count && card.id.indexOf('gradeCard_') === 0 && !card.dataset.counted){ card.dataset.counted = '1'; const n = Math.max(0, (parseInt(count.textContent, 10) || 0) - 1); count.textContent = n ? String(n) : ''; }
       }catch(err){
@@ -5371,7 +5457,7 @@ B3SiteSettings.onAuthStateChanged(handleTeacherAuth);
 </script>
 <script src="../sync-to-nigri/nigri-school-gate.js?v=20261107" data-mode="panel"></script><script src="../sync-to-nigri/nigri-auth.js"></script><script src="../sync-to-nigri/nigri-connect.js?v=20261108"></script>
 <script src="../shared/weekly-practice-marks-core.js?v=20261122b"></script><script src="weekly-nigri-roster.js?v=20261122b"></script><script src="weekly-nigri.js?v=20261122b"></script>
-<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script><script src="../activity-history/tab.js?v=20261126-activity2" data-tool="posuk" defer></script>
+<script src="../back-nav.js" data-href="../teacher-home.html" data-label="← Teacher Home"></script>
 </body>
 </html>
 
