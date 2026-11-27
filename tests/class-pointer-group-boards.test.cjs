@@ -364,7 +364,7 @@ test('the teacher\'s classroom page loads the groups rules before the boards, wi
   const html=read('class-pointer-prototype/classroom.html');
   assert.ok(html.indexOf('board-groups-core.js')>0&&html.indexOf('board-groups-core.js')<html.indexOf('student-boards.js'));
   assert.match(html,/board-groups-core\.js\?v=20261124-groups1/);
-  assert.match(html,/student-boards\.js\?v=20261127-zv1/);
+  assert.match(html,/student-boards\.js\?v=20261127-sel1/);
   // Students never need the groups rules: their board only shows the group the teacher names.
   assert.doesNotMatch(read('class-pointer-prototype/activity-share.js'),/board-groups-core/);
 });

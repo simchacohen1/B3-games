@@ -207,3 +207,73 @@ test('inside his own space a student moves the teacher\'s marks; outside it they
   expect((await marks())[1][1]).toBeCloseTo(.6, 2);
   await a.context.close(); await t.context.close();
 });
+
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC';
+
+test('shared whiteboard with zones: the student moves the teacher picture and words with Select; empty space never draws', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const a = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await t.page.evaluate(() => { for (const id of ['allowPointer', 'allowHighlight', 'allowPen']) { const box = document.getElementById(id); if (box) { box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); } } for (const box of document.querySelectorAll('#roster input[type=checkbox]')) if (!box.checked) box.click(); });
+  await t.page.evaluate(() => document.getElementById('openWhiteboard').click());
+  await expect.poll(() => t.page.evaluate(() => window.ClassPointerPdf.zones.available()), { timeout: 15000 }).toBe(true);
+  await t.page.evaluate(() => window.ClassPointerPdf.zones.set([{ id: 'z1', x: .05, y: .1, w: .6, h: .7, owners: [{ k: 'avi', n: 'Avi Synthetic' }] }], false));
+  await t.page.evaluate(img => { const B = window.ClassPointerBridge;
+    B.submitStroke({ tool: 'picture', color: '#1f2937', size: .016, points: [{ x: .1, y: .2 }, { x: .25, y: .4 }], image: img });
+    B.submitStroke({ tool: 'text', color: '#c62828', size: .04, points: [{ x: .35, y: .3 }, { x: .5, y: .36 }], text: 'Hello' });
+  }, PNG);
+  const marks = () => t.page.evaluate(() => window.ClassPointerBridge.highlights().map(s => [s.tool, +s.points[0].x.toFixed(2), +s.points[0].y.toFixed(2)]));
+  await expect.poll(async () => (await marks()).length, { timeout: 10000 }).toBe(2);
+  await a.page.setViewportSize({ width: 1280, height: 1500 });
+  await expect.poll(() => a.page.evaluate(() => !!document.querySelector('.board-zone-box.mine')), { timeout: 20000 }).toBe(true);
+  await a.page.evaluate(() => document.getElementById('pdfContent').scrollIntoView({ block: 'start' }));
+  await expect.poll(() => a.page.evaluate(() => { const o = [...document.getElementById('studentTool').options].find(x => x.value === 'select'); return !!o && !o.disabled; }), { timeout: 15000 }).toBe(true);
+  await a.page.getByRole('button', { name: 'Select', exact: true }).first().click();
+  const drag = async (fx, fy, tx, ty) => {
+    const box = await a.page.locator('#pdfContent').boundingBox();
+    await a.page.mouse.move(box.x + box.width * fx, box.y + box.height * fy); await a.page.mouse.down();
+    await a.page.mouse.move(box.x + box.width * tx, box.y + box.height * ty, { steps: 6 }); await a.page.mouse.up(); await a.page.waitForTimeout(600);
+  };
+  await drag(.17, .3, .17, .5);                                    // the picture
+  await expect.poll(async () => (await marks())[0][2], { timeout: 10000 }).toBeCloseTo(.4, 1);
+  await drag(.37, .32, .37, .55);                                  // the words
+  await expect.poll(async () => (await marks())[1][2], { timeout: 10000 }).toBeGreaterThan(.4);
+  const before = JSON.stringify(await marks());
+  await drag(.55, .15, .6, .2);                                    // empty space: nothing is drawn, nothing moves
+  await a.page.waitForTimeout(800);
+  expect(JSON.stringify(await marks())).toBe(before);
+  await a.context.close(); await t.context.close();
+});
+
+test('personal whiteboard: the student moves what the teacher sent (picture, shape, word) with Select; empty space never draws', async ({ browser }) => {
+  const t = await startTeacher(browser);
+  const a = await joinStudent(browser, t.room, AVI);
+  await expect.poll(() => roster(t.page), { timeout: 30000 }).toContain('Avi Synthetic — admitted');
+  await a.page.setViewportSize({ width: 1280, height: 1500 });
+  await a.page.evaluate(img => window.ClassPointerBoards.fromTeacher({ type: 'board-mode', on: true, mode: 'boards', activity: { kind: 'word', text: 'שלום' }, text: { value: 'שלום', size: .2, color: '#1f2937', x: .5, y: .49 }, strokes: [
+    { id: 't1', tool: 'rect', color: '#1f2937', size: .006, points: [{ x: .1, y: .2 }, { x: .25, y: .4 }], image: img, by: 'teacher' },
+    { id: 't3', tool: 'ellipse', color: '#2e7d32', size: .006, points: [{ x: .6, y: .65 }, { x: .8, y: .85 }], by: 'teacher' }] }), PNG);
+  await expect(a.page.getByRole('button', { name: 'Select', exact: true }).first()).toBeVisible({ timeout: 15000 });
+  await a.page.getByRole('button', { name: 'Select', exact: true }).first().click();
+  const cv = await a.page.evaluate(() => { const r = document.querySelector('#fttAnnotate .fa-capture').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const at = (fx, fy) => a.page.evaluate(([fx, fy]) => { const c = document.querySelector('#myBoard canvas'), k = c.width / c.clientWidth, d = c.getContext('2d').getImageData(Math.round(fx * c.clientWidth * k), Math.round(fy * c.clientHeight * k), 1, 1).data; return [d[0], d[1], d[2]]; }, [fx, fy]);
+  const isGreen = ([r, g, b]) => g > 200 && r < 160 && b < 160;
+  const isWhite = ([r, g, b]) => r > 240 && g > 240 && b > 240;
+  const drag = async (fx, fy, tx, ty) => {
+    await a.page.mouse.move(cv.x + cv.w * fx, cv.y + cv.h * fy); await a.page.mouse.down();
+    await a.page.mouse.move(cv.x + cv.w * tx, cv.y + cv.h * ty, { steps: 6 }); await a.page.mouse.up(); await a.page.waitForTimeout(600);
+  };
+  expect(isGreen(await at(.17, .3))).toBe(true);
+  await drag(.17, .3, .17, .6);                                    // the picture the teacher sent
+  await expect.poll(async () => isWhite(await at(.17, .3)) && isGreen(await at(.17, .6)), { timeout: 8000 }).toBe(true);
+  const word = () => a.page.evaluate(() => { const c = document.querySelector('#myBoard canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let lo = 1e9, hi = -1; for (let y = 0; y < c.height; y += 2) for (let x = Math.floor(c.width * .3); x < c.width * .7; x += 2) { const i = (y * c.width + x) * 4; if (d[i] < 80 && d[i + 1] < 80 && d[i + 2] < 100) { lo = Math.min(lo, y); hi = Math.max(hi, y); } } return (lo + hi) / 2 / c.height; });
+  const wordBefore = await word();
+  await drag(.5, .49, .5, .3);                                     // the word the teacher sent
+  await expect.poll(async () => (await word()) < wordBefore - .1, { timeout: 8000 }).toBe(true);
+  const sum = () => a.page.evaluate(() => { const c = document.querySelector('#myBoard canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += 765 - d[i] - d[i + 1] - d[i + 2]; return s; });
+  const inkBefore = await sum();
+  await drag(.9, .1, .95, .2);                                     // empty space: nothing is drawn
+  await drag(.05, .9, .4, .95);
+  expect(await sum()).toBe(inkBefore);
+  await a.context.close(); await t.context.close();
+});
