@@ -110,6 +110,11 @@ teacherArtStyle.textContent=`
 .picture-grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
 .picture-cell{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid #d7dbea;background:#fff;border-radius:10px;padding:6px 8px}
 .picture-emoji{font-size:30px;line-height:1.1}
+.picture-img{width:34px;height:34px;object-fit:contain}
+.picture-btn{padding:2px 7px;font-size:11px;border-radius:8px;font-weight:700}
+.picture-cell{gap:3px;padding:4px 6px}
+.picture-count{font-size:1.1rem;font-weight:800;margin:4px 0}
+.picture-group{margin:12px 0 2px}
 `;
 document.head.appendChild(teacherArtStyle);
 const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -501,13 +506,33 @@ function ensureChumashVocabLists(){
 }
 /* ===== Blocked pictures: one simple list for the whole class ===== */
 const blockedSettingsPath=()=>`${teacherSettingsPath()}/blockedArt`;
-// Pictures currently used by any word (student-visible), once each, in first-seen order.
+// Every picture a student can see on any word (any track/list), once each, in first-seen order:
+// emojis, uploaded/drawn/AI pictures, built-in drawings, and each word's suggested pictures.
 function usedPictureList(){
   const seen=new Set(),out=[];
-  const add=a=>{for(const v of (Array.isArray(a)?a:[])){const x=String(v||'').trim();if(x&&!seen.has(x)&&isClassSafeArtChoice(x)&&!/^(data:|https?:)/.test(x)){seen.add(x);out.push(x);}}};
-  for(const i of (state.catalog.shorashim||[]))add(i&&i.art);
-  for(const l of [window.FTT_BOOKLET_SHORASHIM,window.FTT_CHUMASH_VOCAB])for(const i of (Array.isArray(l)?l:[]))add(i&&i.art);
+  const add=a=>{for(const v of (Array.isArray(a)?a:(a&&typeof a==='object'?Object.values(a):[]))){const x=String(v||'').trim();if(x&&!seen.has(x)&&isClassSafeArtChoice(x)){seen.add(x);out.push(x);}}};
+  const take=i=>{if(i){add(i.art);add(i.artPool);add(i.pendingArt);}};
+  for(const t of Object.keys(state.catalog||{}))for(const i of (Array.isArray(state.catalog[t])?state.catalog[t]:[]))take(i);
+  for(const l of [window.FTT_BOOKLET_SHORASHIM,window.FTT_CHUMASH_VOCAB])for(const i of (Array.isArray(l)?l:[]))take(i);
+  const bi=window.FTT_BUILTIN_PICTURES;if(bi)add(bi.allBuiltIn().map(p=>p.key));
   return out;
+}
+const PICTURE_GROUPS=['Animals','People','Food','Nature','Objects','Places','Symbols','Uploaded / Drawn / AI pictures'];
+function pictureGroupOf(v){
+  if(/^(data:|https?:|builtin:)/.test(v))return PICTURE_GROUPS[7];
+  const has=re=>re.test(v);
+  if(has(/[\u{1F600}-\u{1F644}\u{1F466}-\u{1F487}\u{1F440}-\u{1F465}\u{1F645}-\u{1F64F}\u{1F90C}-\u{1F93E}\u{1F9B0}-\u{1F9B3}\u{1F9D0}-\u{1F9DF}\u{1F4AA}\u{1F5E3}\u261D\u270A-\u270D\u{1FAC0}-\u{1FAE8}]/u))return 'People';
+  if(has(/[\u{1F400}-\u{1F43F}\u{1F980}-\u{1F9A2}\u{1F577}\u{1F578}\u{1F54A}\u{1F9A3}-\u{1F9AF}\u{1FAB0}-\u{1FABF}]/u))return 'Animals';
+  if(has(/[\u{1F345}-\u{1F37F}\u{1F32D}-\u{1F32F}\u{1F950}-\u{1F96F}\u{1F9C0}-\u{1F9CB}\u{1FAD0}-\u{1FADF}\u2615]/u))return 'Food';
+  if(has(/[\u{1F3D4}-\u{1F3F0}\u{1F5FA}-\u{1F5FF}\u{1F680}-\u{1F6C5}\u{1F306}-\u{1F30B}\u26EA\u26F2\u26FA\u{1F3A0}-\u{1F3A2}]/u))return 'Places';
+  if(has(/[\u{1F300}-\u{1F344}\u{1F490}\u2600-\u2604\u2614\u2618\u2744\u26A1\u26C4\u26C5\u{1F33A}-\u{1F33F}\u{1F319}-\u{1F31F}]/u))return 'Nature';
+  if(has(/[\u2190-\u21FF\u2300-\u23FF\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\u2900-\u2BFF\u{1F500}-\u{1F53D}\u{1F7E0}-\u{1F7EB}\u{1F170}-\u{1F251}\u20E3\u{1F4A0}-\u{1F4AF}\u{1F493}-\u{1F49F}\u203C\u00A9\u00AE]/u))return 'Symbols';
+  return 'Objects';
+}
+function pictureCellHtml(v,btn){
+  const bi=window.FTT_BUILTIN_PICTURES,p=/^builtin:/.test(v)&&bi?bi.allBuiltIn().find(x=>x.key===v):null;
+  const face=p?`<img class="picture-img" src="${esc(p.src)}" alt="${esc(p.label)}" title="${esc(p.label)}">`:/^(data:|https?:)/.test(v)?`<img class="picture-img" src="${esc(v)}" alt="Picture">`:`<span class="picture-emoji">${esc(v)}</span>`;
+  return `<span class="picture-cell">${face}${btn}</span>`;
 }
 // After a block, a word that lost a picture gets another from its own suggestions, or none.
 function refillItemArt(item,hadCount){
@@ -523,12 +548,13 @@ async function setBlockedPictures(list){
   state.settings.blockedArt=list;
   await db.ref(blockedSettingsPath()).set(list.length?list:null);
 }
+function allCatalogItems(){return Object.keys(state.catalog||{}).flatMap(t=>Array.isArray(state.catalog[t])?state.catalog[t]:[]);}
 async function blockPicture(v){
   v=String(v||'').trim();if(!v||blockedArtList().includes(v))return;
   const had=new Map();
-  for(const i of (state.catalog.shorashim||[]))if(i&&Array.isArray(i.art))had.set(i,i.art.filter(x=>String(x).trim()).length);
+  for(const i of allCatalogItems())if(i&&Array.isArray(i.art))had.set(i,i.art.filter(x=>String(x).trim()).length);
   state.settings.blockedArt=[...blockedArtList(),v]; // from here every picture filter drops it
-  for(const i of (state.catalog.shorashim||[])){
+  for(const i of allCatalogItems()){
     if(!i)continue;
     const touched=[i.art,i.artPool,i.pendingArt].some(a=>Array.isArray(a)&&a.includes(v));
     if(touched)refillItemArt(i,had.get(i)||0);
@@ -546,9 +572,13 @@ async function unblockPicture(v){
 function renderPictureBlockPanel(){
   const box=$('teacherPictureBlockPanel');if(!box)return;
   const used=usedPictureList(),blocked=blockedArtList();
-  box.innerHTML=`<h3>🖼️ Pictures used for words</h3><p class="mini-note">Every picture used for any word, once each. <b>Block</b> removes it from every word and it is never used again, including new automatic pictures. Students' progress, points and recordings are not changed.</p>
-  <div id="pictureGrid" class="picture-grid">${used.map(v=>`<span class="picture-cell"><span class="picture-emoji">${esc(v)}</span><button type="button" class="danger small" data-block-art="${esc(v)}">Block</button></span>`).join('')||'<span class="mini-note">No pictures yet.</span>'}</div>
-  <h3>🚫 Blocked</h3><div id="blockedGrid" class="picture-grid">${blocked.map(v=>`<span class="picture-cell"><span class="picture-emoji">${esc(v)}</span><button type="button" class="ghost small" data-unblock-art="${esc(v)}">Unblock</button></span>`).join('')||'<span class="mini-note">Nothing blocked.</span>'}</div>`;
+  const groups=new Map(PICTURE_GROUPS.map(g=>[g,[]]));
+  for(const v of used)groups.get(pictureGroupOf(v)).push(v);
+  const blockBtn=v=>`<button type="button" class="danger picture-btn" data-block-art="${esc(v)}">Block</button>`;
+  const sections=PICTURE_GROUPS.filter(g=>groups.get(g).length).map(g=>`<h4 class="picture-group">${esc(g)} <span class="mini-note">(${groups.get(g).length})</span></h4><div class="picture-grid">${groups.get(g).map(v=>pictureCellHtml(v,blockBtn(v))).join('')}</div>`).join('');
+  box.innerHTML=`<h3>🖼️ Pictures used for words</h3><p id="pictureCount" class="picture-count">${used.length} picture${used.length===1?'':'s'}${blocked.length?` · ${blocked.length} blocked`:''}</p><p class="mini-note">Every picture a student can see on any word, once each, including suggested pictures. <b>Block</b> removes it from every word and it is never used again, including new automatic pictures. Students' progress, points and recordings are not changed.</p>
+  <div id="pictureGrid">${sections||'<span class="mini-note">No pictures yet.</span>'}</div>
+  <h3>🚫 Blocked <span class="mini-note">(${blocked.length})</span></h3><div id="blockedGrid" class="picture-grid">${blocked.map(v=>pictureCellHtml(v,`<button type="button" class="ghost picture-btn" data-unblock-art="${esc(v)}">Unblock</button>`)).join('')||'<span class="mini-note">Nothing blocked.</span>'}</div>`;
   box.querySelectorAll('[data-block-art]').forEach(b=>b.onclick=()=>blockPicture(b.dataset.blockArt));
   box.querySelectorAll('[data-unblock-art]').forEach(b=>b.onclick=()=>unblockPicture(b.dataset.unblockArt));
 }

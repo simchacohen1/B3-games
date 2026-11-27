@@ -21,5 +21,5 @@ test('the paid Regenerate Pictures button is gone (PR 745)',()=>{
  assert.ok(!js.includes('regeneratePictures'));
  assert.ok(!js.includes('data-a="regen"'));
  assert.ok(!js.includes('Regenerate Pictures'));
- assert.match(html,/teacher\.js\?v=20261126-chumash-2/);
+ assert.match(html,/teacher\.js\?v=20261127-block-all2/);
 });
