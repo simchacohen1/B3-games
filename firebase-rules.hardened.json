@@ -127,6 +127,9 @@
                   "leadTeacher": {
                     ".validate": "newData.isBoolean()"
                   },
+                  "shareMayBeLeftOn": {
+                    ".validate": "newData.isBoolean()"
+                  },
                   "permissionRevision": {
                     ".validate": "newData.isNumber()"
                   },
