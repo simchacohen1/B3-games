@@ -80,8 +80,8 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
   assert.deepEqual(results.teacher_wt.classes,['B3 WT']);
   assert.deepEqual(results.teacher_new.classes,['New Room']);
   assert.deepEqual(results.teacher_return.classes,['New Room']);
-  assert.deepEqual(results.principal.classes,['ET','New Room']);
-  assert.deepEqual(results.owner.classes,['ET','WT','New Room']);
+  assert.deepEqual(results.principal.classes,['B3 ET','New Room']);
+  assert.deepEqual(results.owner.classes,['B3 ET','B3 WT','New Room']);
   assert.deepEqual(results.owner.etStudentTools,results.teacher_et.etStudentTools,'owner and classroom teacher get the same ET student-tool controls');
   assert.deepEqual(results.teacher_signin.classes,['New Room']);
   assert.equal(results.teacher_signin.reads.filter(p=>p==='b3Games/admins/teacher_new').length,1,'Google popup and auth restoration share the in-flight admin check');
