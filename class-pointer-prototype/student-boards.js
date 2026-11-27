@@ -824,8 +824,36 @@
       getItems:()=>board.strokes.filter(item=>(item.by==='student'&&ownItem(item))||(!group&&item.by==='teacher')),
       setItems(list){syncBoardItems(board,'student',list,act,group?ownItem:null,!group)},
       // Hebrew word tiles can be picked up with any drawing tool.
-      grab:{hit:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.hit(p),down:p=>!!drawer?.tiles&&activity?.kind==='tiles'&&boardOpen()&&drawer.tiles.down(p),move:(p,f)=>drawer?.tiles?.move(p,f),up:p=>drawer?.tiles?.up(p),cancel:()=>drawer?.tiles?.cancel()},
+      // The teacher's sent word can be picked up with Select (and dragged) as well.
+      solid:true,
+      grab:{hit:p=>boardOpen()&&((!!drawer?.tiles&&activity?.kind==='tiles'&&drawer.tiles.hit(p))||wordHit(p)),
+        down:p=>{if(!boardOpen())return false;if(drawer?.tiles&&activity?.kind==='tiles'&&drawer.tiles.hit(p))return drawer.tiles.down(p);return wordDown(p)},
+        move:(p,f)=>{if(wordGrab)wordMove(p,f);else drawer?.tiles?.move(p,f)},up:p=>{if(wordGrab){if(p)wordMove(p,true);wordGrab=null}else drawer?.tiles?.up(p)},cancel:()=>{wordGrab=null;drawer?.tiles?.cancel()}},
       live(draft){if(!boardOpen())return;const op=pagedOp(board,{type:'board-draft',stroke:draft||null});applyTo(board,op,'student');B.sendTeacher(op);redraw()}};
+    // The word the teacher sent: where it is on the board, so a press on it can pick it up (Select tool only).
+    let wordGrab=null,wordAt=0;
+    function wordBox(){
+      const t=board.text,w=canvas.clientWidth,h=canvas.clientHeight;
+      if(activity?.kind!=='word'||!t||!t.value||!w||!h)return null;
+      const ctx=canvas.getContext('2d');let size=Math.max(10,h*t.size);
+      ctx.save();ctx.font='700 '+size+'px Arial, sans-serif';
+      while(size>12&&ctx.measureText(t.value).width>w*.90){size*=.9;ctx.font='700 '+size+'px Arial, sans-serif'}
+      const width=Math.min(w*.95,ctx.measureText(t.value).width);ctx.restore();
+      return{cx:t.x*w,cy:t.y*h,hw:width/2+8,hh:size*.6,w,h};
+    }
+    function wordHit(p){
+      if(window.FTTAnnotate?.state?.().tool!=='select')return false;
+      const b=wordBox();return !!b&&Math.abs(p.x*b.w-b.cx)<=b.hw&&Math.abs(p.y*b.h-b.cy)<=b.hh;
+    }
+    function wordDown(p){
+      if(!wordHit(p))return false;
+      wordGrab={dx:p.x-board.text.x,dy:p.y-board.text.y};return true;
+    }
+    function wordMove(p,final){
+      if(!wordGrab||!board.text)return;
+      if(!final&&Date.now()-wordAt<70)return;wordAt=Date.now();
+      act({type:'board-text',text:{...board.text,x:round(Math.min(1,Math.max(0,p.x-wordGrab.dx))),y:round(Math.min(1,Math.max(0,p.y-wordGrab.dy)))}});
+    }
     // The toolbar is there only while my whiteboard is open (or while I share my screen).
     function syncAnnotate(){
       const FA=window.FTTAnnotate;if(!FA)return;

@@ -13,7 +13,7 @@ test('Select: the drawing layer lets clicks through, and only a mark, a handle o
   assert.match(toolbar,/capture\.style\.pointerEvents=st\.tool==='select'\?'none':''/,'no pointer events on the layer while Select is chosen');
   assert.match(toolbar,/function markUnder\(e\)/);
   assert.match(toolbar,/document\.addEventListener\('pointerdown',e=>\{\s*if\(mode!=='open'\|\|st\.tool!=='select'/,'presses are looked at on the document');
-  assert.match(toolbar,/if\(!found\)\{if\(selected\)\{selected=null;sync\(\)\}return\}/,'a press on nothing goes to the page and lets go of the pick');
+  assert.match(toolbar,/if\(!found\)\{\s*if\(selected\)\{selected=null;sync\(\)\}[\s\S]*?return;\s*\}/,'a press on nothing goes to the page and lets go of the pick');
   assert.match(toolbar,/if\(root\.contains\(e\.target\)\)return;/,'the toolbar itself is never intercepted');
   assert.match(toolbar,/capture\.style\.pointerEvents='auto';\s*e\.stopImmediatePropagation\(\);\s*onCaptureDown\(e\);/,'a press on a mark is taken over');
   assert.match(toolbar,/document\.addEventListener\('dblclick'/,'double-clicking words to edit them still works');
