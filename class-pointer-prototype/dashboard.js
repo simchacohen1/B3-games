@@ -38,8 +38,9 @@
       try{
         const rows=access.role==='admin'?(await classes.once('value')).val()||{}:Object.fromEntries(await Promise.all((access.classIds||[]).filter(C.validId).map(async id=>[id,(await classes.child(id).once('value')).val()])));
         if(current!==generation)return;
+        const shown=window.B3ClassGate?.pickable?window.B3ClassGate.pickable(Object.keys(rows)):Object.keys(rows);
         for(const [id,row] of Object.entries(rows)){
-          if(!C.permitted(access,id,row))continue;
+          if(!C.permitted(access,id,row)||!shown.includes(id))continue;
           const name=String(row.name||id);
           const btn=document.createElement('button');
           btn.type='button';btn.className='class-launch-button';btn.setAttribute('data-class-id',id);

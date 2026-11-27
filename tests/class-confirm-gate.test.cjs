@@ -81,3 +81,11 @@ test('owner dropdowns inside tools are limited to B3 ET and B3 WT; admin pages a
   assert.match(src,/limitOwnerDropdowns/);
   assert.match(src,/admin\|owner-admin/);
 });
+test('Class Pointer and the quick-panel class lists use the owner filter',()=>{
+  const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+  assert.match(read('class-pointer-prototype/dashboard-session.js'),/B3ClassGate\?\.pickable/);
+  assert.match(read('class-pointer-prototype/dashboard.js'),/B3ClassGate\?\.pickable/);
+  assert.match(read('class-pointer-prototype/classroom.html'),/class-confirm-gate\.js/);
+  assert.match(read('teacher-global-controls.js'),/pickableClasses\(\)\.forEach/);
+  assert.match(read('class-confirm-gate.js'),/pointerClassChoice/);
+});
