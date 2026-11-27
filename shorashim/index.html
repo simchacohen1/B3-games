@@ -1170,7 +1170,7 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shorashim-skin.css?v=20261013-skin">
 <link rel="stylesheet" href="compact-67.css?v=20261014-67-1">
-<link rel="stylesheet" href="shorashim-hubs.css?v=20261127-simplify2">
+<link rel="stylesheet" href="shorashim-hubs.css?v=20261127-simplify3">
 <link rel="stylesheet" href="practice.css?v=20261127-mastery2">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gveret+Levin&display=swap">
 <style id="shorashim-perek-menu-styles">
@@ -1305,10 +1305,11 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
         <section id="learnScreen" class="screen">
           <div class="section-head">
             <button class="backBtn backStep ghost" data-back="auto-learn">← Back</button><button class="backBtn ghost">← Home</button>
-            <div>
+            <div id="learnListBar">
               <h2 id="learnHeading">Learn New Shorashim</h2>
+              <span id="learnListTag" class="hidden" aria-live="polite"></span>
+              <button type="button" id="changeLearningPerekBtn" class="ghost small hidden">Switch list ▾</button>
             </div>
-            <button type="button" id="changeLearningPerekBtn" class="ghost small hidden">🔀 Switch list</button>
             <div class="session-status" id="sessionStatus">Cards save as you go</div>
           </div>
 
@@ -1672,13 +1673,14 @@ body.shorashim-review-active .review-nav{flex:0 0 auto!important;margin-top:14px
   <script src="../firebase-config.js?v=20261029-staging-config"></script>
   <script src="booklet-3rd-grade.js?v=20261019-import-1"></script>
   <script src="chumash-vocab.js?v=20261126-chumash-1"></script>
+  <script src="chumash-emoji.js?v=20261127-emoji1"></script>
   <script src="units.js?v=20261108-units-2"></script>
   <script src="review-cycle-core.js?v=20261127-cycles2"></script>
   <script src="builtin-pictures.js?v=20261127-builtin1"></script>
   <script src="mastery-core.js?v=20261127-mastery1"></script>
-  <script src="app.js?v=20261127-builtin1-simplify2"></script>
+  <script src="app.js?v=20261127-builtin1-simplify3"></script>
   <script src="practice-activities.js?v=20261127-mastery2"></script>
-  <script src="review-categories.js?v=20261127-cycles2"></script>
+  <script src="review-categories.js?v=20261127-cycles2-emoji1"></script>
   <script src="review-cycles.js?v=20261127-cycles3"></script>
   <script src="review-points.js?v=20261127-points1"></script>
   <script src="../student-class.js?v=20261007-shared-account-v2"></script>

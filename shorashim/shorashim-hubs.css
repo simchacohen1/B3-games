@@ -121,3 +121,20 @@ body.shorashim-review-active #reviewScreen.active{display:block}
 body.shorashim-review-active .review-more-ways{display:none}
 @media(max-width:900px){#reviewScreen.active{display:block}.review-more-ways .rmw-group{flex-direction:row;flex-wrap:wrap}}
 #changeLearningPerekBtn{white-space:nowrap;font-weight:800;border:2px solid #d9def5}
+
+/* Study Path: the status tag ("Choose • Learn" / "Learned • Edit") sits under the word, not on top of it.
+   The list name is now shown big at the top of the page, so the small list badge is not repeated on every row. */
+html body #learnWorkspace .word-row{padding:8px 12px 10px!important}
+html body #learnWorkspace .word-row .meta{display:flex!important;flex-direction:column;align-items:center;gap:5px}
+html body #learnWorkspace .word-row .meta .perek-badge{display:none}
+html body #learnWorkspace .word-row .meta>span:last-child,
+html body #learnWorkspace .word-row.current .meta>span:last-child,
+html body #learnWorkspace .word-row.active .meta>span:last-child,
+html body #learnWorkspace .word-row.learned .meta>span:last-child{display:inline-block!important;position:static!important;white-space:nowrap}
+html body #learnWorkspace .word-row:not(.learned):not(.active):not(.current) .meta>span:last-child{background:#2f6fdd;color:#fff;border-radius:7px;padding:2px 7px;font-size:10px;font-weight:900;letter-spacing:.06em}
+
+/* Current list: big colored tag + obvious Switch list button next to it */
+#learnListBar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+#learnListTag{display:inline-flex;align-items:center;gap:10px;padding:8px 18px;border-radius:999px;background:linear-gradient(180deg,#5b8cff,#3b63d6);color:#fff;font-weight:900;font-size:clamp(1rem,1.6vw,1.35rem);box-shadow:0 3px 0 #2a47a3;white-space:nowrap}
+#learnListTag .lt-count{background:#ffffff33;border-radius:999px;padding:2px 10px;font-size:.85em}
+html body #learnScreen #changeLearningPerekBtn{background:#ffd34d!important;color:#5a3a00!important;border:3px solid #e0a800!important;border-radius:14px!important;padding:9px 16px!important;font-size:16px!important;font-weight:900;box-shadow:0 3px 0 #c58f00}
