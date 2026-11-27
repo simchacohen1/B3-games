@@ -112,6 +112,8 @@ export async function configureBrowser(page:Page,errors:string[],failed:string[]
       }
     }
     if(['fonts.googleapis.com','fonts.gstatic.com'].includes(url.hostname))return route.fulfill({status:204,body:''});
+    // Nigri pages ping the sync service's /health on load to wake it; answer locally so CI never calls the real service.
+    if(url.hostname==='nigrisync.onrender.com'&&url.pathname==='/health')return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"ok":true}'});
     if(url.protocol==='http:'&&['127.0.0.1','localhost'].includes(url.hostname))return route.continue();
     failed.push('Unexpected external request: '+url.origin+url.pathname);return route.abort();
   });
