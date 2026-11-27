@@ -76,8 +76,8 @@ test('Teacher Center waits for authorization, scopes synthetic identities, and m
    const median=rows=>rows.map(x=>x.elapsedMs).sort((a,b)=>a-b)[Math.floor(rows.length/2)];
    results.teacher_signin={measuredMs:median(currentRuns),classes:currentRuns[0].classes,appVisible:currentRuns[0].appVisible,signInVisible:currentRuns[0].signInVisible,reads:currentRuns[0].reads,baselineMs:median(baseRuns),baselineReads:baseRuns[0].reads};
   }
-  assert.deepEqual(results.teacher_et.classes,['ET']);
-  assert.deepEqual(results.teacher_wt.classes,['WT']);
+  assert.deepEqual(results.teacher_et.classes,['B3 ET']);
+  assert.deepEqual(results.teacher_wt.classes,['B3 WT']);
   assert.deepEqual(results.teacher_new.classes,['New Room']);
   assert.deepEqual(results.teacher_return.classes,['New Room']);
   assert.deepEqual(results.principal.classes,['ET','New Room']);
